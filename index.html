@@ -6311,7 +6311,10 @@
             }
 
             const bubbleKeys = [
-                'bg_color', 'bg_opacity', 'bg_image', 'text_color', 'border_color', 'border_width', 'border_opacity', 'shadow_color', 'shadow_opacity', 'shadow_x', 'shadow_y', 'shadow_blur', 'tail_color', 'hide_triangle', 'radius'
+                'bg_color', 'bg_opacity', 'text_color', 'border_color', 'border_width', 'border_opacity', 
+                'shadow_color', 'shadow_opacity', 'shadow_x', 'shadow_y', 'shadow_blur', 
+                'tail_color', 'hide_triangle', 'radius', 'offset_x', 'offset_y', '3d_effect',
+                'tail_image', 'tail_width', 'tail_height', 'tail_x', 'tail_y', 'tail_rot'
             ];
             const cornerKeys = ['img', 'op', 'x', 'y', 'w', 'h'];
             const sides = ['sent', 'recv'];
@@ -6319,35 +6322,43 @@
 
             const presetData = {};
 
-            const extractData = (source, isGlobal) => {
+            const buildPreset = (friend) => {
                 sides.forEach(side => {
                     bubbleKeys.forEach(k => {
                         const fullKey = `bubble_${side}_${k}`;
-                        presetData[fullKey] = isGlobal ? localStorage.getItem(fullKey) : source[fullKey];
+                        const value = getBubbleSetting(fullKey, friend);
+                        if (value !== null && value !== undefined) {
+                            presetData[fullKey] = value;
+                        }
                     });
                     corners.forEach(corner => {
                         cornerKeys.forEach(k => {
-                            const fullKey = `${side}_${corner}_${k}`;
-                            presetData[fullKey] = isGlobal ? localStorage.getItem(fullKey) : source[fullKey];
+                            const fullKey = `bubble_${side}_${corner}_${k}`;
+                            const value = getBubbleSetting(fullKey, friend);
+                            if (value !== null && value !== undefined) {
+                                presetData[fullKey] = value;
+                            }
                         });
                     });
                 });
+                
+                // Also save page-level settings
+                const pageBg = getBubbleSetting('bubble_page_bg_image', friend);
+                if (pageBg) presetData['bubble_page_bg_image'] = pageBg;
+                const pageOpacity = getBubbleSetting('bubble_page_bg_opacity', friend);
+                if (pageOpacity) presetData['bubble_page_bg_opacity'] = pageOpacity;
+
+                localStorage.setItem(`bubble_preset_${name}`, JSON.stringify(presetData));
+                showToast('气泡预设保存成功');
+                closeBubblePresetModal();
             };
 
             if (currentBubbleThemeFriendId) {
                 dbGet('friends', currentBubbleThemeFriendId, friend => {
-                    if (friend) {
-                        extractData(friend, false);
-                        localStorage.setItem(`bubble_preset_${name}`, JSON.stringify(presetData));
-                        showToast('气泡预设保存成功');
-                        closeBubblePresetModal();
-                    }
+                    buildPreset(friend || null);
                 });
             } else {
-                extractData(localStorage, true);
-                localStorage.setItem(`bubble_preset_${name}`, JSON.stringify(presetData));
-                showToast('气泡预设保存成功');
-                closeBubblePresetModal();
+                buildPreset(null);
             }
         }
 
