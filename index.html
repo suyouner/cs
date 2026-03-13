@@ -7022,8 +7022,7 @@
                 showToast('请先配置API');
                 return;
             }
-
-            showToast('开始生成朋友圈，请稍候...');
+            closeRoleMomentsModal()
             btn.disabled = true;
             btn.textContent = '生成中...';
 
@@ -7031,7 +7030,7 @@
                 if (friend) {
                     try {
                         await generateMomentForCharacter(friend, config);
-                        showToast(`已成功为 ${friend.name} 生成朋友圈`);
+                        showToast(`${friend.name}发了一条朋友圈。`);
                         if (document.getElementById('wechat-discover-page').classList.contains('active')) {
                             renderDiscoverFeed();
                         }
