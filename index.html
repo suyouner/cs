@@ -11284,6 +11284,9 @@
         function applyChatTheme(friend) {
             const getSetting = (key, defaultVal) => {
                 if (friend && friend[key] !== undefined && friend[key] !== null) return friend[key];
+                // Read from the in-memory cache which is populated from IndexedDB
+                if (themeSettings[key] !== undefined && themeSettings[key] !== null) return themeSettings[key];
+                // Fallback to localStorage for older data before migration
                 const globalVal = localStorage.getItem(key);
                 if (globalVal !== null) return globalVal;
                 return defaultVal;
@@ -11301,11 +11304,14 @@
             // Wallpaper
             const wallpaper = getSetting('chat_wallpaper', null);
             if (wallpaper) {
-                chatContainer.style.backgroundImage = `url(${wallpaper})`;
-                chatContainer.style.backgroundSize = 'cover';
-                chatContainer.style.backgroundPosition = 'center';
+                chatPage.style.backgroundImage = `url(${wallpaper})`;
+                chatPage.style.backgroundSize = 'cover';
+                chatPage.style.backgroundPosition = 'center';
+                chatContainer.style.backgroundColor = 'transparent'; // Make message area transparent
             } else {
-                chatContainer.style.backgroundImage = 'none';
+                chatPage.style.backgroundImage = 'none';
+                chatPage.style.backgroundColor = '#ededed';
+                chatContainer.style.backgroundColor = ''; // Revert to stylesheet default
             }
 
             // Header BG
