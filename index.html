@@ -5345,8 +5345,65 @@
 
         // --- IndexedDB Helpers ---
         let db;
+        let themeSettings = {}; // In-memory cache for theme settings
+
+        function dbSaveSetting(key, value) {
+            return new Promise((resolve, reject) => {
+                if (!db) return reject('DB not initialized');
+                const transaction = db.transaction(['theme_settings'], 'readwrite');
+                const store = transaction.objectStore('theme_settings');
+                const request = store.put({ id: key, value: value });
+                request.onsuccess = () => {
+                    themeSettings[key] = value; // Update cache
+                    resolve();
+                };
+                request.onerror = (e) => {
+                    console.error(`Error saving setting ${key}:`, e.target.error);
+                    if (e.target.error.name === 'QuotaExceededError') {
+                        showToast('存储空间已满，请清理其他主题图片');
+                    }
+                    reject(e.target.error);
+                };
+            });
+        }
+
+        function dbDeleteSetting(key) {
+            return new Promise((resolve, reject) => {
+                if (!db) return resolve();
+                const transaction = db.transaction(['theme_settings'], 'readwrite');
+                const store = transaction.objectStore('theme_settings');
+                const request = store.delete(key);
+                request.onsuccess = () => {
+                    delete themeSettings[key];
+                    resolve();
+                };
+                request.onerror = (e) => reject(e.target.error);
+            });
+        }
+
+        function dbLoadAllSettings(callback) {
+            if (!db || !db.objectStoreNames.contains('theme_settings')) {
+                if (callback) callback();
+                return;
+            }
+            const transaction = db.transaction(['theme_settings'], 'readonly');
+            const store = transaction.objectStore('theme_settings');
+            const request = store.getAll();
+            request.onsuccess = () => {
+                themeSettings = {};
+                request.result.forEach(item => {
+                    themeSettings[item.id] = item.value;
+                });
+                if (callback) callback();
+            };
+            request.onerror = (e) => {
+                console.error(`Error loading all settings:`, e.target.error);
+                if (callback) callback(); // Proceed even if loading fails
+            };
+        }
+
         function initDB(callback) {
-            const request = indexedDB.open('UserData', 11); // Version 11
+            const request = indexedDB.open('UserData', 12); // Version 12
 
             request.onerror = (event) => {
                 console.error("Database error: ", event.target.error);
@@ -5381,7 +5438,6 @@
                 }
                 if (!db.objectStoreNames.contains('regex_rules')) {
                     const regexStore = db.createObjectStore('regex_rules', { keyPath: 'id' });
-                    // No specific index needed yet, we'll fetch all and filter in memory or by index if needed later
                 }
                 if (!db.objectStoreNames.contains('global_playlist')) {
                     db.createObjectStore('global_playlist', { keyPath: 'id' });
@@ -5390,12 +5446,18 @@
                     const notifStore = db.createObjectStore('discover_notifications', { keyPath: 'id' });
                     notifStore.createIndex('toId', 'toId', { unique: false });
                 }
+                if (!db.objectStoreNames.contains('theme_settings')) {
+                    db.createObjectStore('theme_settings', { keyPath: 'id' });
+                }
             };
 
             request.onsuccess = (event) => {
                 db = event.target.result;
                 console.log("Database opened successfully.");
-                if (callback) callback();
+                // Load all theme settings into memory after DB is ready
+                dbLoadAllSettings(() => {
+                    if (callback) callback();
+                });
             };
         }
 
@@ -5614,7 +5676,7 @@
                 dbGet('friends', currentChatThemeFriendId, friend => {
                     const merged = {};
                     keys.forEach(k => {
-                        const globalVal = localStorage.getItem(k);
+                        const globalVal = themeSettings[k] !== undefined ? themeSettings[k] : localStorage.getItem(k);
                         merged[k] = (friend && friend[k] !== undefined && friend[k] !== null) ? friend[k] : globalVal;
                     });
                     merged.avatarSrc = friend ? friend.avatar : null;
@@ -5622,7 +5684,7 @@
                 });
             } else {
                 const globalSettings = {};
-                keys.forEach(k => globalSettings[k] = localStorage.getItem(k));
+                keys.forEach(k => globalSettings[k] = themeSettings[k] !== undefined ? themeSettings[k] : localStorage.getItem(k));
                 globalSettings.avatarSrc = null;
                 applyPreview(globalSettings);
             }
@@ -5654,7 +5716,8 @@
                     }
                 });
             } else {
-                localStorage.setItem(type, value);
+                dbSaveSetting(type, value);
+                localStorage.removeItem(type);
             }
         }
 
@@ -5727,9 +5790,11 @@
                     }
                 });
             } else {
-                localStorage.setItem(type, compressedSrc);
-                updateChatThemePreview();
-                showToast('已保存全局设置');
+                dbSaveSetting(type, compressedSrc).then(() => {
+                    localStorage.removeItem(type);
+                    updateChatThemePreview();
+                    showToast('已保存全局设置');
+                });
             }
         });
         const triggerChatThemeUpload = (type) => uploaderForChatTheme(type);
