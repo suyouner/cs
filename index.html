@@ -6548,48 +6548,36 @@
                 return;
             }
 
-            const chatThemeKeys = [
-                'chat_wallpaper', 'chat_header_bg', 'chat_input_bg',
-                'chat_back_icon', 'chat_options_icon', 'chat_voice_icon',
-                'chat_emoji_icon', 'chat_plus_icon', 'chat_send_icon',
-                'chat_avatar_size', 'chat_avatar_radius'
-            ];
-
             const presetData = {};
 
-            const buildPreset = (friend) => {
-                chatThemeKeys.forEach(key => {
-                    let value = null;
-                    if (friend && friend[key] !== undefined && friend[key] !== null) {
-                        value = friend[key];
-                    } else {
-                        // Fallback to global settings from cache or localStorage
-                        const globalVal = themeSettings[key] !== undefined ? themeSettings[key] : localStorage.getItem(key);
-                        if (globalVal !== null && globalVal !== undefined) {
-                            value = globalVal;
-                        }
-                    }
-                    
-                    if (value !== null && value !== undefined) {
-                        presetData[key] = value;
-                    }
-                });
-
-                localStorage.setItem(`chat_theme_preset_${name}`, JSON.stringify(presetData));
-                showToast('聊天界面预设保存成功');
-                closeChatThemePresetModal();
+            const getUrlFromStyle = (style) => {
+                if (style && style !== 'none' && style.includes('url(')) {
+                    const match = style.match(/url\("?([^"]+)"?\)/);
+                    return match ? match[1] : null;
+                }
+                return null;
             };
 
-            if (currentChatThemeFriendId) {
-                dbGet('friends', currentChatThemeFriendId, friend => {
-                    buildPreset(friend || null);
-                });
-            } else {
-                buildPreset(null); // For global settings
-            }
+            presetData.chat_wallpaper = getUrlFromStyle(document.getElementById('chat-wallpaper-preview').style.backgroundImage);
+            presetData.chat_header_bg = getUrlFromStyle(document.getElementById('chat-header-bg-preview').style.backgroundImage);
+            presetData.chat_input_bg = getUrlFromStyle(document.getElementById('chat-input-bg-preview').style.backgroundImage);
+
+            const icons = ['back', 'options', 'voice', 'emoji', 'plus', 'send'];
+            icons.forEach(icon => {
+                const key = `chat_${icon}_icon`;
+                const box = document.getElementById(`chat-${icon}-icon-preview`);
+                presetData[key] = getUrlFromStyle(box.style.backgroundImage);
+            });
+
+            presetData.chat_avatar_size = document.getElementById('chat-avatar-size-slider').value;
+            presetData.chat_avatar_radius = document.getElementById('chat-avatar-radius-slider').value;
+
+            localStorage.setItem(`chat_theme_preset_${name}`, JSON.stringify(presetData));
+            showToast('聊天界面预设保存成功');
+            closeChatThemePresetModal();
         }
 
-        function loadChatThemePreset() {
+        async function loadChatThemePreset() {
             const checked = document.querySelectorAll('#chat-theme-preset-list input[type="checkbox"]:checked');
             if (checked.length !== 1) {
                 showToast('请选择一个预设进行加载');
@@ -6601,20 +6589,12 @@
             if (!dataStr) return;
             const presetData = JSON.parse(dataStr);
 
-            const applyPreset = (target, isGlobal) => {
-                for (const key in presetData) {
-                    if (isGlobal) {
-                        localStorage.setItem(key, presetData[key]);
-                    } else {
-                        target[key] = presetData[key];
-                    }
-                }
-            };
-
             if (currentChatThemeFriendId) {
                 dbGet('friends', currentChatThemeFriendId, friend => {
                     if (friend) {
-                        applyPreset(friend, false);
+                        for (const key in presetData) {
+                            friend[key] = presetData[key];
+                        }
                         dbUpdate('friends', friend, () => {
                             updateChatThemePreview();
                             showToast(`已为当前角色加载预设：${name}`);
@@ -6623,7 +6603,14 @@
                     }
                 });
             } else {
-                applyPreset(localStorage, true);
+                // For global settings, update IndexedDB and cache
+                const promises = [];
+                for (const key in presetData) {
+                    // Ensure null values are handled correctly to reset properties
+                    promises.push(dbSaveSetting(key, presetData[key]));
+                }
+                await Promise.all(promises);
+                
                 updateChatThemePreview();
                 showToast(`已加载全局预设：${name}`);
                 closeChatThemePresetModal();
