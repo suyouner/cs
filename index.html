@@ -6907,7 +6907,7 @@
                 }
             });
             
-            const coverUrl = localStorage.getItem('discover_cover');
+            const coverUrl = themeSettings['discover_cover'] || localStorage.getItem('discover_cover');
             if (coverUrl) {
                 document.getElementById('discover-cover-container').style.backgroundImage = `url(${coverUrl})`;
             }
@@ -7196,13 +7196,15 @@
 
         function handleDiscoverCoverUpload(input) {
             if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const imageUrl = e.target.result;
-                    document.getElementById('discover-cover-container').style.backgroundImage = `url(${imageUrl})`;
-                    localStorage.setItem('discover_cover', imageUrl);
-                }
-                reader.readAsDataURL(input.files[0]);
+                compressImage(input.files[0], 0.8, (compressedSrc) => {
+                    document.getElementById('discover-cover-container').style.backgroundImage = `url(${compressedSrc})`;
+                    dbSaveSetting('discover_cover', compressedSrc).then(() => {
+                        localStorage.removeItem('discover_cover'); // Clean up old storage
+                        showToast('封面已更新');
+                    }).catch(err => {
+                        showToast('封面保存失败，存储空间可能已满');
+                    });
+                });
             }
         }
 
