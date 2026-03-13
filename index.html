@@ -5658,45 +5658,141 @@
             }
         }
 
-        let currentChatThemeUploadType = null;
-        function triggerChatThemeUpload(type) {
-            currentChatThemeUploadType = type;
-            let input = document.getElementById('chat-theme-file-input');
-            if (!input) {
-                input = document.createElement('input');
+        // --- Unified Image Uploader ---
+        window.isUploading = false;
+
+        function createImageUploader(callback, options = {}) {
+            const { quality = 0.7, maxSizeMB = 10 } = options;
+
+            return function(...args) {
+                if (window.isUploading) {
+                    showToast('请等待当前上传完成');
+                    return;
+                }
+                
+                const input = document.createElement('input');
                 input.type = 'file';
-                input.id = 'chat-theme-file-input';
                 input.accept = 'image/*';
                 input.style.display = 'none';
-                input.onchange = (e) => handleChatThemeUpload(e.target);
+                
+                input.onchange = function(e) {
+                    window.isUploading = true;
+                    const file = e.target.files[0];
+                    
+                    // Cleanup function
+                    const cleanup = () => {
+                        window.isUploading = false;
+                        if (input.parentNode) {
+                            document.body.removeChild(input);
+                        }
+                    };
+
+                    if (!file) {
+                        cleanup();
+                        return;
+                    }
+                    
+                    if (!file.type.startsWith('image/')) {
+                        showToast('请选择图片文件');
+                        cleanup();
+                        return;
+                    }
+                    
+                    if (file.size > maxSizeMB * 1024 * 1024) {
+                        showToast(`图片不能超过${maxSizeMB}MB`);
+                        cleanup();
+                        return;
+                    }
+                    
+                    compressImage(file, quality, (compressedSrc) => {
+                        callback(compressedSrc, ...args);
+                        cleanup();
+                    });
+                };
+                
                 document.body.appendChild(input);
-            }
-            input.click();
+                input.click();
+            };
         }
 
-        function handleChatThemeUpload(input) {
-            if (input.files && input.files[0]) {
-                const file = input.files[0];
-                compressImage(file, 0.7, (compressedSrc) => {
-                    if (currentChatThemeFriendId) {
-                        dbGet('friends', currentChatThemeFriendId, friend => {
-                            if (friend) {
-                                friend[currentChatThemeUploadType] = compressedSrc;
-                                dbUpdate('friends', friend, () => {
-                                    updateChatThemePreview();
-                                    showToast('已保存专属设置');
-                                });
-                            }
+        const uploaderForChatTheme = createImageUploader((compressedSrc, type) => {
+            if (currentChatThemeFriendId) {
+                dbGet('friends', currentChatThemeFriendId, friend => {
+                    if (friend) {
+                        friend[type] = compressedSrc;
+                        dbUpdate('friends', friend, () => {
+                            updateChatThemePreview();
+                            showToast('已保存专属设置');
                         });
-                    } else {
-                        localStorage.setItem(currentChatThemeUploadType, compressedSrc);
-                        updateChatThemePreview();
-                        showToast('已保存全局设置');
                     }
                 });
+            } else {
+                localStorage.setItem(type, compressedSrc);
+                updateChatThemePreview();
+                showToast('已保存全局设置');
             }
-            input.value = '';
+        });
+        const triggerChatThemeUpload = (type) => uploaderForChatTheme(type);
+
+        const uploaderForDesktopTheme = createImageUploader((compressedSrc, type) => {
+            localStorage.setItem(type, compressedSrc);
+            applyDesktopTheme();
+            showToast('已保存设置');
+        });
+        const triggerDesktopThemeUpload = (type) => uploaderForDesktopTheme(type);
+
+        const uploaderForBubbleTheme = createImageUploader((compressedSrc, type) => {
+            if (type === 'corner_img') {
+                updateBubbleCorner('img', compressedSrc);
+            } else if (type === 'bg_image') {
+                updateBubbleThemeValue('bg_image', compressedSrc);
+            } else if (type === 'page_bg_image') {
+                updateBubbleThemeValue('page_bg_image', compressedSrc);
+            } else if (type === 'tail_image') {
+                updateBubbleThemeValue('tail_image', compressedSrc);
+            }
+        });
+        const triggerBubbleUpload = (type) => uploaderForBubbleTheme(type);
+
+        const uploaderForMainPage = createImageUploader((compressedSrc, displayId) => {
+            document.getElementById(displayId).src = compressedSrc;
+            const slot = document.getElementById(displayId).parentElement;
+            if (slot) slot.classList.add('has-image');
+
+            dbGet('user_profile', 'main_user', profile => {
+                const updatedProfile = profile || { id: 'main_user' };
+                if (displayId === 'avatar-display') {
+                    updatedProfile.avatar = compressedSrc;
+                    const mePageAvatar = document.getElementById('me-page-avatar');
+                    if (mePageAvatar) {
+                        mePageAvatar.src = compressedSrc;
+                        document.getElementById('me-avatar-container').classList.add('has-image');
+                    }
+                } else {
+                    const propName = displayId.replace('-', '_');
+                    updatedProfile[propName] = compressedSrc;
+                }
+                dbUpdate('user_profile', updatedProfile);
+            });
+        });
+        function triggerMainPageUpload(displayId) {
+             uploaderForMainPage(displayId);
         }
+
+        const uploaderForWallpaper = createImageUploader((compressedSrc) => {
+            document.getElementById('main-page').style.backgroundImage = `url(${compressedSrc})`;
+            document.getElementById('wallpaper-preview').style.backgroundImage = `url(${compressedSrc})`;
+            localStorage.setItem('wallpaper', compressedSrc);
+        });
+        const triggerWallpaperUpload = () => uploaderForWallpaper();
+
+        const uploaderForIndividualIcon = createImageUploader((compressedSrc, id) => {
+            const targetIcons = document.querySelectorAll(`.app-item[data-app-id='${id}'] .app-icon img`);
+            targetIcons.forEach(icon => icon.src = compressedSrc);
+            localStorage.setItem(id, compressedSrc);
+            generateIconPreviews(); // Refresh previews
+        });
+        const triggerIndividualUpload = (id) => uploaderForIndividualIcon(id);
 
         function resetChatTheme(type) {
             if (currentChatThemeFriendId) {
@@ -6275,39 +6371,7 @@
             input.value = ''; // Reset input
         }
 
-        let currentBubbleUploadType = null;
-        function triggerBubbleUpload(type) {
-            currentBubbleUploadType = type;
-            let input = document.getElementById('bubble-theme-file-input');
-            if (!input) {
-                input = document.createElement('input');
-                input.type = 'file';
-                input.id = 'bubble-theme-file-input';
-                input.accept = 'image/*';
-                input.style.display = 'none';
-                input.onchange = (e) => handleBubbleThemeUpload(e.target);
-                document.body.appendChild(input);
-            }
-            input.click();
-        }
-
-        function handleBubbleThemeUpload(input) {
-            if (input.files && input.files[0]) {
-                const file = input.files[0];
-                compressImage(file, 0.7, (compressedSrc) => {
-                    if (currentBubbleUploadType === 'corner_img') {
-                        updateBubbleCorner('img', compressedSrc);
-                    } else if (currentBubbleUploadType === 'bg_image') {
-                        updateBubbleThemeValue('bg_image', compressedSrc);
-                    } else if (currentBubbleUploadType === 'page_bg_image') {
-                        updateBubbleThemeValue('page_bg_image', compressedSrc);
-                    } else if (currentBubbleUploadType === 'tail_image') {
-                        updateBubbleThemeValue('tail_image', compressedSrc);
-                    }
-                });
-            }
-            input.value = '';
-        }
+        // Old bubble upload functions removed.
 
         function resetBubbleTheme() {
             tempBubbleSettings = {};
@@ -7840,59 +7904,7 @@
             });
         }
 
-        function handleFileUpload(event, type, id) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const imageUrl = e.target.result;
-                if (type === 'wallpaper') {
-                    document.getElementById('main-page').style.backgroundImage = `url(${imageUrl})`;
-                    document.getElementById('wallpaper-preview').style.backgroundImage = `url(${imageUrl})`;
-                    localStorage.setItem('wallpaper', imageUrl);
-                } else if (type === 'chat-wallpaper') {
-                    if (currentChatThemeFriendId) {
-                        dbGet('friends', currentChatThemeFriendId, friend => {
-                            if (friend) {
-                                friend.chatWallpaper = imageUrl;
-                                dbUpdate('friends', friend, () => {
-                                    updateChatThemePreview();
-                                    showToast('已保存该角色的专属背景');
-                                });
-                            }
-                        });
-                    } else {
-                        localStorage.setItem('chat_wallpaper', imageUrl);
-                        updateChatThemePreview();
-                        showToast('已保存全局聊天背景');
-                    }
-                } else if (type === 'app-icon' || type === 'dock-icon') {
-                    const targetIcons = document.querySelectorAll(`.app-item[data-app-id='${id}'] .app-icon img`);
-                    targetIcons.forEach(icon => icon.src = imageUrl);
-                    localStorage.setItem(id, imageUrl);
-                    generateIconPreviews(); // Refresh previews
-                }
-            }
-            reader.readAsDataURL(file);
-        }
-        
-        function triggerUpload(inputId) {
-            let input = document.getElementById(inputId);
-            if (!input) {
-                input = document.createElement('input');
-                input.type = 'file';
-                input.id = inputId;
-                input.accept = 'image/*';
-                input.style.display = 'none';
-                if (inputId === 'wallpaper-upload') {
-                    input.onchange = (event) => handleFileUpload(event, 'wallpaper');
-                } else if (inputId === 'chat-wallpaper-upload') {
-                    input.onchange = (event) => handleFileUpload(event, 'chat-wallpaper');
-                }
-                document.body.appendChild(input);
-            }
-            input.click();
-        }
+        // Old handleFileUpload and triggerUpload removed.
 
         function generateIconPreviews() {
             const appGrid = document.getElementById('app-icon-preview');
@@ -7903,30 +7915,17 @@
             document.querySelectorAll('#main-page .apps-area .app-item').forEach(item => {
                 const clone = item.cloneNode(true);
                 const id = item.dataset.appId;
-                clone.onclick = () => triggerIndividualUpload(id, 'app-icon');
+                clone.onclick = () => triggerIndividualUpload(id);
                 appGrid.appendChild(clone);
             });
             document.querySelectorAll('#main-page .dock-bar .app-item').forEach(item => {
                 const clone = item.cloneNode(true);
                 const id = item.dataset.appId;
-                clone.onclick = () => triggerIndividualUpload(id, 'dock-icon');
+                clone.onclick = () => triggerIndividualUpload(id);
                 dockGrid.appendChild(clone);
             });
         }
-
-        function triggerIndividualUpload(id, type) {
-            let input = document.getElementById(`upload-${id}`);
-            if (!input) {
-                input = document.createElement('input');
-                input.type = 'file';
-                input.id = `upload-${id}`;
-                input.accept = 'image/*';
-                input.style.display = 'none';
-                input.onchange = (event) => handleFileUpload(event, type, id);
-                document.body.appendChild(input);
-            }
-            input.click();
-        }
+        // Old triggerIndividualUpload removed.
 
         function toggleStatusBar(isVisible) {
             localStorage.setItem('show_status_bar', isVisible);
@@ -7987,33 +7986,7 @@
             }
         }
 
-        let currentDesktopThemeUploadType = null;
-        function triggerDesktopThemeUpload(type) {
-            currentDesktopThemeUploadType = type;
-            let input = document.getElementById('desktop-theme-file-input');
-            if (!input) {
-                input = document.createElement('input');
-                input.type = 'file';
-                input.id = 'desktop-theme-file-input';
-                input.accept = 'image/*';
-                input.style.display = 'none';
-                input.onchange = (e) => handleDesktopThemeUpload(e.target);
-                document.body.appendChild(input);
-            }
-            input.click();
-        }
-
-        function handleDesktopThemeUpload(input) {
-            if (input.files && input.files[0]) {
-                const file = input.files[0];
-                compressImage(file, 0.7, (compressedSrc) => {
-                    localStorage.setItem(currentDesktopThemeUploadType, compressedSrc);
-                    applyDesktopTheme();
-                    showToast('已保存设置');
-                });
-            }
-            input.value = '';
-        }
+        // Old desktop theme upload functions removed.
 
         function resetDesktopTheme(type) {
             localStorage.removeItem(type);
@@ -8170,51 +8143,7 @@
             if (discoverTime) discoverTime.textContent = timeStr;
         }
         
-        function previewImage(input, displayId) {
-            if (input.files && input.files[0]) {
-                const file = input.files[0];
-                if (displayId === 'img1-display' || displayId === 'img2-display' || displayId === 'img3-display') {
-                    compressImage(file, 0.7, (compressedSrc) => {
-                        document.getElementById(displayId).src = compressedSrc;
-                        document.getElementById(displayId).parentElement.classList.add('has-image');
-                        dbGet('user_profile', 'main_user', profile => {
-                            const updatedProfile = profile || { id: 'main_user' };
-                            const propName = displayId.replace('-', '_');
-                            updatedProfile[propName] = compressedSrc;
-                            dbUpdate('user_profile', updatedProfile);
-                        });
-                    });
-                    return;
-                }
-
-                if (displayId === 'avatar-display') {
-                    compressImage(file, 0.7, (compressedSrc) => {
-                        document.getElementById(displayId).src = compressedSrc;
-                        document.getElementById(displayId).parentElement.classList.add('has-image');
-                        dbGet('user_profile', 'main_user', profile => {
-                            const updatedProfile = profile || { id: 'main_user' };
-                            updatedProfile.avatar = compressedSrc;
-                            dbUpdate('user_profile', updatedProfile);
-                            
-                            // Sync to Me Page
-                            const mePageAvatar = document.getElementById('me-page-avatar');
-                            if (mePageAvatar) {
-                                mePageAvatar.src = compressedSrc;
-                                document.getElementById('me-avatar-container').classList.add('has-image');
-                            }
-                        });
-                    });
-                    return;
-                }
-
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const imageUrl = e.target.result;
-                    document.getElementById(displayId).src = imageUrl;
-                }
-                reader.readAsDataURL(file);
-            }
-        }
+        // Old previewImage function removed.
 
         document.querySelectorAll('[contenteditable]').forEach(el => {
             const id = el.className || el.id;
@@ -10992,6 +10921,18 @@
         }
 
         function compressImage(file, quality = 0.7, callback) {
+            // For GIFs, we can't really compress them via canvas, so just return the original
+            if (file.type === 'image/gif') {
+                const reader = new FileReader();
+                reader.onload = (e) => callback(e.target.result);
+                reader.readAsDataURL(file);
+                return;
+            }
+
+            // 限制最大尺寸
+            const MAX_WIDTH = 1024;
+            const MAX_HEIGHT = 1024;
+            
             const reader = new FileReader();
             reader.onload = (e) => {
                 const img = new Image();
@@ -10999,43 +10940,95 @@
                     const canvas = document.getElementById('compression-canvas');
                     const ctx = canvas.getContext('2d');
                     
-                    const MAX_WIDTH = 800;
-                    const MAX_HEIGHT = 800;
                     let width = img.width;
                     let height = img.height;
 
+                    // 更智能的缩放
                     if (width > height) {
                         if (width > MAX_WIDTH) {
-                            height *= MAX_WIDTH / width;
+                            height = Math.round(height * MAX_WIDTH / width);
                             width = MAX_WIDTH;
                         }
                     } else {
                         if (height > MAX_HEIGHT) {
-                            width *= MAX_HEIGHT / height;
+                            width = Math.round(width * MAX_HEIGHT / height);
                             height = MAX_HEIGHT;
                         }
                     }
+                    
                     canvas.width = width;
                     canvas.height = height;
                     ctx.drawImage(img, 0, 0, width, height);
                     
-                    // For GIFs, we can't really compress them via canvas, so just return the original
-                    if (file.type === 'image/gif') {
-                        callback(e.target.result);
-                        return;
-                    }
-
-                    // Determine output format
-                    // If it's a PNG, keep it as PNG to preserve transparency. Otherwise use JPEG for better compression.
+                    // 根据文件类型选择格式
                     const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-
-                    // For other types, compress
-                    const dataUrl = canvas.toDataURL(mimeType, quality);
-                    callback(dataUrl);
+                    
+                    // 分批处理，避免阻塞UI
+                    setTimeout(() => {
+                        const dataUrl = canvas.toDataURL(mimeType, quality);
+                        callback(dataUrl);
+                    }, 10);
                 };
                 img.src = e.target.result;
             };
             reader.readAsDataURL(file);
+        }
+
+        // --- Unified Image Uploader ---
+        window.isUploading = false;
+
+        function createImageUploader(callback, options = {}) {
+            const { quality = 0.7, maxSizeMB = 10 } = options;
+
+            return function(...args) {
+                if (window.isUploading) {
+                    showToast('请等待当前上传完成');
+                    return;
+                }
+                
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*';
+                input.style.display = 'none';
+                
+                input.onchange = function(e) {
+                    window.isUploading = true;
+                    const file = e.target.files[0];
+                    
+                    // Cleanup function
+                    const cleanup = () => {
+                        window.isUploading = false;
+                        if (input.parentNode) {
+                            document.body.removeChild(input);
+                        }
+                    };
+
+                    if (!file) {
+                        cleanup();
+                        return;
+                    }
+                    
+                    if (!file.type.startsWith('image/')) {
+                        showToast('请选择图片文件');
+                        cleanup();
+                        return;
+                    }
+                    
+                    if (file.size > maxSizeMB * 1024 * 1024) {
+                        showToast(`图片不能超过${maxSizeMB}MB`);
+                        cleanup();
+                        return;
+                    }
+                    
+                    compressImage(file, quality, (compressedSrc) => {
+                        callback(compressedSrc, ...args);
+                        cleanup();
+                    });
+                };
+                
+                document.body.appendChild(input);
+                input.click();
+            };
         }
 
         stickerUploadBtn.addEventListener('click', () => stickerFileInput.click());
