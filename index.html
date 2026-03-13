@@ -7472,7 +7472,11 @@
                     });
                     prompt += `\n${chatContextStr}\n`;
 
-                    prompt += `\n【当前场景：朋友圈动态互动】\n用户发布了一条动态：\n内容：${post.text || '无'}\n`;
+                    let postAuthorDisplayName = '用户';
+                    if (post.authorId !== 'main_user') {
+                        postAuthorDisplayName = post.authorName || '一位朋友';
+                    }
+                    prompt += `\n【当前场景：朋友圈动态互动】\n${postAuthorDisplayName}发布了一条动态：\n内容：${post.text || '无'}\n`;
                     if (post.images && post.images.length > 0) {
                         prompt += `附带了 ${post.images.length} 张图片。\n`;
                     }
