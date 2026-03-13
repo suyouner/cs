@@ -5690,15 +5690,16 @@
                 dbGet('friends', currentChatThemeFriendId, friend => {
                     const merged = {};
                     keys.forEach(k => {
-                        const globalVal = themeSettings[k] !== undefined ? themeSettings[k] : localStorage.getItem(k);
-                        merged[k] = (friend && friend[k] !== undefined && friend[k] !== null) ? friend[k] : globalVal;
+                        // 优先使用角色特定设置，否则回退到内存中的全局设置
+                        merged[k] = (friend && friend[k] !== undefined && friend[k] !== null) ? friend[k] : themeSettings[k];
                     });
                     merged.avatarSrc = friend ? friend.avatar : null;
                     applyPreview(merged);
                 });
             } else {
+                // 全局设置直接从内存缓存读取
                 const globalSettings = {};
-                keys.forEach(k => globalSettings[k] = themeSettings[k] !== undefined ? themeSettings[k] : localStorage.getItem(k));
+                keys.forEach(k => globalSettings[k] = themeSettings[k]);
                 globalSettings.avatarSrc = null;
                 applyPreview(globalSettings);
             }
@@ -6592,9 +6593,8 @@
             if (currentChatThemeFriendId) {
                 dbGet('friends', currentChatThemeFriendId, friend => {
                     if (friend) {
-                        for (const key in presetData) {
-                            friend[key] = presetData[key];
-                        }
+                        // 直接将预设数据合并到 friend 对象
+                        Object.assign(friend, presetData);
                         dbUpdate('friends', friend, () => {
                             updateChatThemePreview();
                             showToast(`已为当前角色加载预设：${name}`);
@@ -6603,15 +6603,25 @@
                     }
                 });
             } else {
-                // For global settings, update IndexedDB and cache
-                const promises = [];
-                for (const key in presetData) {
-                    // Ensure null values are handled correctly to reset properties
-                    promises.push(dbSaveSetting(key, presetData[key]));
-                }
-                await Promise.all(promises);
+                // 全局设置：先更新内存缓存和UI，再异步存入数据库
+                // 1. 更新内存缓存
+                Object.assign(themeSettings, presetData);
                 
+                // 2. 立即刷新UI
                 updateChatThemePreview();
+                
+                // 3. 在后台将设置存入数据库
+                const savePromises = Object.entries(presetData).map(([key, value]) => 
+                    dbSaveSetting(key, value).catch(err => {
+                        console.error(`Error saving setting ${key} to DB:`, err);
+                        // 即使单个失败也继续
+                    })
+                );
+                
+                Promise.all(savePromises).then(() => {
+                    console.log('All global theme presets saved to DB in background.');
+                });
+
                 showToast(`已加载全局预设：${name}`);
                 closeChatThemePresetModal();
             }
