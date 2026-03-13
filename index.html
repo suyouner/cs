@@ -5403,7 +5403,7 @@
         }
 
         function initDB(callback) {
-            const request = indexedDB.open('UserData', 12); // Version 12
+            const request = indexedDB.open('UserData', 13); // Version 13
 
             request.onerror = (event) => {
                 console.error("Database error: ", event.target.error);
@@ -5411,6 +5411,12 @@
 
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
+                if (!db.objectStoreNames.contains('world_books')) {
+                    db.createObjectStore('world_books', { keyPath: 'id' });
+                }
+                if (!db.objectStoreNames.contains('wb_settings')) {
+                    db.createObjectStore('wb_settings', { keyPath: 'id' });
+                }
                 if (!db.objectStoreNames.contains('friends')) {
                     db.createObjectStore('friends', { keyPath: 'id' });
                 }
@@ -13575,16 +13581,8 @@ ${historyText}`;
         }
 
         // --- World Book Logic ---
-        let worldBooks = JSON.parse(localStorage.getItem('worldBooks')) || [];
-        
-        // Remove default "恋爱日常" if present
-        const wbInitialLen = worldBooks.length;
-        worldBooks = worldBooks.filter(wb => wb.title !== '恋爱日常');
-        if (worldBooks.length !== wbInitialLen) {
-            localStorage.setItem('worldBooks', JSON.stringify(worldBooks));
-        }
-
-        let worldBookGroups = JSON.parse(localStorage.getItem('worldBookGroups')) || ['默认'];
+        let worldBooks = [];
+        let worldBookGroups = ['默认'];
         let currentWbGroup = '全部';
         let editingWbId = null;
         let deletingWbId = null;
@@ -13788,25 +13786,29 @@ ${historyText}`;
             }
 
             if (editingWbId) {
-                // Update existing
-                const index = worldBooks.findIndex(b => b.id === editingWbId);
-                if (index !== -1) {
-                    worldBooks[index] = { ...worldBooks[index], title, group, content };
+                const book = worldBooks.find(b => b.id === editingWbId);
+                if (book) {
+                    book.title = title;
+                    book.group = group;
+                    book.content = content;
+                    dbUpdate('world_books', book, () => {
+                        closeWbModal();
+                        renderWbList();
+                    });
                 }
             } else {
-                // Create new
                 const newBook = {
                     id: Date.now().toString(),
                     title,
                     group,
                     content
                 };
-                worldBooks.unshift(newBook); // Add to top
+                dbAdd('world_books', newBook, () => {
+                    worldBooks.unshift(newBook);
+                    closeWbModal();
+                    renderWbList();
+                });
             }
-
-            localStorage.setItem('worldBooks', JSON.stringify(worldBooks));
-            closeWbModal();
-            renderWbList();
         }
 
         function openWbGroupModal() {
@@ -13824,10 +13826,14 @@ ${historyText}`;
             
             if (!worldBookGroups.includes(name)) {
                 worldBookGroups.push(name);
-                localStorage.setItem('worldBookGroups', JSON.stringify(worldBookGroups));
-                renderWbTabs();
+                const groupData = { id: 'groups', value: worldBookGroups };
+                dbUpdate('wb_settings', groupData, () => {
+                    renderWbTabs();
+                    closeWbGroupModal();
+                });
+            } else {
+                closeWbGroupModal();
             }
-            closeWbGroupModal();
         }
 
         function requestDeleteWbGroup(groupName) {
@@ -13840,26 +13846,29 @@ ${historyText}`;
 
         function deleteWbGroup(groupName) {
             // Move books to default group
+            const updates = [];
             worldBooks.forEach(book => {
                 if (book.group === groupName) {
                     book.group = '默认';
+                    updates.push(new Promise(res => dbUpdate('world_books', book, res)));
                 }
             });
-            localStorage.setItem('worldBooks', JSON.stringify(worldBooks));
 
-            // Remove group from list
-            worldBookGroups = worldBookGroups.filter(g => g !== groupName);
-            localStorage.setItem('worldBookGroups', JSON.stringify(worldBookGroups));
-
-            // If the deleted group was the active one, switch to "All"
-            if (currentWbGroup === groupName) {
-                currentWbGroup = '全部';
-            }
-
-            // Re-render UI
-            renderWbTabs();
-            renderWbList();
-            showToast(`分组 "${groupName}" 已删除。`);
+            Promise.all(updates).then(() => {
+                // Remove group from list
+                worldBookGroups = worldBookGroups.filter(g => g !== groupName);
+                const groupData = { id: 'groups', value: worldBookGroups };
+                dbUpdate('wb_settings', groupData, () => {
+                    // If the deleted group was the active one, switch to "All"
+                    if (currentWbGroup === groupName) {
+                        currentWbGroup = '全部';
+                    }
+                    // Re-render UI
+                    renderWbTabs();
+                    renderWbList();
+                    showToast(`分组 "${groupName}" 已删除。`);
+                });
+            });
         }
 
         function openWbDeleteModal(id) {
@@ -13869,11 +13878,14 @@ ${historyText}`;
             // Bind confirm button
             document.getElementById('wb-confirm-delete-btn').onclick = () => {
                 if (deletingWbId) {
-                    worldBooks = worldBooks.filter(b => b.id !== deletingWbId);
-                    localStorage.setItem('worldBooks', JSON.stringify(worldBooks));
-                    renderWbList();
+                    dbDelete('world_books', deletingWbId, () => {
+                        worldBooks = worldBooks.filter(b => b.id !== deletingWbId);
+                        renderWbList();
+                        closeWbDeleteModal();
+                    });
+                } else {
+                    closeWbDeleteModal();
                 }
-                closeWbDeleteModal();
             };
         }
 
@@ -16185,12 +16197,103 @@ ${historyText}`;
             reader.readAsText(file);
         }
 
+        function migrateWorldBookData(callback) {
+            const oldBooks = localStorage.getItem('worldBooks');
+            const oldGroups = localStorage.getItem('worldBookGroups');
+            
+            let promises = [];
+
+            if (oldBooks) {
+                try {
+                    const books = JSON.parse(oldBooks);
+                    if (Array.isArray(books)) {
+                        const bookPromise = new Promise(resolve => {
+                            const tx = db.transaction('world_books', 'readwrite');
+                            const store = tx.objectStore('world_books');
+                            let count = 0;
+                            if (books.length === 0) {
+                                resolve();
+                                return;
+                            }
+                            books.forEach(book => {
+                                if (!book.id) book.id = String(Date.now() + Math.random());
+                                const req = store.put(book);
+                                req.onsuccess = () => {
+                                    count++;
+                                    if (count === books.length) resolve();
+                                };
+                                req.onerror = (e) => {
+                                    console.error('Book migration put error:', e.target.error);
+                                    count++; // still increment to not block forever
+                                    if (count === books.length) resolve();
+                                }
+                            });
+                            tx.oncomplete = () => {
+                                localStorage.removeItem('worldBooks');
+                                console.log('Migrated world books to IndexedDB.');
+                            };
+                            tx.onerror = (e) => {
+                                console.error('Book migration transaction error:', e.target.error);
+                                resolve(); // Resolve anyway
+                            }
+                        });
+                        promises.push(bookPromise);
+                    }
+                } catch (e) {
+                    console.error('Error parsing old world books from localStorage', e);
+                }
+            }
+
+            if (oldGroups) {
+                try {
+                    const groups = JSON.parse(oldGroups);
+                    if (Array.isArray(groups)) {
+                        const groupPromise = new Promise(resolve => {
+                            const groupData = { id: 'groups', value: groups };
+                            dbUpdate('wb_settings', groupData, () => {
+                                localStorage.removeItem('worldBookGroups');
+                                console.log('Migrated world book groups to IndexedDB.');
+                                resolve();
+                            });
+                        });
+                        promises.push(groupPromise);
+                    }
+                } catch (e) {
+                    console.error('Error parsing old world book groups from localStorage', e);
+                }
+            }
+
+            Promise.all(promises).then(() => {
+                if (callback) callback();
+            });
+        }
+
+        async function loadWorldBookData(callback) {
+            try {
+                const books = await new Promise((resolve, reject) => dbGetAll('world_books', data => resolve(data || [])));
+                worldBooks = books;
+
+                const groupData = await new Promise((resolve, reject) => dbGet('wb_settings', 'groups', data => resolve(data)));
+                worldBookGroups = (groupData && groupData.value) ? groupData.value : ['默认'];
+            } catch (e) {
+                console.error("Failed to load world book data:", e);
+                worldBooks = [];
+                worldBookGroups = ['默认'];
+            } finally {
+                if (callback) callback();
+            }
+        }
+
         // Initial Load
         initDB(() => {
-            // After DB is ready, render the list
-            renderChatList();
-            loadTheme();
-            // The rest of the init can happen in parallel
+            migrateWorldBookData(() => {
+                loadWorldBookData(() => {
+                    // After all data is loaded, render the list
+                    renderChatList();
+                    loadTheme();
+                    // The rest of the init can happen in parallel
+                });
+            });
         });
 
         showPage('main-page');
