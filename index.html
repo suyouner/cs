@@ -5285,6 +5285,14 @@
         <div class="modal-content" style="width: 320px; padding: 20px; overflow: visible;">
             <h3 style="text-align: center; margin-bottom: 15px;">角色发朋友圈管理</h3>
 
+            <div class="settings-item" style="flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                <label style="font-weight: 600;">显示角色动态删除键</label>
+                <label class="switch">
+                    <input type="checkbox" id="role-moment-delete-toggle" onchange="toggleRoleMomentDelete(this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
             <div class="settings-item" style="flex-direction: row; justify-content: space-between; align-items: center;">
                 <label style="font-weight: 600;">角色自动发朋友圈</label>
                 <label class="switch">
@@ -6896,6 +6904,13 @@
             overlay.classList.add('show');
         }
 
+        function toggleRoleMomentDelete(isChecked) {
+            localStorage.setItem('show_role_moment_delete_button', isChecked);
+            if (document.getElementById('wechat-discover-page').classList.contains('active')) {
+                renderDiscoverFeed();
+            }
+        }
+
         function closeDiscoverActionSheet(e) {
             // If e is provided, it came from the overlay click. Make sure we didn't click inside the sheet itself.
             if (e && e.target !== document.getElementById('discover-action-sheet-overlay')) {
@@ -6921,6 +6936,11 @@
 
         function openRoleMomentsModal() {
             document.getElementById('role-moments-modal').style.display = 'flex';
+
+            const deleteToggle = document.getElementById('role-moment-delete-toggle');
+            const showDelete = localStorage.getItem('show_role_moment_delete_button') === 'true';
+            deleteToggle.checked = showDelete;
+
             const toggle = document.getElementById('role-auto-post-toggle');
             const isEnabled = localStorage.getItem('global_auto_post_moments') === 'true';
             toggle.checked = isEnabled;
@@ -7701,7 +7721,11 @@
                             }
 
                             let deleteHtml = '';
+                            const showRoleDelete = localStorage.getItem('show_role_moment_delete_button') === 'true';
+
                             if (post.authorId === 'main_user') {
+                                deleteHtml = `<span class="discover-post-delete" onclick="deleteDiscoverPost('${post.id}')">删除</span>`;
+                            } else if (showRoleDelete) {
                                 deleteHtml = `<span class="discover-post-delete" onclick="deleteDiscoverPost('${post.id}')">删除</span>`;
                             }
 
