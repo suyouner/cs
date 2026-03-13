@@ -6549,37 +6549,43 @@
             }
 
             const chatThemeKeys = [
-                'chat_wallpaper', 'chat_header_bg', 'chat_input_bg', 
-                'chat_back_icon', 'chat_options_icon', 'chat_voice_icon', 
-                'chat_emoji_icon', 'chat_plus_icon', 'chat_send_icon', 
+                'chat_wallpaper', 'chat_header_bg', 'chat_input_bg',
+                'chat_back_icon', 'chat_options_icon', 'chat_voice_icon',
+                'chat_emoji_icon', 'chat_plus_icon', 'chat_send_icon',
                 'chat_avatar_size', 'chat_avatar_radius'
             ];
 
             const presetData = {};
 
-            const extractData = (source, isGlobal) => {
+            const buildPreset = (friend) => {
                 chatThemeKeys.forEach(key => {
-                    const value = isGlobal ? localStorage.getItem(key) : source[key];
+                    let value = null;
+                    if (friend && friend[key] !== undefined && friend[key] !== null) {
+                        value = friend[key];
+                    } else {
+                        // Fallback to global settings from cache or localStorage
+                        const globalVal = themeSettings[key] !== undefined ? themeSettings[key] : localStorage.getItem(key);
+                        if (globalVal !== null && globalVal !== undefined) {
+                            value = globalVal;
+                        }
+                    }
+                    
                     if (value !== null && value !== undefined) {
                         presetData[key] = value;
                     }
                 });
+
+                localStorage.setItem(`chat_theme_preset_${name}`, JSON.stringify(presetData));
+                showToast('聊天界面预设保存成功');
+                closeChatThemePresetModal();
             };
 
             if (currentChatThemeFriendId) {
                 dbGet('friends', currentChatThemeFriendId, friend => {
-                    if (friend) {
-                        extractData(friend, false);
-                        localStorage.setItem(`chat_theme_preset_${name}`, JSON.stringify(presetData));
-                        showToast('聊天界面预设保存成功');
-                        closeChatThemePresetModal();
-                    }
+                    buildPreset(friend || null);
                 });
             } else {
-                extractData(localStorage, true);
-                localStorage.setItem(`chat_theme_preset_${name}`, JSON.stringify(presetData));
-                showToast('聊天界面预设保存成功');
-                closeChatThemePresetModal();
+                buildPreset(null); // For global settings
             }
         }
 
