@@ -2044,8 +2044,40 @@
         }
 
         .sticker-grid-container.edit-mode .sticker-item .sticker-delete-btn,
-        .sticker-grid-container.edit-mode .sticker-item .sticker-edit-btn {
+        .sticker-grid-container.edit-mode .sticker-item .sticker-edit-btn,
+        #ai-sticker-grid.selection-mode .sticker-item .sticker-selection-checkbox {
             display: flex;
+        }
+
+        .sticker-selection-checkbox {
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            width: 20px;
+            height: 20px;
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 1.5px solid #ccc;
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 15;
+            backdrop-filter: blur(2px);
+        }
+
+        .sticker-selection-checkbox.checked {
+            background-color: #07c160;
+            border-color: #07c160;
+        }
+
+        .sticker-selection-checkbox.checked::after {
+            content: '';
+            width: 6px;
+            height: 10px;
+            border: solid white;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+            margin-bottom: 2px;
         }
 
         .sticker-edit-btn {
@@ -4820,6 +4852,7 @@
             <div class="theme-header">
                 <span class="back-arrow" onclick="showPage('main-page')"><</span>
                 <span class="title">表情库</span>
+                <div id="emoji-library-manage-btn" style="position: absolute; right: 20px; font-size: 16px; cursor: pointer;" onclick="toggleEmojiLibraryEditMode()">管理</div>
             </div>
             <div style="padding: 15px; flex-shrink: 0; background-color: #fff; border-bottom: 1px solid #eee; position: relative; z-index: 10;">
                 <select id="emoji-library-character-select" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 12px; font-size: 14px; background: white;"></select>
@@ -4827,7 +4860,13 @@
             <div class="sticker-grid-container" id="ai-sticker-grid" style="padding: 15px; padding-bottom: 80px; align-content: flex-start;">
                 <!-- AI stickers will be injected here -->
             </div>
-            <div style="position: absolute; bottom: 30px; right: 20px; width: 50px; height: 50px; background-color: white; color: black; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; font-weight: 300; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); z-index: 20;" onclick="openAiStickerUploadModal()">+</div>
+            <div id="emoji-library-add-btn" style="position: absolute; bottom: 30px; right: 20px; width: 50px; height: 50px; background-color: white; color: black; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; font-weight: 300; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); z-index: 20;" onclick="openAiStickerUploadModal()">+</div>
+            
+            <div class="selection-bottom-bar" id="emoji-library-selection-bar" style="position: absolute; bottom: 0; width: 100%; justify-content: flex-end; gap: 15px;">
+                 <div class="selection-action-btn delete-btn" onclick="deleteSelectedAiStickers()" style="background-color: #ff3b30; border-radius: 50%; width: 50px; height: 50px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </div>
+            </div>
         </div>
 
         <!-- Regex App Page -->
@@ -15823,6 +15862,32 @@ ${historyText}`;
 
         // --- AI Emoji Library Logic ---
         let lastSelectedEmojiCharacter = "";
+        let isEmojiLibraryEditMode = false;
+        let selectedAiStickerIds = new Set();
+
+        function toggleEmojiLibraryEditMode(forceState = null) {
+            isEmojiLibraryEditMode = forceState !== null ? forceState : !isEmojiLibraryEditMode;
+            
+            const grid = document.getElementById('ai-sticker-grid');
+            const manageBtn = document.getElementById('emoji-library-manage-btn');
+            const addBtn = document.getElementById('emoji-library-add-btn');
+            const selectionBar = document.getElementById('emoji-library-selection-bar');
+
+            if (isEmojiLibraryEditMode) {
+                grid.classList.add('selection-mode');
+                if (manageBtn) manageBtn.textContent = '取消';
+                if (addBtn) addBtn.style.display = 'none';
+                if (selectionBar) selectionBar.classList.add('active');
+            } else {
+                grid.classList.remove('selection-mode');
+                if (manageBtn) manageBtn.textContent = '管理';
+                if (addBtn) addBtn.style.display = 'flex';
+                if (selectionBar) selectionBar.classList.remove('active');
+                selectedAiStickerIds.clear();
+                // Re-render to clear visual selection state
+                renderAiStickers(lastSelectedEmojiCharacter);
+            }
+        }
 
         function renderEmojiLibraryCharacters() {
             const select = document.getElementById('emoji-library-character-select');
@@ -15875,7 +15940,10 @@ ${historyText}`;
                 grid.innerHTML = '<div style="grid-column: 1 / -1; text-align:center; color:#999; margin-top:20px;">请先选择一个角色</div>';
                 return;
             }
-            
+
+            if (isEmojiLibraryEditMode) grid.classList.add('selection-mode');
+            else grid.classList.remove('selection-mode');
+
             // Default Dice
             const diceItem = document.createElement('div');
             diceItem.className = 'sticker-item';
@@ -15898,16 +15966,11 @@ ${historyText}`;
                         const img = document.createElement('img');
                         img.src = sticker.src;
 
-                        const deleteBtn = document.createElement('div');
-                        deleteBtn.className = 'sticker-delete-btn';
-                        deleteBtn.innerHTML = '&times;';
-                        
-                        deleteBtn.onclick = (e) => {
-                            e.stopPropagation();
-                            dbDelete('ai_stickers', sticker.id, () => {
-                                renderAiStickers(friendId);
-                            });
-                        };
+                        const selectionCheckbox = document.createElement('div');
+                        selectionCheckbox.className = 'sticker-selection-checkbox';
+                        if (selectedAiStickerIds.has(sticker.id)) {
+                            selectionCheckbox.classList.add('checked');
+                        }
 
                         let pressTimer;
                         let wasLongPress = false;
@@ -15917,36 +15980,66 @@ ${historyText}`;
                             wasLongPress = false;
                             pressTimer = setTimeout(() => {
                                 wasLongPress = true;
-                                grid.classList.add('edit-mode');
+                                if (!isEmojiLibraryEditMode) {
+                                    toggleEmojiLibraryEditMode(true);
+                                }
                             }, 500);
                         };
 
-                        const cancelPress = () => {
-                            clearTimeout(pressTimer);
-                        };
+                        const cancelPress = () => clearTimeout(pressTimer);
 
                         item.addEventListener('mousedown', startPress);
                         item.addEventListener('touchstart', startPress, { passive: true });
-                        item.addEventListener('mouseup', cancelPress);
-                        item.addEventListener('mouseleave', cancelPress);
-                        item.addEventListener('touchend', cancelPress);
-                        item.addEventListener('touchcancel', cancelPress);
+                        ['mouseup', 'mouseleave', 'touchend', 'touchcancel'].forEach(ev => item.addEventListener(ev, cancelPress));
 
-                        item.onclick = (e) => {
+                        item.onclick = () => {
                             if (wasLongPress) return;
-                            if (grid.classList.contains('edit-mode')) {
-                                grid.classList.remove('edit-mode');
+                            if (isEmojiLibraryEditMode) {
+                                if (selectedAiStickerIds.has(sticker.id)) {
+                                    selectedAiStickerIds.delete(sticker.id);
+                                    selectionCheckbox.classList.remove('checked');
+                                } else {
+                                    selectedAiStickerIds.add(sticker.id);
+                                    selectionCheckbox.classList.add('checked');
+                                }
+                            } else {
+                                // Add click to send logic if needed
                             }
                         };
                         
                         item.appendChild(img);
-                        item.appendChild(deleteBtn);
+                        item.appendChild(selectionCheckbox);
                         grid.appendChild(item);
                     });
                 };
             } catch(e) {
                  grid.innerHTML += '<div style="grid-column: 1 / -1; text-align:center; color:#999; margin-top:20px;">请刷新页面重试</div>';
             }
+        }
+
+        function deleteSelectedAiStickers() {
+            if (selectedAiStickerIds.size === 0) {
+                showToast('请选择要删除的表情');
+                return;
+            }
+
+            showCustomConfirm(`确定要删除选中的 ${selectedAiStickerIds.size} 个表情吗？`, () => {
+                const idsToDelete = Array.from(selectedAiStickerIds);
+                const transaction = db.transaction(['ai_stickers'], 'readwrite');
+                const store = transaction.objectStore('ai_stickers');
+                let deleteCount = 0;
+                
+                idsToDelete.forEach(id => {
+                    const request = store.delete(id);
+                    request.onsuccess = () => {
+                        deleteCount++;
+                        if (deleteCount === idsToDelete.length) {
+                            showToast('删除成功');
+                            toggleEmojiLibraryEditMode(false); // This will clear selection and re-render
+                        }
+                    };
+                });
+            }, '删除表情');
         }
 
         function openAiStickerUploadModal() {
