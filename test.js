@@ -652,7 +652,15 @@
                     });
                     prompt += `\n${chatContextStr}\n`;
 
-                    prompt += `\n【当前场景：朋友圈动态互动】\n用户发布了一条动态：\n内容：${post.text || '无'}\n`;
+                    let postOwnerName = '用户';
+                    if (post.authorId !== 'main_user') {
+                        if (post.authorId === friend.id) {
+                            postOwnerName = '你';
+                        } else {
+                            postOwnerName = post.authorName || '有人';
+                        }
+                    }
+                    prompt += `\n【当前场景：朋友圈动态互动】\n${postOwnerName}发布了一条动态：\n内容：${post.text || '无'}\n`;
                     if (post.images && post.images.length > 0) {
                         prompt += `附带了 ${post.images.length} 张图片。\n`;
                     }
@@ -1110,6 +1118,7 @@
                         });
                         
                         dbUpdate('discover_posts', post, () => {
+                            triggerBotInteractionsForPost(activeCommentPostId);
                             closeCommentDrawer();
                             renderDiscoverFeed();
                         });

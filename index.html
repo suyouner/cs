@@ -3393,12 +3393,12 @@
 
         <div id="main-page" class="page active">
             <div class="top-images">
-                <div class="image-slot" id="img1-slot" onclick="triggerUpload('img1')"><span class="placeholder-text">点击添加<br>图片</span><img id="img1-display" src="" alt="Pic"><input type="file" id="img1" accept="image/*" onchange="previewImage(this, 'img1-display')"></div>
-                <div class="image-slot" id="img2-slot" onclick="triggerUpload('img2')"><span class="placeholder-text">点击添加<br>图片</span><img id="img2-display" src="" alt="Pic"><input type="file" id="img2" accept="image/*" onchange="previewImage(this, 'img2-display')"></div>
-                <div class="image-slot" id="img3-slot" onclick="triggerUpload('img3')"><span class="placeholder-text">点击添加<br>图片</span><img id="img3-display" src="" alt="Pic"><input type="file" id="img3" accept="image/*" onchange="previewImage(this, 'img3-display')"></div>
+                <div class="image-slot" id="img1-slot" onclick="triggerMainPageUpload('img1-display')"><span class="placeholder-text">点击添加<br>图片</span><img id="img1-display" src="" alt="Pic"></div>
+                <div class="image-slot" id="img2-slot" onclick="triggerMainPageUpload('img2-display')"><span class="placeholder-text">点击添加<br>图片</span><img id="img2-display" src="" alt="Pic"></div>
+                <div class="image-slot" id="img3-slot" onclick="triggerMainPageUpload('img3-display')"><span class="placeholder-text">点击添加<br>图片</span><img id="img3-display" src="" alt="Pic"></div>
             </div>
             <div class="info-area">
-                <div class="avatar-container" id="main-avatar-container" onclick="triggerUpload('avatar')"><span class="avatar-placeholder-text">添加<br>头像</span><img id="avatar-display" class="avatar" src="" alt="Avatar"><div class="camera-icon"></div><input type="file" id="avatar" accept="image/*" onchange="previewImage(this, 'avatar-display')"></div>
+                <div class="avatar-container" id="main-avatar-container" onclick="triggerMainPageUpload('avatar-display')"><span class="avatar-placeholder-text">添加<br>头像</span><img id="avatar-display" class="avatar" src="" alt="Avatar"><div class="camera-icon"></div></div>
                 <div class="dialogue-box" contenteditable="true">00:14</div>
                 <div class="text-line-1" contenteditable="true">人類是脆弱的...</div>
                 <div class="text-line-2" contenteditable="true">小不忍則變大萌>w<</div>
@@ -3452,7 +3452,7 @@
                     <div style="width:100%; display: flex; flex-direction: column;">
                         <p>主屏幕壁纸</p>
                         <div class="wallpaper-preview" id="wallpaper-preview"></div>
-                        <button class="upload-button" onclick="triggerUpload('wallpaper-upload')">上传壁纸</button>
+                        <button class="upload-button" onclick="triggerWallpaperUpload()">上传壁纸</button>
                     </div>
                 </div>
                 <div class="theme-option-item">
@@ -5345,9 +5345,10 @@
                 document.getElementById('activation-page').style.display = 'none';
                 document.getElementById('main-app-container').style.display = 'flex';
             } else {
-                showToast('激活码错误');
+                prompt += `\n【系统提示】重要：当前是普通的【微信线上聊天模式】，请完全模拟真实人类在微信聊天的习惯。根据你的角色性格，灵活决定是否将一段话拆分为多条短消息发送以增加活人感。你可以根据语义、情绪和停顿，在任何地方（如逗号、句号、感叹号后，甚至一句话的中间）使用【换行符（回车）】来分隔消息。系统会自动将每一行识别为一条独立的消息发出。\n`;
+                prompt += `\n【！！！格式强力阻断警告！！！】：\n无论你们之前的聊天记录是什么格式（即使有小说般的动作或心理描写），**从现在起，请必须切换回纯粹的微信聊天格式**！\n1. **严禁任何动作描写**：聊天正文中绝对不能出现如 *看着你*、(叹气)、走过去、微笑着说 等任何形式的动作、神态描述或旁白。\n2. **严禁在正文输出心理标签**：不要在正文中输出 <thought> 标签。心理活动请严格使用 <inner_thought> 标签包裹（且只能放在最后），不要包含在正文中。\n3. **只需要说话的内容**：除了符合角色身份的话语，不要加任何多余的文字修饰和引号，直接输出语言！严禁输出 <br> 等 HTML 代码。\n`;
+                prompt += `\n            【例如】，对于“你好呀，今天天气真不错！吃饭了吗？”，你可以灵活地回复为：\n\n            - **方案一:**\n              你好呀\n              今天天气真不错！\n              吃饭了吗？\n\n            - **方案二:**\n              你好呀，今天天气真不错！\n              吃饭了吗？\n\n            - **方案三:**\n              你好呀\n              今天天气真不错！吃饭了吗？\n\n            请根据你的角色性格和当前对话的节奏，自然地选择如何断句。\n            \n【功能指令】：\n1. 引用回复：如果你想引用对方（用户）的某句话进行针对性回复，请在这条消息中使用格式 <quote>被引用的对方的话</quote>。\n2. 发起转账：如果你想给对方（用户）转账，请输出单独的一行：<transfer amount="金额">备注说明</transfer>。例如：<transfer amount="52.00">请你喝奶茶</transfer>。\n3. 接收转账：如果对方（用户）给你转账了，你想接收，请在回复中包含：[已接收]。系统会自动将其转换为确认收款的卡片。\n4. 退还转账：如果对方（用户）给你转账了，你想退还，请在回复中包含：[已退还]。系统会自动将其转换为退还转账的卡片。\n5. 扔骰子：如果你想扔骰子，请在回复中包含：<dice></dice>。系统会自动将其转换为一个随机骰子动画。\n6. 识别图片/表情包：对方可能会发送图片或表情包，请你结合图片内容或表情包上的文字/画面情感进行自然的回应，如果图里有梗，请根据人设回应。\n7. 更换头像：如果用户发给你一张或多张图片让你换头像，你的反应要符合人设，这可以是一个多回合的互动。你可以同意、拒绝，或者先拉扯几句再同意。例如：\n- **如果你是傲娇型**：你可以先说‘我才不要，这个不好看’，如果用户哄你，你再说‘好吧好吧，真拿你没办法……’，然后输出 <change_avatar>图片ID</change_avatar> 指令。\n- **如果你想提条件**：你可以说‘换倒是可以，不过你得先夸我几句’，等用户夸完你再输出指令。\n- **如果你想马上换**：直接换，说出符合人设的话，并输出指令。\n- **核心**：让互动更真实，你可以先拒绝或嘴硬，等用户哄你或满足条件后，再输出 <change_avatar>图片ID或图片链接</change_avatar> 指令来完成更换。如果就是不想换，也可以根据人设坚持拒绝。\n8. 发送图片：如果用户发给你图片并希望你把它发出来（例如玩梗等），你可以根据人设直接答应或者进行多回合互动。当你决定要发这张照片时，请输出 <send_image>图片ID或图片链接</send_image> 指令，系统会自动帮你把那张图发出去。\n9. 删除朋友圈：如果用户在聊天中提到让你删掉某条朋友圈动态，你可以根据人设决定是否同意。如果同意，请在回复中包含指令 <delete_moment>动态关键字或ID</delete_moment>，系统会自动帮你删除包含该关键字的最新一条朋友圈。如果你不想删，可以找理由拒绝。`;
             }
-        }
 
         let lastAIMusicActionTime = 0;
 
