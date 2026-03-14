@@ -6263,40 +6263,52 @@
         function openBubblePresetModal() {
             const listContainer = document.getElementById('bubble-preset-list');
             listContainer.innerHTML = '';
-            let hasPresets = false;
+            
+            let presetNames = new Set();
 
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
                 if (key.startsWith('bubble_preset_')) {
-                    hasPresets = true;
-                    const name = key.replace('bubble_preset_', '');
-                    
-                    const item = document.createElement('label');
-                    item.className = 'preset-checkbox-item';
-                    
-                    const checkbox = document.createElement('input');
-                    checkbox.type = 'checkbox';
-                    checkbox.value = name;
-                    
-                    const customCheck = document.createElement('div');
-                    customCheck.className = 'custom-checkbox';
-                    
-                    const span = document.createElement('span');
-                    span.textContent = name;
-                    
-                    item.appendChild(checkbox);
-                    item.appendChild(customCheck);
-                    item.appendChild(span);
-                    listContainer.appendChild(item);
+                    presetNames.add(key.replace('bubble_preset_', ''));
                 }
             }
 
-            if (!hasPresets) {
-                listContainer.innerHTML = '<div style="text-align:center; color:#999; padding:10px; font-size: 13px;">暂无预设</div>';
-            }
+            dbGetAll('theme_settings', items => {
+                if (items) {
+                    items.forEach(item => {
+                        if (String(item.id).startsWith('bubble_preset_')) {
+                            presetNames.add(String(item.id).replace('bubble_preset_', ''));
+                        }
+                    });
+                }
 
-            document.getElementById('bubble-preset-name-input').value = '';
-            document.getElementById('bubble-preset-modal').style.display = 'flex';
+                if (presetNames.size === 0) {
+                    listContainer.innerHTML = '<div style="text-align:center; color:#999; padding:10px; font-size: 13px;">暂无预设</div>';
+                } else {
+                    Array.from(presetNames).sort().forEach(name => {
+                        const item = document.createElement('label');
+                        item.className = 'preset-checkbox-item';
+                        
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.value = name;
+                        
+                        const customCheck = document.createElement('div');
+                        customCheck.className = 'custom-checkbox';
+                        
+                        const span = document.createElement('span');
+                        span.textContent = name;
+                        
+                        item.appendChild(checkbox);
+                        item.appendChild(customCheck);
+                        item.appendChild(span);
+                        listContainer.appendChild(item);
+                    });
+                }
+
+                document.getElementById('bubble-preset-name-input').value = '';
+                document.getElementById('bubble-preset-modal').style.display = 'flex';
+            });
         }
 
         function closeBubblePresetModal() {
@@ -6348,9 +6360,14 @@
                 const pageOpacity = getBubbleSetting('bubble_page_bg_opacity', friend);
                 if (pageOpacity) presetData['bubble_page_bg_opacity'] = pageOpacity;
 
-                localStorage.setItem(`bubble_preset_${name}`, JSON.stringify(presetData));
-                showToast('气泡预设保存成功');
-                closeBubblePresetModal();
+                dbSaveSetting(`bubble_preset_${name}`, JSON.stringify(presetData)).then(() => {
+                    showToast('气泡预设保存成功');
+                    document.getElementById('bubble-preset-name-input').value = '';
+                    openBubblePresetModal(); // 刷新列表
+                }).catch(e => {
+                    showToast('存储空间已满，保存失败，请清理其他预设');
+                    console.error('Save preset error:', e);
+                });
             };
 
             if (currentBubbleThemeFriendId) {
@@ -6362,7 +6379,7 @@
             }
         }
 
-        function loadBubblePreset() {
+        async function loadBubblePreset() {
             const checked = document.querySelectorAll('#bubble-preset-list input[type="checkbox"]:checked');
             if (checked.length !== 1) {
                 showToast('请选择一个预设进行加载');
@@ -6370,7 +6387,11 @@
             }
             const name = checked[0].value;
 
-            const dataStr = localStorage.getItem(`bubble_preset_${name}`);
+            let dataStr = localStorage.getItem(`bubble_preset_${name}`);
+            if (!dataStr) {
+                const item = await new Promise(res => dbGet('theme_settings', `bubble_preset_${name}`, res));
+                if (item) dataStr = item.value;
+            }
             if (!dataStr) return;
             const presetData = JSON.parse(dataStr);
 
@@ -6394,15 +6415,18 @@
             const namesToDelete = Array.from(checked).map(cb => cb.value);
             
             showCustomConfirm(`确定要删除选中的 ${namesToDelete.length} 个预设吗？`, () => {
-                namesToDelete.forEach(name => {
+                const promises = namesToDelete.map(name => {
                     localStorage.removeItem(`bubble_preset_${name}`);
+                    return dbDeleteSetting(`bubble_preset_${name}`);
                 });
-                showToast('预设已删除');
-                openBubblePresetModal(); // Refresh list
+                Promise.all(promises).then(() => {
+                    showToast('预设已删除');
+                    openBubblePresetModal(); // Refresh list
+                });
             }, '删除预设');
         }
 
-        function exportBubblePresets() {
+        async function exportBubblePresets() {
             const checked = document.querySelectorAll('#bubble-preset-list input[type="checkbox"]:checked');
             if (checked.length === 0) {
                 showToast('请选择要导出的预设');
@@ -6410,13 +6434,17 @@
             }
 
             const presetsToExport = {};
-            Array.from(checked).forEach(cb => {
+            for (const cb of Array.from(checked)) {
                 const name = cb.value;
-                const data = localStorage.getItem(`bubble_preset_${name}`);
-                if (data) {
-                    presetsToExport[name] = JSON.parse(data);
+                let dataStr = localStorage.getItem(`bubble_preset_${name}`);
+                if (!dataStr) {
+                    const item = await new Promise(res => dbGet('theme_settings', `bubble_preset_${name}`, res));
+                    if (item) dataStr = item.value;
                 }
-            });
+                if (dataStr) {
+                    presetsToExport[name] = JSON.parse(dataStr);
+                }
+            }
 
             if (Object.keys(presetsToExport).length === 0) {
                 showToast('没有找到可导出的预设数据');
@@ -6444,14 +6472,20 @@
                 try {
                     const importedData = JSON.parse(e.target.result);
                     let importCount = 0;
+                    const promises = [];
                     for (const name in importedData) {
                         if (typeof importedData[name] === 'object') {
-                            localStorage.setItem(`bubble_preset_${name}`, JSON.stringify(importedData[name]));
+                            promises.push(dbSaveSetting(`bubble_preset_${name}`, JSON.stringify(importedData[name])));
                             importCount++;
                         }
                     }
-                    showToast(`成功导入 ${importCount} 个预设`);
-                    openBubblePresetModal(); // Refresh list
+                    Promise.all(promises).then(() => {
+                        showToast(`成功导入 ${importCount} 个预设`);
+                        openBubblePresetModal(); // Refresh list
+                    }).catch(() => {
+                        showToast('部分预设导入失败，可能是存储空间不足');
+                        openBubblePresetModal();
+                    });
                 } catch (err) {
                     showToast('导入失败，文件格式错误');
                     console.error('Preset import error:', err);
@@ -6501,40 +6535,52 @@
         function openChatThemePresetModal() {
             const listContainer = document.getElementById('chat-theme-preset-list');
             listContainer.innerHTML = '';
-            let hasPresets = false;
+            
+            let presetNames = new Set();
 
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
                 if (key.startsWith('chat_theme_preset_')) {
-                    hasPresets = true;
-                    const name = key.replace('chat_theme_preset_', '');
-                    
-                    const item = document.createElement('label');
-                    item.className = 'preset-checkbox-item';
-                    
-                    const checkbox = document.createElement('input');
-                    checkbox.type = 'checkbox';
-                    checkbox.value = name;
-                    
-                    const customCheck = document.createElement('div');
-                    customCheck.className = 'custom-checkbox';
-                    
-                    const span = document.createElement('span');
-                    span.textContent = name;
-                    
-                    item.appendChild(checkbox);
-                    item.appendChild(customCheck);
-                    item.appendChild(span);
-                    listContainer.appendChild(item);
+                    presetNames.add(key.replace('chat_theme_preset_', ''));
                 }
             }
 
-            if (!hasPresets) {
-                listContainer.innerHTML = '<div style="text-align:center; color:#999; padding:10px; font-size: 13px;">暂无预设</div>';
-            }
+            dbGetAll('theme_settings', items => {
+                if (items) {
+                    items.forEach(item => {
+                        if (String(item.id).startsWith('chat_theme_preset_')) {
+                            presetNames.add(String(item.id).replace('chat_theme_preset_', ''));
+                        }
+                    });
+                }
 
-            document.getElementById('chat-theme-preset-name-input').value = '';
-            document.getElementById('chat-theme-preset-modal').style.display = 'flex';
+                if (presetNames.size === 0) {
+                    listContainer.innerHTML = '<div style="text-align:center; color:#999; padding:10px; font-size: 13px;">暂无预设</div>';
+                } else {
+                    Array.from(presetNames).sort().forEach(name => {
+                        const item = document.createElement('label');
+                        item.className = 'preset-checkbox-item';
+                        
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.value = name;
+                        
+                        const customCheck = document.createElement('div');
+                        customCheck.className = 'custom-checkbox';
+                        
+                        const span = document.createElement('span');
+                        span.textContent = name;
+                        
+                        item.appendChild(checkbox);
+                        item.appendChild(customCheck);
+                        item.appendChild(span);
+                        listContainer.appendChild(item);
+                    });
+                }
+
+                document.getElementById('chat-theme-preset-name-input').value = '';
+                document.getElementById('chat-theme-preset-modal').style.display = 'flex';
+            });
         }
 
         function closeChatThemePresetModal() {
@@ -6572,9 +6618,14 @@
             presetData.chat_avatar_size = document.getElementById('chat-avatar-size-slider').value;
             presetData.chat_avatar_radius = document.getElementById('chat-avatar-radius-slider').value;
 
-            localStorage.setItem(`chat_theme_preset_${name}`, JSON.stringify(presetData));
-            showToast('聊天界面预设保存成功');
-            closeChatThemePresetModal();
+            dbSaveSetting(`chat_theme_preset_${name}`, JSON.stringify(presetData)).then(() => {
+                showToast('聊天界面预设保存成功');
+                document.getElementById('chat-theme-preset-name-input').value = '';
+                openChatThemePresetModal(); // 刷新列表
+            }).catch(e => {
+                showToast('存储空间已满，保存失败，请清理其他预设');
+                console.error('Save preset error:', e);
+            });
         }
 
         async function loadChatThemePreset() {
@@ -6585,7 +6636,11 @@
             }
             const name = checked[0].value;
 
-            const dataStr = localStorage.getItem(`chat_theme_preset_${name}`);
+            let dataStr = localStorage.getItem(`chat_theme_preset_${name}`);
+            if (!dataStr) {
+                const item = await new Promise(res => dbGet('theme_settings', `chat_theme_preset_${name}`, res));
+                if (item) dataStr = item.value;
+            }
             if (!dataStr) return;
             const presetData = JSON.parse(dataStr);
 
@@ -6627,15 +6682,18 @@
             const namesToDelete = Array.from(checked).map(cb => cb.value);
             
             showCustomConfirm(`确定要删除选中的 ${namesToDelete.length} 个预设吗？`, () => {
-                namesToDelete.forEach(name => {
+                const promises = namesToDelete.map(name => {
                     localStorage.removeItem(`chat_theme_preset_${name}`);
+                    return dbDeleteSetting(`chat_theme_preset_${name}`);
                 });
-                showToast('预设已删除');
-                openChatThemePresetModal(); // Refresh list
+                Promise.all(promises).then(() => {
+                    showToast('预设已删除');
+                    openChatThemePresetModal(); // Refresh list
+                });
             }, '删除预设');
         }
 
-        function exportChatThemePresets() {
+        async function exportChatThemePresets() {
             const checked = document.querySelectorAll('#chat-theme-preset-list input[type="checkbox"]:checked');
             if (checked.length === 0) {
                 showToast('请选择要导出的预设');
@@ -6643,13 +6701,17 @@
             }
 
             const presetsToExport = {};
-            Array.from(checked).forEach(cb => {
+            for (const cb of Array.from(checked)) {
                 const name = cb.value;
-                const data = localStorage.getItem(`chat_theme_preset_${name}`);
-                if (data) {
-                    presetsToExport[name] = JSON.parse(data);
+                let dataStr = localStorage.getItem(`chat_theme_preset_${name}`);
+                if (!dataStr) {
+                    const item = await new Promise(res => dbGet('theme_settings', `chat_theme_preset_${name}`, res));
+                    if (item) dataStr = item.value;
                 }
-            });
+                if (dataStr) {
+                    presetsToExport[name] = JSON.parse(dataStr);
+                }
+            }
 
             if (Object.keys(presetsToExport).length === 0) {
                 showToast('没有找到可导出的预设数据');
@@ -6677,14 +6739,20 @@
                 try {
                     const importedData = JSON.parse(e.target.result);
                     let importCount = 0;
+                    const promises = [];
                     for (const name in importedData) {
                         if (typeof importedData[name] === 'object') {
-                            localStorage.setItem(`chat_theme_preset_${name}`, JSON.stringify(importedData[name]));
+                            promises.push(dbSaveSetting(`chat_theme_preset_${name}`, JSON.stringify(importedData[name])));
                             importCount++;
                         }
                     }
-                    showToast(`成功导入 ${importCount} 个预设`);
-                    openChatThemePresetModal(); // Refresh list
+                    Promise.all(promises).then(() => {
+                        showToast(`成功导入 ${importCount} 个预设`);
+                        openChatThemePresetModal(); // Refresh list
+                    }).catch(() => {
+                        showToast('部分预设导入失败，可能是存储空间不足');
+                        openChatThemePresetModal();
+                    });
                 } catch (err) {
                     showToast('导入失败，文件格式错误');
                     console.error('Preset import error:', err);
