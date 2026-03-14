@@ -10,7 +10,6 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <link rel="manifest" href="./manifest.json">
     <link rel="apple-touch-icon" href="icon.svg">
-    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
     <style>
         :root {
             --bg-color: #f0f2f5;
@@ -16206,12 +16205,37 @@ ${historyText}`;
                     }
                 }
 
-                // Create and download file using FileSaver.js
+                // Create and download file
                 const jsonStr = JSON.stringify(data);
-                const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+                const blob = new Blob([jsonStr], { type: 'application/json' });
                 const dateStr = new Date().toISOString().split('T')[0];
-                saveAs(blob, `suanpiji_backup_${dateStr}.json`);
-                showToast('导出成功');
+                const fileName = `suanpiji_backup_${dateStr}.json`;
+
+                // 使用 FileReader 转为 Data URL 以兼容部分不支持 blob: 下载的网页封装壳
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const dataUrl = e.target.result;
+                    const a = document.createElement('a');
+                    a.href = dataUrl;
+                    a.download = fileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    showToast('导出成功');
+                };
+                reader.onerror = function() {
+                    // 退回到标准 Blob 方式
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = fileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    showToast('导出成功');
+                };
+                reader.readAsDataURL(blob);
             } catch (error) {
                 console.error('Export failed:', error);
                 showToast('导出失败');

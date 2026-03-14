@@ -35,11 +35,6 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  // 如果是 blob URL（通常用于文件下载），则不拦截
-  if (event.request.url.startsWith('blob:')) {
-    return;
-  }
-  
   // 只处理 GET 请求的缓存
   if (event.request.method !== 'GET') return;
 
