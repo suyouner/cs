@@ -14940,8 +14940,8 @@ ${historyText}`;
                 if (!friend) return;
                 const boundIds = friend.boundWorldBooks || [];
                 
-                // Get world books from localStorage
-                let allWorldBooks = JSON.parse(localStorage.getItem('worldBooks')) || [];
+                // Get world books from global variable
+                let allWorldBooks = worldBooks || [];
                 
                 if (allWorldBooks.length === 0) {
                     listContainer.innerHTML = '<div style="text-align:center; color:#999; padding: 20px 0; font-size:14px;">暂无世界书，请先在世界书页面创建</div>';
@@ -15013,7 +15013,7 @@ ${historyText}`;
             if (!boundIds || boundIds.length === 0) {
                 textEl.textContent = '未绑定';
             } else {
-                let allWorldBooks = JSON.parse(localStorage.getItem('worldBooks')) || [];
+                let allWorldBooks = worldBooks || [];
                 const boundTitles = allWorldBooks.filter(wb => boundIds.includes(wb.id)).map(wb => wb.title);
                 if (boundTitles.length === 1) {
                     textEl.textContent = boundTitles[0];
@@ -15967,7 +15967,7 @@ ${historyText}`;
 
             const writingStyleSelect = document.getElementById('writing-style-select');
             writingStyleSelect.innerHTML = '<option value="default">默认风格</option>';
-            const localWorldBooks = JSON.parse(localStorage.getItem('worldBooks')) || [];
+            const localWorldBooks = worldBooks || [];
             localWorldBooks.forEach(book => {
                 const option = document.createElement('option');
                 option.value = book.id;
