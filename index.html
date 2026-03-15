@@ -1731,9 +1731,11 @@
             box-shadow: 0 -1px 3px rgba(0,0,0,0.05);
         }
         .quote-preview-content {
-            white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
             max-width: 90%;
             font-weight: 500;
         }
@@ -1767,11 +1769,12 @@
             margin-right: 4px;
         }
         .message-quote-text {
-            display: inline;
-            color: #888;
-            white-space: nowrap;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
             overflow: hidden;
             text-overflow: ellipsis;
+            color: #888;
             max-width: 200px;
             vertical-align: bottom;
         }
@@ -1848,6 +1851,7 @@
             outline: none;
             height: 36px;
             resize: none;
+            line-height: 1.4;
         }
         .send-button {
             padding: 8px 20px;
@@ -4467,7 +4471,7 @@
                     <svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="none" stroke-width="2"></circle><line x1="12" y1="13" x2="12" y2="19" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"></line><line x1="16" y1="10" x2="16" y2="22" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"></line><line x1="20" y1="13" x2="20" y2="19" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"></line></svg>
                 </div>
                 <div class="chat-input-wrapper">
-                    <input type="text" class="chat-input" id="chat-message-input" placeholder="" onfocus="hideAllInputPanels()">
+                    <textarea rows="1" class="chat-input" id="chat-message-input" placeholder="" onfocus="hideAllInputPanels()"></textarea>
                 </div>
                 <div class="chat-input-icon" id="emoji-icon">
                     <svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="none" stroke="currentColor" stroke-width="2"></circle><circle cx="11" cy="13" r="1.5" fill="currentColor" stroke="none"></circle><circle cx="21" cy="13" r="1.5" fill="currentColor" stroke="none"></circle><path d="M10 19 A8 8 0 0 0 22 19" stroke="currentColor" stroke-width="2" fill="none"></path></svg>
@@ -10533,6 +10537,7 @@
                 
                 pressTimer = setTimeout(() => {
                     isLongPress = true;
+                    e.preventDefault();
                     showMessageContextMenu(e, messageObj);
                 }, 500);
             };
@@ -11913,6 +11918,12 @@
                                 text: continuePrompt,
                                 timestamp: Date.now()
                             });
+                        } else if (!(friend.offlineSettings && friend.offlineSettings.enabled)) {
+                            history.push({
+                                type: 'system',
+                                text: "【系统强制指令】当前是【微信线上聊天模式】！\n1. 严禁使用「」引号包裹对话。\n2. 严禁发送任何背景旁白、动作描写或心理活动（如“我看着...”、“手指...”等）。\n3. 请直接输出你要回复的文字内容，就像你在用微信打字一样。",
+                                timestamp: Date.now()
+                            });
                         }
 
                     try {
@@ -12610,7 +12621,7 @@
                 if (friend.enableThoughts) {
                     prompt += `\n【心声功能特别强调】\n即便开启了心声功能，你在“线上模式”下的正文也【必须】保持纯粹的聊天格式，【严禁】任何形式的动作或心理描写。心声只能作为附加信息，使用 <mood> 和 <inner_thought> 标签包裹，并【必须】放在所有聊天消息的【最后面】。\n`;
                 }
-                prompt += `\n【！！！格式强力阻断警告！！！】：\n无论你们之前的聊天记录是什么格式（即使有小说般的动作或心理描写），**从现在起，请必须切换回纯粹的微信聊天格式**！\n1. **严禁任何动作描写**：聊天正文中绝对不能出现如 *看着你*、(叹气)、走过去、微笑着说 等任何形式的动作、神态描述或旁白。\n2. **严禁在正文输出心理标签**：不要在正文中输出 <thought> 标签。心理活动请严格使用 <inner_thought> 标签包裹（且只能放在最后），不要在对话中间穿插。\n3. **只需要说话的内容**：除了符合角色身份的话语，不要加任何多余的文字修饰和引号，直接输出语言！严禁输出 <br> 等 HTML 代码。\n`;
+                prompt += `\n【！！！格式强力阻断警告！！！】：\n无论你们之前的聊天记录是什么格式（即使有小说般的动作或心理描写），**从现在起，请必须切换回纯粹的微信聊天格式**！\n1. **严禁任何动作描写**：聊天正文中绝对不能出现如 *看着你*、(叹气)、走过去、微笑着说 等任何形式的动作、神态描述或旁白。\n2. **严禁在正文输出心理标签**：不要在正文中输出 <thought> 标签。心理活动请严格使用 <inner_thought> 标签包裹（且只能放在最后），不要在对话中间穿插。\n3. **只需要说话的内容**：除了符合角色身份的话语，不要加任何多余的文字修饰，**严禁使用「」等引号包裹对话**，直接输出语言！严禁输出 <br> 等 HTML 代码。\n`;
                 prompt += `\n            【例如】，对于“你好呀，今天天气真不错！吃饭了吗？”，你可以灵活地回复为：\n\n            - **方案一:**\n              你好呀\n              今天天气真不错！\n              吃饭了吗？\n\n            - **方案二:**\n              你好呀，今天天气真不错！\n              吃饭了吗？\n\n            - **方案三:**\n              你好呀\n              今天天气真不错！吃饭了吗？\n\n            请根据你的角色性格和当前对话的节奏，自然地选择如何断句。\n            \n【功能指令】：\n1. 引用回复：如果你想引用对方（用户）的某句话进行针对性回复，请在这条消息中使用格式 <quote>被引用的对方的话</quote>。
 2. 发起转账：如果你想给对方（用户）转账，请输出单独的一行：<transfer amount="金额">备注说明</transfer>。例如：<transfer amount="52.00">请你喝奶茶</transfer>。
 3. 接收转账：如果对方（用户）给你转账了，你想接收，请在回复中包含：[已接收]。系统会自动将其转换为确认收款的卡片。
@@ -16208,34 +16219,16 @@ ${historyText}`;
                 // Create and download file
                 const jsonStr = JSON.stringify(data);
                 const blob = new Blob([jsonStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
                 const dateStr = new Date().toISOString().split('T')[0];
-                const fileName = `suanpiji_backup_${dateStr}.json`;
-
-                // 使用 FileReader 转为 Data URL 以兼容部分不支持 blob: 下载的网页封装壳
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const dataUrl = e.target.result;
-                    const a = document.createElement('a');
-                    a.href = dataUrl;
-                    a.download = fileName;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    showToast('导出成功');
-                };
-                reader.onerror = function() {
-                    // 退回到标准 Blob 方式
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = fileName;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    showToast('导出成功');
-                };
-                reader.readAsDataURL(blob);
+                a.download = `suanpiji_backup_${dateStr}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showToast('导出成功');
             } catch (error) {
                 console.error('Export failed:', error);
                 showToast('导出失败');
