@@ -7517,9 +7517,9 @@
                         grouped[g].push(f);
                     });
 
-                    for (const groupName in grouped) {
+                    for (const groupName of Object.keys(grouped)) {
                         const groupFriends = grouped[groupName];
-                        processGroupInteractions(postId, groupFriends, config);
+                        await processGroupInteractions(postId, groupFriends, config);
                     }
                 });
             });
