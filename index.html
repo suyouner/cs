@@ -12210,6 +12210,8 @@
 
                                 if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
                                     addMessageToUI(responseMsg);
+                                } else {
+                                    responseMsg.isRead = false;
                                 }
                                 await new Promise(resolve => dbAdd('chat_history', responseMsg, resolve));
                                 
@@ -12460,6 +12462,7 @@
                                             if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
                                                 addMessageToUI(textMsg);
                                             } else {
+                                                textMsg.isRead = false;
                                                 showBannerNotification(friend, partText);
                                             }
                                             await new Promise(resolve => dbAdd('chat_history', textMsg, resolve));
@@ -12469,6 +12472,7 @@
                                         if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
                                             addMessageToUI(transferMsg);
                                         } else {
+                                            transferMsg.isRead = false;
                                             showBannerNotification(friend, `[转账] ¥${transferData.amount}`);
                                         }
                                         await new Promise(resolve => dbAdd('chat_history', transferMsg, resolve));
@@ -12480,6 +12484,7 @@
                                             if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
                                                 addMessageToUI(textMsg);
                                             } else {
+                                                textMsg.isRead = false;
                                                 showBannerNotification(friend, partText);
                                             }
                                             await new Promise(resolve => dbAdd('chat_history', textMsg, resolve));
@@ -12489,6 +12494,7 @@
                                         if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
                                             addMessageToUI(stickerMsg);
                                         } else {
+                                            stickerMsg.isRead = false;
                                             showBannerNotification(friend, '[表情包]');
                                         }
                                         await new Promise(resolve => dbAdd('chat_history', stickerMsg, resolve));
@@ -12500,6 +12506,7 @@
                                             if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
                                                 addMessageToUI(textMsg);
                                             } else {
+                                                textMsg.isRead = false;
                                                 showBannerNotification(friend, partText);
                                             }
                                             await new Promise(resolve => dbAdd('chat_history', textMsg, resolve));
@@ -12510,6 +12517,7 @@
                                         if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
                                             bubble = addMessageToUI(diceMsg);
                                         } else {
+                                            diceMsg.isRead = false;
                                             showBannerNotification(friend, '[骰子]');
                                         }
                                         
@@ -12529,14 +12537,17 @@
                                         const responseMsg = { friendId: friend.id, text: partText, type: 'received', timestamp: Date.now() };
                                         if (quoteData) responseMsg.quote = quoteData;
 
-                                if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
-                                    addMessageToUI(responseMsg);
-                                } else {
-                                    if (partText) {
-                                        responseMsg.isRead = false; // 标记为未读
-                                        showBannerNotification(friend, partText);
+                                        if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
+                                            addMessageToUI(responseMsg);
+                                        } else {
+                                            if (partText) {
+                                                responseMsg.isRead = false;
+                                                showBannerNotification(friend, partText);
+                                            }
+                                        }
+                                        await new Promise(resolve => dbAdd('chat_history', responseMsg, resolve));
+                                        friend.lastMsg = partText;
                                     }
-                                }
                                 await new Promise(resolve => dbAdd('chat_history', responseMsg, resolve));
                                 friend.lastMsg = partText;
                                     }
@@ -13406,19 +13417,23 @@
                                     }
                                 }
 
-                                if (transferData) {
-                                    if (partText) {
-                                        const textMsg = {
-                                            friendId: friend.id,
-                                            text: partText,
-                                            type: 'received',
-                                            timestamp: Date.now()
-                                        };
-                                        if (quoteData) textMsg.quote = quoteData;
-                                        await new Promise(resolve => dbAdd('chat_history', textMsg, resolve));
-                                        if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) addMessageToUI(textMsg);
-                                        else showBannerNotification(friend, partText);
-                                    }
+                                    if (transferData) {
+                                        if (partText) {
+                                            const textMsg = {
+                                                friendId: friend.id,
+                                                text: partText,
+                                                type: 'received',
+                                                timestamp: Date.now()
+                                            };
+                                            if (quoteData) textMsg.quote = quoteData;
+                                            if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
+                                                addMessageToUI(textMsg);
+                                            } else {
+                                                textMsg.isRead = false;
+                                                showBannerNotification(friend, partText);
+                                            }
+                                            await new Promise(resolve => dbAdd('chat_history', textMsg, resolve));
+                                        }
                                     
                                     const transferMsg = {
                                         friendId: friend.id,
@@ -13431,9 +13446,13 @@
                                         transferStatus: transferData.status || 'PENDING',
                                         isReceipt: transferData.isReceipt || false
                                     };
+                                    if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
+                                        addMessageToUI(transferMsg);
+                                    } else {
+                                        transferMsg.isRead = false;
+                                        showBannerNotification(friend, `[转账] ¥${transferData.amount}`);
+                                    }
                                     await new Promise(resolve => dbAdd('chat_history', transferMsg, resolve));
-                                    if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) addMessageToUI(transferMsg);
-                                    else showBannerNotification(friend, `[转账] ¥${transferData.amount}`);
                                     friend.lastMsg = `[转账]`;
                                 } else if (aiStickerUrl) {
                                     if (partText) {
@@ -13444,9 +13463,13 @@
                                             timestamp: Date.now()
                                         };
                                         if (quoteData) textMsg.quote = quoteData;
+                                        if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
+                                            addMessageToUI(textMsg);
+                                        } else {
+                                            textMsg.isRead = false;
+                                            showBannerNotification(friend, partText);
+                                        }
                                         await new Promise(resolve => dbAdd('chat_history', textMsg, resolve));
-                                        if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) addMessageToUI(textMsg);
-                                        else showBannerNotification(friend, partText);
                                     }
 
                                     const stickerMsg = {
@@ -13456,9 +13479,13 @@
                                         timestamp: Date.now() + 100,
                                         isSticker: true
                                     };
+                                    if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
+                                        addMessageToUI(stickerMsg);
+                                    } else {
+                                        stickerMsg.isRead = false;
+                                        showBannerNotification(friend, '[表情包]');
+                                    }
                                     await new Promise(resolve => dbAdd('chat_history', stickerMsg, resolve));
-                                    if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) addMessageToUI(stickerMsg);
-                                    else showBannerNotification(friend, '[表情包]');
                                     friend.lastMsg = '[表情包]';
                                 } else if (hasDice) {
                                     if (partText) {
@@ -13469,9 +13496,13 @@
                                             timestamp: Date.now()
                                         };
                                         if (quoteData) textMsg.quote = quoteData;
+                                        if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
+                                            addMessageToUI(textMsg);
+                                        } else {
+                                            textMsg.isRead = false;
+                                            showBannerNotification(friend, partText);
+                                        }
                                         await new Promise(resolve => dbAdd('chat_history', textMsg, resolve));
-                                        if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) addMessageToUI(textMsg);
-                                        else showBannerNotification(friend, partText);
                                     }
 
                                     const diceMsg = {
@@ -13486,6 +13517,7 @@
                                     if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
                                         bubble = addMessageToUI(diceMsg);
                                     } else {
+                                        diceMsg.isRead = false;
                                         showBannerNotification(friend, '[骰子]');
                                     }
                                     
