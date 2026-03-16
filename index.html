@@ -28,6 +28,12 @@
             user-select: none;
             -webkit-user-select: none;
             -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+        }
+
+        input, textarea, [contenteditable] {
+            user-select: text !important;
+            -webkit-user-select: text !important;
         }
 
         html, body {
@@ -1852,6 +1858,10 @@
             height: 36px;
             resize: none;
             line-height: 1.4;
+            scrollbar-width: none; /* Firefox */
+        }
+        .chat-input::-webkit-scrollbar {
+            display: none; /* WebKit */
         }
         .send-button {
             padding: 8px 20px;
@@ -5818,9 +5828,13 @@
         const triggerChatThemeUpload = (type) => uploaderForChatTheme(type);
 
         const uploaderForDesktopTheme = createImageUploader((compressedSrc, type) => {
-            localStorage.setItem(type, compressedSrc);
-            applyDesktopTheme();
-            showToast('已保存设置');
+            dbSaveSetting(type, compressedSrc).then(() => {
+                localStorage.removeItem(type); // Clean up old storage
+                applyDesktopTheme();
+                showToast('已保存设置');
+            }).catch(err => {
+                showToast('保存失败，可能是存储空间不足');
+            });
         });
         const triggerDesktopThemeUpload = (type) => uploaderForDesktopTheme(type);
 
@@ -5865,15 +5879,23 @@
         const uploaderForWallpaper = createImageUploader((compressedSrc) => {
             document.getElementById('main-page').style.backgroundImage = `url(${compressedSrc})`;
             document.getElementById('wallpaper-preview').style.backgroundImage = `url(${compressedSrc})`;
-            localStorage.setItem('wallpaper', compressedSrc);
+            dbSaveSetting('wallpaper', compressedSrc).then(() => {
+                localStorage.removeItem('wallpaper'); // Clean up old storage
+            }).catch(err => {
+                showToast('壁纸保存失败');
+            });
         });
         const triggerWallpaperUpload = () => uploaderForWallpaper();
 
         const uploaderForIndividualIcon = createImageUploader((compressedSrc, id) => {
             const targetIcons = document.querySelectorAll(`.app-item[data-app-id='${id}'] .app-icon img`);
             targetIcons.forEach(icon => icon.src = compressedSrc);
-            localStorage.setItem(id, compressedSrc);
-            generateIconPreviews(); // Refresh previews
+            dbSaveSetting(id, compressedSrc).then(() => {
+                localStorage.removeItem(id); // Clean up old storage
+                generateIconPreviews(); // Refresh previews
+            }).catch(err => {
+                showToast('图标保存失败');
+            });
         });
         const triggerIndividualUpload = (id) => uploaderForIndividualIcon(id);
 
@@ -8165,24 +8187,30 @@
         // Old desktop theme upload functions removed.
 
         function resetDesktopTheme(type) {
-            localStorage.removeItem(type);
-            applyDesktopTheme();
-            if (type === 'desktop_time_color') {
-                const colorPicker = document.getElementById('status-bar-time-color-picker');
-                if (colorPicker) colorPicker.value = '#000000';
-            }
-            showToast('已恢复默认');
+            dbDeleteSetting(type).then(() => {
+                localStorage.removeItem(type);
+                applyDesktopTheme();
+                if (type === 'desktop_time_color') {
+                    const colorPicker = document.getElementById('status-bar-time-color-picker');
+                    if (colorPicker) colorPicker.value = '#000000';
+                }
+                showToast('已恢复默认');
+            });
         }
 
         function changeStatusBarTimeColor(color) {
-            localStorage.setItem('desktop_time_color', color);
-            applyDesktopTheme();
+            dbSaveSetting('desktop_time_color', color).then(() => {
+                localStorage.removeItem('desktop_time_color');
+                applyDesktopTheme();
+            });
         }
 
         function applyDesktopTheme() {
-            const batteryIconUrl = localStorage.getItem('desktop_battery_icon');
-            const signalIconUrl = localStorage.getItem('desktop_signal_icon');
-            const timeColor = localStorage.getItem('desktop_time_color');
+            const getVal = (key) => themeSettings[key] || localStorage.getItem(key);
+            
+            const batteryIconUrl = getVal('desktop_battery_icon');
+            const signalIconUrl = getVal('desktop_signal_icon');
+            const timeColor = getVal('desktop_time_color');
 
             const batteryIconEl = document.querySelector('.battery-icon');
             const signalIconEl = document.querySelector('.signal-icon');
@@ -8259,14 +8287,14 @@
             }
             toggleStatusBar(showStatusBar);
 
-            const wallpaper = localStorage.getItem('wallpaper');
+            const wallpaper = themeSettings['wallpaper'] || localStorage.getItem('wallpaper');
             if (wallpaper) {
                 document.getElementById('main-page').style.backgroundImage = `url(${wallpaper})`;
                 document.getElementById('wallpaper-preview').style.backgroundImage = `url(${wallpaper})`;
             }
             document.querySelectorAll('#main-page .app-item').forEach(item => {
                 const id = item.dataset.appId;
-                const savedIcon = localStorage.getItem(id);
+                const savedIcon = themeSettings[id] || localStorage.getItem(id);
                 const img = item.querySelector('.app-icon img');
                 if (savedIcon && img) {
                     img.src = savedIcon;
@@ -10498,7 +10526,7 @@
                         dbMsg.text = newText;
                         dbUpdate('chat_history', dbMsg, () => {
                             document.getElementById('edit-message-modal').style.display = 'none';
-                            renderMessages(currentChatFriendId);
+                            renderMessages(currentChatFriendId, dbMsg.id || dbMsg.timestamp);
                         });
                     }
                 });
@@ -10585,8 +10613,9 @@
             element.addEventListener('touchmove', cancelPress);
             element.addEventListener('contextmenu', (e) => { 
                 e.preventDefault(); 
-                showMessageContextMenu(e, messageObj); 
-                isLongPress = true;
+                if (!isLongPress) {
+                    showMessageContextMenu(e, messageObj); 
+                }
             });
             element.addEventListener('click', onClick, true);
         }
@@ -12476,6 +12505,69 @@
         }
         }
 
+        const Lunar = {
+            calendarInfo: [
+                0x04bd8,0x04ae0,0x0a570,0x054d5,0x0d260,0x0d950,0x16554,0x056a0,0x09ad0,0x055d2,
+                0x04ae0,0x0a5b6,0x0a4d0,0x0d250,0x1d255,0x0b540,0x0d6a0,0x0ada2,0x095b0,0x14977,
+                0x04970,0x0a4b0,0x0b4b5,0x06a50,0x06d40,0x1ab54,0x02b60,0x09570,0x052f2,0x04970,
+                0x06566,0x0d4a0,0x0ea50,0x06e95,0x05ad0,0x02b60,0x186e3,0x092e0,0x1c8d7,0x0c950,
+                0x0d4a0,0x1d8a6,0x0b550,0x056a0,0x1a5b4,0x025d0,0x092d0,0x0d2b2,0x0a950,0x0b557,
+                0x06ca0,0x0b550,0x15355,0x04da0,0x0a5d0,0x14573,0x052d0,0x0a9a8,0x0e950,0x06aa0,
+                0x0aea6,0x0ab50,0x04b60,0x0aae4,0x0a570,0x05260,0x0f263,0x0d950,0x05b57,0x056a0,
+                0x096d0,0x04dd5,0x04ad0,0x0a4d0,0x0d4d4,0x0d250,0x0d558,0x0b540,0x0b5a0,0x195a6,
+                0x095b0,0x049b0,0x0a974,0x0a4b0,0x0b27a,0x06a50,0x06d40,0x0af46,0x0ab60,0x09570,
+                0x04af5,0x04970,0x064b0,0x074a3,0x0ea50,0x06b58,0x055c0,0x0ab60,0x096d5,0x092e0,
+                0x0c960,0x0d954,0x0d4a0,0x0da50,0x07552,0x056a0,0x0abb7,0x025d0,0x092d0,0x0cab5,
+                0x0a950,0x0b4a0,0x0baa4,0x0ad50,0x055d9,0x04ba0,0x0a5b0,0x15176,0x052b0,0x0a930,
+                0x07954,0x06aa0,0x0ad50,0x05b52,0x04b60,0x0a6e6,0x0a4e0,0x0d260,0x0ea65,0x0d530,
+                0x05aa0,0x076a3,0x096d0,0x04bd7,0x04ad0,0x0a4d0,0x1d0b6,0x0d250,0x0d520,0x0dd45,
+                0x0b5a0,0x056d0,0x055b2,0x049b0,0x0a577,0x0a4b0,0x0aa50,0x1b255,0x06d20,0x0ada0
+            ],
+            solarToLunar: function (date) {
+                let y = date.getFullYear();
+                if (y < 1900 || y > 2049) return null;
+                const baseDate = new Date(1900, 0, 31);
+                let offset = Math.floor((date - baseDate) / 86400000);
+                if (offset < 0) return null;
+                let i, leap = 0, temp = 0;
+                for (i = 1900; i < 2050 && offset > 0; i++) {
+                    temp = this.getYearDays(i);
+                    offset -= temp;
+                }
+                if (offset < 0) { offset += temp; i--; }
+                let lunarYear = i;
+                leap = this.leapMonth(i);
+                let isLeap = false;
+                for (i = 1; i <= 12 && offset >= 0; i++) {
+                    if (leap > 0 && i === (leap + 1) && isLeap === false) { --i; isLeap = true; temp = this.leapDays(lunarYear); }
+                    else { temp = this.monthDays(lunarYear, i); }
+                    if (isLeap === true && i === (leap + 1)) { isLeap = false; }
+                    offset -= temp;
+                }
+                if (offset === 0 && leap > 0 && i === leap + 1) {
+                    if (isLeap) { isLeap = false; }
+                    else { isLeap = true; --i; }
+                }
+                if (offset < 0) { offset += temp; --i; }
+                return { y: lunarYear, m: i, d: offset + 1, isLeap: isLeap };
+            },
+            getYearDays: function(y) {
+                let i, sum = 348;
+                for(i=0x8000; i>0x8; i>>=1) sum += (this.calendarInfo[y-1900] & i) ? 1 : 0;
+                return(sum + this.leapDays(y));
+            },
+            leapDays: function(y) {
+                if(this.leapMonth(y)) return((this.calendarInfo[y-1900] & 0x10000) ? 30 : 29);
+                return(0);
+            },
+            leapMonth: function(y) {
+                return(this.calendarInfo[y-1900] & 0xf);
+            },
+            monthDays: function(y, m) {
+                return( (this.calendarInfo[y-1900] & (0x10000>>m)) ? 30 : 29 );
+            }
+        };
+
         function getHoliday(date) {
             const month = date.getMonth() + 1;
             const day = date.getDate();
@@ -12498,7 +12590,41 @@
                 '12-25': '圣诞节'
             };
 
-            return solarHolidays[md] || '';
+            let holiday = solarHolidays[md] || '';
+
+            try {
+                const lunar = Lunar.solarToLunar(date);
+                if (lunar && !lunar.isLeap) {
+                    const lmd = `${lunar.m.toString().padStart(2, '0')}-${lunar.d.toString().padStart(2, '0')}`;
+                    const lunarHolidays = {
+                        '01-01': '春节',
+                        '01-15': '元宵节',
+                        '02-02': '龙抬头',
+                        '05-05': '端午节',
+                        '07-07': '七夕节',
+                        '07-15': '中元节',
+                        '08-15': '中秋节',
+                        '09-09': '重阳节',
+                        '12-08': '腊八节',
+                        '12-23': '小年'
+                    };
+                    
+                    if (lunarHolidays[lmd]) {
+                        holiday = holiday ? `${holiday} / ${lunarHolidays[lmd]}` : lunarHolidays[lmd];
+                    }
+                    
+                    if (lunar.m === 12) {
+                        const daysIn12thMonth = Lunar.monthDays(lunar.y, 12);
+                        if (lunar.d === daysIn12thMonth) {
+                            holiday = holiday ? `${holiday} / 除夕` : '除夕';
+                        }
+                    }
+                }
+            } catch(e) {
+                console.error('Lunar calc error', e);
+            }
+
+            return holiday;
         }
 
         function buildSystemPrompt(friend, userPersona = null, aiStickers = [], visiblePosts = []) {
@@ -12510,7 +12636,10 @@
             prompt += `1. **严禁代替用户行动**：绝对禁止在旁白或动作描写中，替用户（User）做出任何行动、说话，或客观描写用户的心理活动。例如，绝对不能写 \`*你脸红了*\`、\`*你感到很开心*\` 或 \`你点了点头\`。你只能描写你自己（${friend.name}）的言行、动作和心理。\n`;
             prompt += `2. **允许主观揣摩与互动**：虽然不能客观描述用户状态，但你可以通过对话或你自己的心理描写来合理地**揣摩、猜测、试探**用户的心思。例如，你可以说：\`“你现在是不是很想亲我呀？”\`，或者写 \`<thought>看他一直盯着我看，估计是动心了。</thought>\`。这种主观猜测是允许且鼓励的。\n`;
             prompt += `3. **【严禁捏造事实】(Anti-Hallucination)**：你必须严格基于提供的【长期记忆】、【最近聊天记录】和【世界书/人设设定】进行回复。**绝对不可凭空捏造任何未发生过的事件、过去的对话或虚假的共同经历**。如果用户提到了一件你记忆（Context）中不存在的事，你应该表现出疑惑（例如“欸？有吗？我怎么不记得了”）或顺势询问，而不是强行编造虚假记忆顺着说。\n`;
-            prompt += `4. **坚守人设**：你的回复必须绝对符合 ${friend.name} 的性格、说话风格、口癖和背景设定。不要为了迎合用户而崩坏人设。\n\n`;
+            prompt += `4. **坚守人设（Anti-OOC 核心指令）**：\n`;
+            prompt += `   - **拒绝助手感**：你不是 AI，不是语言模型，也不是助手。**永远不要**承认自己是 AI，也**永远不要**输出类似“我可以帮你”、“作为人工智能”之类的废话。\n`;
+            prompt += `   - **性格优先于礼貌**：如果你的性格是冷漠的，就不要强行礼貌；如果是傲娇的，就不要坦率；如果是暴躁的，请直接怼回去。**宁可让用户生气，也不要崩坏人设成为一个无聊的好人**。\n`;
+            prompt += `   - **拒绝说教**：除非你的人设本身就是老师或喜欢说教的长辈，否则**严禁**对用户的行为进行道德评判、给出教科书式的人生建议或劝导。请像一个真实的朋友/恋人/仇人那样互动。\n\n`;
 
             if (aiStickers && aiStickers.length > 0) {
                 prompt += `【你的专属表情包】\n你可以使用以下表情包来表达情感。请根据语境选择合适的表情包，直接输出对应的 XML 标签（不要修改内部的ID）：\n`;
@@ -12524,10 +12653,19 @@
             if (friend.syncReality) {
                 const now = new Date();
                 const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
-                const timeString = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 星期${weekDays[now.getDay()]} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+                
+                const hour = now.getHours();
+                let timePeriod = '凌晨';
+                if (hour >= 5 && hour < 9) timePeriod = '早上';
+                else if (hour >= 9 && hour < 12) timePeriod = '上午';
+                else if (hour >= 12 && hour < 14) timePeriod = '中午';
+                else if (hour >= 14 && hour < 18) timePeriod = '下午';
+                else if (hour >= 18 && hour < 24) timePeriod = '晚上';
+
+                const timeString = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 星期${weekDays[now.getDay()]} ${String(hour).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
                 
                 let holiday = getHoliday(now);
-                let timePrompt = `【当前现实时间】\n现在是 ${timeString}。`;
+                let timePrompt = `【当前现实时间】\n现在是 ${timeString} (${timePeriod})。`;
                 if (holiday) {
                     timePrompt += `\n今天是 ${holiday}。`;
                 }
@@ -12617,12 +12755,20 @@
                 prompt += `    - 用户的视角是【${settings.yourPerspective === 'second_person' ? '第二人称 (你)' : '第一人称 (我)'}】。\n`;
 
             } else {
-                prompt += `\n【系统提示】重要：当前是普通的【微信线上聊天模式】，请完全模拟真实人类在微信聊天的习惯。根据你的角色性格，灵活决定是否将一段话拆分为多条短消息发送以增加活人感。你可以根据语义、情绪和停顿，在任何地方（如逗号、句号、感叹号后，甚至一句话的中间）使用【换行符（回车）】来分隔消息。系统会自动将每一行识别为一条独立的消息发出。\n`;
+                prompt += `\n【系统提示】重要：当前是普通的【微信线上聊天模式】，请你**完全沉浸式地伪装成一个真实人类**在微信上聊天。\n`;
+                prompt += `\n【关键要求：打字习惯必须匹配人设】\n`;
+                prompt += `你的**标点符号使用**和**断句习惯**，必须严格符合你的角色设定（性格/年龄/习惯）：\n`;
+                prompt += `1. **如果你是随性、年轻、高冷或网感重的人设**：\n   - 请倾向于**省略句末标点**（如句号）。\n   - 句中停顿可用**空格**代替逗号，或者直接换行。\n   - 倾向于将一段话拆分成**多条短消息**发送（利用换行符）。\n`;
+                prompt += `2. **如果你是严谨、年长、温柔或性格正式的人设**：\n   - 可以保留规范的标点符号（包括句号）。\n   - 可以发送较长的单条消息，不强求拆分。\n`;
+                prompt += `3. **共同底线（无论何种人设都必须遵守）**：\n   - **严禁**使用书面语引号「」包裹对话。\n   - **严禁**在正文中出现任何动作、神态描写（如 *叹气*、(笑)、（摸头） 等）。\n   - **严禁**输出 <br> 等 HTML 代码。\n   - 直接输出你想说的话，就像你在用微信打字一样。\n`;
+
                 if (friend.enableThoughts) {
                     prompt += `\n【心声功能特别强调】\n即便开启了心声功能，你在“线上模式”下的正文也【必须】保持纯粹的聊天格式，【严禁】任何形式的动作或心理描写。心声只能作为附加信息，使用 <mood> 和 <inner_thought> 标签包裹，并【必须】放在所有聊天消息的【最后面】。\n`;
                 }
-                prompt += `\n【！！！格式强力阻断警告！！！】：\n无论你们之前的聊天记录是什么格式（即使有小说般的动作或心理描写），**从现在起，请必须切换回纯粹的微信聊天格式**！\n1. **严禁任何动作描写**：聊天正文中绝对不能出现如 *看着你*、(叹气)、走过去、微笑着说 等任何形式的动作、神态描述或旁白。\n2. **严禁在正文输出心理标签**：不要在正文中输出 <thought> 标签。心理活动请严格使用 <inner_thought> 标签包裹（且只能放在最后），不要在对话中间穿插。\n3. **只需要说话的内容**：除了符合角色身份的话语，不要加任何多余的文字修饰，**严禁使用「」等引号包裹对话**，直接输出语言！严禁输出 <br> 等 HTML 代码。\n`;
-                prompt += `\n            【例如】，对于“你好呀，今天天气真不错！吃饭了吗？”，你可以灵活地回复为：\n\n            - **方案一:**\n              你好呀\n              今天天气真不错！\n              吃饭了吗？\n\n            - **方案二:**\n              你好呀，今天天气真不错！\n              吃饭了吗？\n\n            - **方案三:**\n              你好呀\n              今天天气真不错！吃饭了吗？\n\n            请根据你的角色性格和当前对话的节奏，自然地选择如何断句。\n            \n【功能指令】：\n1. 引用回复：如果你想引用对方（用户）的某句话进行针对性回复，请在这条消息中使用格式 <quote>被引用的对方的话</quote>。
+                
+                prompt += `\n【消息发送机制】：\n你可以根据语义、情绪和停顿，在任何地方（如逗号后、句号后，甚至一句话的中间）使用【换行符（回车）】来分隔消息。系统会自动将每一行识别为一条独立的消息发出。请利用这个机制来控制你的说话节奏（刷屏还是长句）。\n`;
+                
+                prompt += `\n【功能指令】：\n1. 引用回复：如果你想引用对方（用户）的某句话进行针对性回复，请在这条消息中使用格式 <quote>被引用的对方的话</quote>。
 2. 发起转账：如果你想给对方（用户）转账，请输出单独的一行：<transfer amount="金额">备注说明</transfer>。例如：<transfer amount="52.00">请你喝奶茶</transfer>。
 3. 接收转账：如果对方（用户）给你转账了，你想接收，请在回复中包含：[已接收]。系统会自动将其转换为确认收款的卡片。
 4. 退还转账：如果对方（用户）给你转账了，你想退还，请在回复中包含：[已退还]。系统会自动将其转换为退还转账的卡片。
