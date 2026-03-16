@@ -1039,6 +1039,27 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            margin-right: 25px; /* 为角标留出空间 */
+            position: relative;
+        }
+
+        .unread-badge {
+            position: absolute;
+            top: 50%;
+            right: -20px;
+            transform: translateY(-50%);
+            background-color: #ff3b30;
+            color: white;
+            font-size: 12px;
+            font-weight: 500;
+            border-radius: 50%;
+            min-width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 5px;
+            box-sizing: border-box;
         }
 
         .wechat-footer {
@@ -9590,26 +9611,47 @@
                     return b.id.localeCompare(a.id); // Sort by newest first
                 });
                 
-                visibleFriends.forEach(friend => {
-                    const item = document.createElement('div');
-                    item.className = 'chat-item';
-                    item.dataset.friendId = friend.id;
-                    if (friend.isPinned) {
-                        item.style.backgroundColor = '#f5f5f5';
-                    }
+                const unreadPromises = visibleFriends.map(friend => {
+                    return new Promise(resolve => {
+                        const transaction = db.transaction(['chat_history'], 'readonly');
+                        const store = transaction.objectStore('chat_history');
+                        const index = store.index('friendId');
+                        const request = index.getAll(friend.id);
+                        
+                        request.onsuccess = () => {
+                            const unreadCount = request.result.filter(m => m.isRead === false && m.type === 'received').length;
+                            resolve({ friend, unreadCount });
+                        };
+                        request.onerror = () => resolve({ friend, unreadCount: 0 });
+                    });
+                });
 
-                    item.innerHTML = `
-                        <img class="chat-avatar" src="${friend.avatar}" alt="${friend.name}">
-                        <div class="chat-info">
-                            <div class="chat-top">
-                                <span class="chat-name">${friend.name}</span>
-                                <span class="chat-time">${friend.lastTime}</span>
+                Promise.all(unreadPromises).then(results => {
+                    results.forEach(({ friend, unreadCount }) => {
+                        const item = document.createElement('div');
+                        item.className = 'chat-item';
+                        item.dataset.friendId = friend.id;
+                        if (friend.isPinned) {
+                            item.style.backgroundColor = '#f5f5f5';
+                        }
+
+                        const unreadBadgeHtml = unreadCount > 0 ? `<span class="unread-badge">${unreadCount}</span>` : '';
+
+                        item.innerHTML = `
+                            <img class="chat-avatar" src="${friend.avatar}" alt="${friend.name}">
+                            <div class="chat-info">
+                                <div class="chat-top">
+                                    <span class="chat-name">${friend.name}</span>
+                                    <span class="chat-time">${friend.lastTime}</span>
+                                </div>
+                                <div class="chat-preview">
+                                    ${friend.lastMsg}
+                                    ${unreadBadgeHtml}
+                                </div>
                             </div>
-                            <div class="chat-preview">${friend.lastMsg}</div>
-                        </div>
-                    `;
+                        `;
 
-                    let pressTimer;
+                        let pressTimer;
                     let startX, startY;
                     let wasLongPress = false;
 
@@ -9662,6 +9704,7 @@
                     item.addEventListener('contextmenu', (e) => e.preventDefault());
 
                     list.appendChild(item);
+                    });
                 });
             });
         }
@@ -11649,6 +11692,31 @@
                 document.querySelector('.status-bar').style.backgroundColor = 'transparent';
                 
                 applyChatTheme(friend);
+
+                // Mark messages as read
+                const transaction = db.transaction(['chat_history'], 'readwrite');
+                const store = transaction.objectStore('chat_history');
+                const index = store.index('friendId');
+                const request = index.openCursor(IDBKeyRange.only(friendId));
+
+                request.onsuccess = (event) => {
+                    const cursor = event.target.result;
+                    if (cursor) {
+                        const message = cursor.value;
+                        if (message.isRead === false) {
+                            message.isRead = true;
+                            cursor.update(message);
+                        }
+                        cursor.continue();
+                    }
+                };
+
+                transaction.oncomplete = () => {
+                    // Re-render chat list to remove unread badge
+                    if (document.getElementById('wechat-page').classList.contains('active')) {
+                       renderChatList();
+                    }
+                };
             });
         }
 
@@ -12461,13 +12529,16 @@
                                         const responseMsg = { friendId: friend.id, text: partText, type: 'received', timestamp: Date.now() };
                                         if (quoteData) responseMsg.quote = quoteData;
 
-                                        if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
-                                            addMessageToUI(responseMsg);
-                                        } else {
-                                            if (partText) showBannerNotification(friend, partText);
-                                        }
-                                        await new Promise(resolve => dbAdd('chat_history', responseMsg, resolve));
-                                        friend.lastMsg = partText;
+                                if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
+                                    addMessageToUI(responseMsg);
+                                } else {
+                                    if (partText) {
+                                        responseMsg.isRead = false; // 标记为未读
+                                        showBannerNotification(friend, partText);
+                                    }
+                                }
+                                await new Promise(resolve => dbAdd('chat_history', responseMsg, resolve));
+                                friend.lastMsg = partText;
                                     }
 
                                     friend.lastTime = getCurrentTimeStr();
@@ -13438,9 +13509,14 @@
                                         timestamp: Date.now()
                                     };
                                     if (quoteData) responseMsg.quote = quoteData;
+                                    
+                                    if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
+                                        addMessageToUI(responseMsg);
+                                    } else {
+                                        responseMsg.isRead = false; // 标记为未读
+                                        showBannerNotification(friend, partText);
+                                    }
                                     await new Promise(resolve => dbAdd('chat_history', responseMsg, resolve));
-                                    if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) addMessageToUI(responseMsg);
-                                    else showBannerNotification(friend, partText);
                                     friend.lastMsg = partText;
                                 }
 
