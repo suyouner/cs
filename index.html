@@ -5391,83 +5391,6 @@
     </div>
 
     <script>
-        // ===== 推送通知 =====
-        let pushSubscription = null;
-
-        // 转换 VAPID 公钥
-        function urlBase64ToUint8Array(base64String) {
-          const padding = '='.repeat((4 - base64String.length % 4) % 4);
-          const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
-          const rawData = window.atob(base64);
-          const outputArray = new Uint8Array(rawData.length);
-          for (let i = 0; i < rawData.length; ++i) {
-            outputArray[i] = rawData.charCodeAt(i);
-          }
-          return outputArray;
-        }
-
-        // 订阅推送
-        async function subscribePush() {
-          try {
-            const registration = await navigator.serviceWorker.ready;
-            
-            // 请求通知权限
-            const permission = await Notification.requestPermission();
-            if (permission !== 'granted') {
-              console.log('通知权限被拒绝');
-              return;
-            }
-            
-            // 检查是否已订阅
-            const existingSubscription = await registration.pushManager.getSubscription();
-            if (existingSubscription) {
-              pushSubscription = existingSubscription;
-              console.log('已存在订阅');
-              return;
-            }
-            
-            // VAPID 公钥（硬编码的测试密钥）
-            const vapidPublicKey = 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U';
-            
-            // 新订阅
-            const subscription = await registration.pushManager.subscribe({
-              userVisibleOnly: true,
-              applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
-            });
-            
-            pushSubscription = subscription;
-            console.log('推送订阅成功');
-            
-          } catch (err) {
-            console.error('推送订阅失败:', err);
-          }
-        }
-
-        // 发送系统通知
-        function sendSystemNotification(title, options) {
-          if (!('Notification' in window)) {
-            console.log('浏览器不支持通知');
-            return;
-          }
-          
-          if (Notification.permission === 'granted') {
-            new Notification(title, options);
-          } else if (Notification.permission !== 'denied') {
-            Notification.requestPermission().then(permission => {
-              if (permission === 'granted') {
-                new Notification(title, options);
-              }
-            });
-          }
-        }
-
-        // 在页面加载时请求权限
-        document.addEventListener('DOMContentLoaded', () => {
-          if ('Notification' in window) {
-            Notification.requestPermission();
-          }
-        });
-
         const ACTIVATION_CODE = "16750";
 
         function checkActivationCode() {
@@ -9373,77 +9296,64 @@
         }
 
         function showBannerNotification(friend, text) {
-          // ===== 发送系统通知 =====
-          if (document.visibilityState !== 'visible') {
-            // 清理消息
-            let cleanText = text.replace(/<[^>]+>/g, '');
-            if (cleanText.length > 50) cleanText = cleanText.substring(0, 50) + '...';
-            if (!cleanText) cleanText = '[图片或表情]';
-            
-            // 发送系统通知
-            sendSystemNotification(friend.name, {
-              body: cleanText,
-              icon: friend.avatar || 'icon.svg',
-              tag: `chat-${friend.id}`,
-              data: { url: './?chat=' + friend.id }
-            });
-          }
-
-          // ===== 下面的代码是原来的，不要动 =====
-          const chatPage = document.getElementById('chat-interface-page');
-          if (chatPage.classList.contains('active') && currentChatFriendId === friend.id) {
-            return;
-          }
-
-          let previewText = text;
-          if (previewText) {
-            previewText = previewText.replace(/<thought>[\s\S]*?<\/thought>/g, '');
-            previewText = previewText.replace(/<[^>]+>/g, ''); 
-            previewText = previewText.trim();
-            
-            if (!previewText) {
-              if (text.includes('<sticker>') || text.includes('data:image')) previewText = '[图片/表情]';
-              else if (text.includes('dice:')) previewText = '[骰子]';
-              else previewText = '收到一条新消息';
+            const chatPage = document.getElementById('chat-interface-page');
+            // If user is currently in the chat interface with this friend, don't show banner
+            if (chatPage.classList.contains('active') && currentChatFriendId === friend.id) {
+                return; 
             }
-          } else {
-            previewText = '收到一条新消息';
-          }
 
-          const banner = document.createElement('div');
-          banner.className = 'banner-notification';
-          bannerZIndex++;
-          banner.style.zIndex = bannerZIndex;
+            // Clean up text for preview
+            let previewText = text;
+            if (previewText) {
+                // Remove thought tags completely
+                previewText = previewText.replace(/<thought>[\s\S]*?<\/thought>/g, '');
+                previewText = previewText.replace(/<[^>]+>/g, ''); 
+                previewText = previewText.trim();
+                
+                if (!previewText) {
+                     if (text.includes('<sticker>') || text.includes('data:image')) previewText = '[图片/表情]';
+                     else if (text.includes('dice:')) previewText = '[骰子]';
+                     else previewText = '收到一条新消息';
+                }
+            } else {
+                previewText = '收到一条新消息';
+            }
 
-          const avatarUrl = friend.avatar || 'https://via.placeholder.com/150/B5EAD7/ffffff?text=Avatar';
+            const banner = document.createElement('div');
+            banner.className = 'banner-notification';
+            bannerZIndex++;
+            banner.style.zIndex = bannerZIndex;
 
-          banner.innerHTML = `
-    <img class="banner-avatar" src="${avatarUrl}" alt="Avatar">
-    <div class="banner-content">
-      <div class="banner-name">${friend.name}</div>
-      <div class="banner-text">${previewText}</div>
-    </div>
-  `;
+            const avatarUrl = friend.avatar || 'https://via.placeholder.com/150/B5EAD7/ffffff?text=Avatar';
 
-          document.querySelector('.phone-container').appendChild(banner);
+            banner.innerHTML = `
+                <img class="banner-avatar" src="${avatarUrl}" alt="Avatar">
+                <div class="banner-content">
+                    <div class="banner-name">${friend.name}</div>
+                    <div class="banner-text">${previewText}</div>
+                </div>
+            `;
 
-          const bannerObj = { element: banner, isClosed: false };
-          activeBanners.push(bannerObj);
+            document.querySelector('.phone-container').appendChild(banner);
 
-          banner.onclick = () => {
-            dismissAllBanners();
-            openChat(friend.id);
-          };
+            const bannerObj = { element: banner, isClosed: false };
+            activeBanners.push(bannerObj);
 
-          void banner.offsetWidth; 
-          banner.classList.add('show');
+            banner.onclick = () => {
+                dismissAllBanners();
+                openChat(friend.id);
+            };
 
-          if (globalBannerTimeout) {
-            clearTimeout(globalBannerTimeout);
-          }
-          globalBannerTimeout = setTimeout(() => {
-            dismissAllBanners();
-          }, 2000);
+            // Force reflow to ensure animation triggers
+            void banner.offsetWidth; 
+            banner.classList.add('show');
+
+            if (globalBannerTimeout) {
+                clearTimeout(globalBannerTimeout);
+            }
+            globalBannerTimeout = setTimeout(() => {
+                dismissAllBanners();
+            }, 2000); // Show for 2 seconds
         }
 
         function saveFriend() {
@@ -15478,31 +15388,20 @@ ${historyText}`;
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     const imageUrl = e.target.result;
-                    const chatInfoAvatar = document.getElementById('chat-info-avatar');
-                    if (chatInfoAvatar) {
-                        chatInfoAvatar.src = imageUrl;
-                    }
-
-                    if (!currentChatFriendId) return;
-
-                    dbGet('friends', currentChatFriendId, friend => {
-                        if (!friend) return;
-
-                        friend.avatar = imageUrl;
-                        dbUpdate('friends', friend, () => {
-                            renderChatList();
-                            if (document.getElementById('wechat-contacts-page').classList.contains('active')) {
-                                renderContactsList();
-                            }
-                            if (document.getElementById('chat-interface-page').classList.contains('active')) {
-                                renderMessages(currentChatFriendId);
-                            }
-                            const fpAvatar = document.getElementById('fp-avatar');
-                            if (fpAvatar && document.getElementById('friend-profile-page').classList.contains('active')) {
-                                fpAvatar.src = imageUrl;
+                    document.getElementById('chat-info-avatar').src = imageUrl;
+                    
+                    if (currentChatFriendId) {
+                        dbGet('friends', currentChatFriendId, friend => {
+                            if (friend) {
+                                friend.avatar = imageUrl;
+                                dbUpdate('friends', friend, () => {
+                                    renderMessages(currentChatFriendId);
+                                    renderChatList();
+                                    renderContactsList();
+                                });
                             }
                         });
-                    });
+                    }
                 };
                 reader.readAsDataURL(input.files[0]);
             }
@@ -16749,15 +16648,10 @@ ${historyText}`;
         initDB(() => {
             migrateWorldBookData(() => {
                 loadWorldBookData(() => {
+                    // After all data is loaded, render the list
                     renderChatList();
                     loadTheme();
-      
-                    // ===== 新增：订阅推送 =====
-                    if ('serviceWorker' in navigator && 'PushManager' in window) {
-                        navigator.serviceWorker.ready.then(() => {
-                            subscribePush();
-                        });
-                    }
+                    // The rest of the init can happen in parallel
                 });
             });
         });

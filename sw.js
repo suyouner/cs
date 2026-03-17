@@ -1,92 +1,85 @@
-const CACHE_NAME = 'suanpiji-v11';
+const CACHE_NAME = 'suanpiji-v10';
+const urlsToCache = [
+  './',
+  './index.html',
+  './manifest.json',
+  './icon.svg'
+];
 
 self.addEventListener('install', event => {
+  // 强制新的 Service Worker 立即接管，跳过等待状态
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll([
-      './',
-      './index.html',
-      './manifest.json',
-      './icon.svg'
-    ]))
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(urlsToCache))
   );
 });
 
 self.addEventListener('activate', event => {
+  // 立即接管所有客户端页面
   event.waitUntil(self.clients.claim());
+  
+  // 清理旧版本的缓存
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) return caches.delete(cacheName);
+          if (cacheName !== CACHE_NAME) {
+            console.log('Service Worker: Deleting old cache', cacheName);
+            return caches.delete(cacheName);
+          }
         })
       );
     })
   );
 });
 
-// ===== 推送通知监听 =====
-self.addEventListener('push', event => {
-  const data = event.data.json();
-  
-  const options = {
-    body: data.body,
-    icon: data.icon || 'icon.svg',
-    badge: 'icon.svg',
-    vibrate: [200, 100, 200],
-    tag: data.tag || 'default',
-    data: {
-      url: data.url || './',
-      friendId: data.friendId
-    },
-    actions: [
-      { action: 'open', title: '打开聊天' },
-      { action: 'close', title: '关闭' }
-    ]
-  };
-  
-  event.waitUntil(
-    self.registration.showNotification(data.title, options)
-  );
-});
-
-// ===== 点击通知 =====
-self.addEventListener('notificationclick', event => {
-  event.notification.close();
-  
-  if (event.action === 'close') return;
-  
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true })
-      .then(windowClients => {
-        // 如果应用已打开，聚焦并跳转
-        for (const client of windowClients) {
-          if (client.url.includes(self.registration.scope) && 'focus' in client) {
-            client.focus();
-            if (event.notification.data.url) {
-              client.navigate(event.notification.data.url);
-            }
-            return;
-          }
-        }
-        // 否则打开新窗口
-        if (clients.openWindow) {
-          return clients.openWindow(event.notification.data.url || './');
-        }
-      })
-  );
-});
-
-// 网络优先策略
 self.addEventListener('fetch', event => {
+  // 只处理 GET 请求的缓存
   if (event.request.method !== 'GET') return;
+
+  // 采用网络优先 (Network First) 策略，失败则回退到缓存
   event.respondWith(
     fetch(event.request)
       .then(response => {
+        // 检查是否是有效的响应
+        if (!response || response.status !== 200 || response.type !== 'basic') {
+          return response;
+        }
+
+        // 网络请求成功，将新数据克隆一份放到缓存里，然后返回新数据
         const responseToCache = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseToCache));
+        caches.open(CACHE_NAME).then(cache => {
+          cache.put(event.request, responseToCache);
+        });
+
         return response;
       })
-      .catch(() => caches.match(event.request))
+      .catch(() => {
+        // 网络请求失败（离线或网络极差），尝试从缓存中读取
+        return caches.match(event.request);
+      })
+  );
+});
+
+// 监听后台推送点击事件，唤醒应用
+self.addEventListener('notificationclick', function(event) {
+  event.notification.close();
+  
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+      // 如果应用已经打开，就聚焦它
+      for (var i = 0; i < windowClients.length; i++) {
+        var client = windowClients[i];
+        if (client.url && client.url.includes(self.registration.scope) && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // 如果没打开，就打开新窗口
+      if (clients.openWindow) {
+        // 使用相对路径确保基于 PWA 的 start_url 打开
+        return clients.openWindow('./');
+      }
+    })
   );
 });
