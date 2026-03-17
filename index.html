@@ -5952,9 +5952,10 @@
                     }
                 });
             } else {
-                localStorage.removeItem(type);
-                updateChatThemePreview();
-                showToast('全局设置已恢复默认');
+                dbDeleteSetting(type).then(() => {
+                    updateChatThemePreview();
+                    showToast('全局设置已恢复默认');
+                });
             }
         }
 
