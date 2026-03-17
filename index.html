@@ -9296,65 +9296,75 @@
         }
 
         function showBannerNotification(friend, text) {
-            const chatPage = document.getElementById('chat-interface-page');
-            // If user is currently in the chat interface with this friend, don't show banner
-            if (chatPage.classList.contains('active') && currentChatFriendId === friend.id) {
-                return; 
+            // ===== 新增：发送微信通知 =====
+            if (document.visibilityState !== 'visible') {
+                // 清理消息
+                let cleanText = text.replace(/<[^>]+>/g, '');
+                if (cleanText.length > 50) cleanText = cleanText.substring(0, 50) + '...';
+                if (!cleanText) cleanText = '[图片或表情]';   
+                // 你的 Server酱 SendKey（改成你自己的） 
+                const SEND_KEY = 'SCT324657TYbixgv4Q68eNjgWrQmsnhg3M'; 
+                // 你的 Cloudflare Workers 地址（改成你自己的）
+                const WORKER_URL = 'https://spj.1787823994.workers.dev/';
+                // 发送通知
+                fetch(WORKER_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: `📱 ${friend.name} 发来消息`,
+                        content: `💬 ${cleanText}\n⏰ ${new Date().toLocaleTimeString()}`,
+                        sendKey: SEND_KEY  
+                    })
+                }).catch(err => console.log('通知发送失败'));
             }
 
-            // Clean up text for preview
+            // ===== 下面的代码是原来的，不要动 =====
+            const chatPage = document.getElementById('chat-interface-page');
+            if (chatPage.classList.contains('active') && currentChatFriendId === friend.id) {
+                return;
+            }
             let previewText = text;
             if (previewText) {
-                // Remove thought tags completely
                 previewText = previewText.replace(/<thought>[\s\S]*?<\/thought>/g, '');
-                previewText = previewText.replace(/<[^>]+>/g, ''); 
-                previewText = previewText.trim();
-                
-                if (!previewText) {
-                     if (text.includes('<sticker>') || text.includes('data:image')) previewText = '[图片/表情]';
-                     else if (text.includes('dice:')) previewText = '[骰子]';
-                     else previewText = '收到一条新消息';
-                }
-            } else {
-                previewText = '收到一条新消息';
-            }
-
-            const banner = document.createElement('div');
-            banner.className = 'banner-notification';
-            bannerZIndex++;
-            banner.style.zIndex = bannerZIndex;
-
-            const avatarUrl = friend.avatar || 'https://via.placeholder.com/150/B5EAD7/ffffff?text=Avatar';
-
-            banner.innerHTML = `
-                <img class="banner-avatar" src="${avatarUrl}" alt="Avatar">
-                <div class="banner-content">
-                    <div class="banner-name">${friend.name}</div>
-                    <div class="banner-text">${previewText}</div>
-                </div>
-            `;
-
-            document.querySelector('.phone-container').appendChild(banner);
-
-            const bannerObj = { element: banner, isClosed: false };
-            activeBanners.push(bannerObj);
-
-            banner.onclick = () => {
-                dismissAllBanners();
-                openChat(friend.id);
-            };
-
-            // Force reflow to ensure animation triggers
-            void banner.offsetWidth; 
-            banner.classList.add('show');
-
-            if (globalBannerTimeout) {
-                clearTimeout(globalBannerTimeout);
-            }
-            globalBannerTimeout = setTimeout(() => {
-                dismissAllBanners();
-            }, 2000); // Show for 2 seconds
-        }
+                    previewText = previewText.replace(/<[^>]+>/g, ''); 
+                    previewText = previewText.trim();
+                    if (!previewText) { 
+                        if (text.includes('<sticker>') || text.includes('data:image')) previewText = '[图片/表情]';
+                            else if (text.includes('dice:')) previewText = '[骰子]';
+                            else previewText = '收到一条新消息';
+                        }
+                    } else {
+                        previewText = '收到一条新消息';
+                    }
+                    const banner = document.createElement('div');
+                    banner.className = 'banner-notification';
+                    bannerZIndex++;
+                    banner.style.zIndex = bannerZIndex;
+                    const avatarUrl = friend.avatar || 'https://via.placeholder.com/150/B5EAD7/ffffff?text=Avatar';
+                    banner.innerHTML = `
+                    <img class="banner-avatar" src="${avatarUrl}" alt="Avatar">
+                    <div class="banner-content">
+                        <div class="banner-name">${friend.name}</div>
+                        <div class="banner-text">${previewText}</div>
+                        </div>
+                        `;
+                        document.querySelector('.phone-container').appendChild(banner);
+                        const bannerObj = { element: banner, isClosed: false };
+                        activeBanners.push(bannerObj);
+                        banner.onclick = () => {
+                            dismissAllBanners();
+                            openChat(friend.id);
+ 
+                        };
+                        void banner.offsetWidth; 
+                        banner.classList.add('show');
+                        if (globalBannerTimeout) {
+                            clearTimeout(globalBannerTimeout);
+                        }
+                        globalBannerTimeout = setTimeout(() => {
+                            dismissAllBanners();
+                        }, 2000);
+                    }
 
         function saveFriend() {
             const name = document.getElementById('af-name-input').value.trim();
