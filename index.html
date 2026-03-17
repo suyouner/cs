@@ -15478,23 +15478,32 @@ ${historyText}`;
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     const imageUrl = e.target.result;
-                    document.getElementById('chat-info-avatar').src = imageUrl;
-                    
-                    if (currentChatFriendId) {
-            dbGet('friends', currentChatFriendId, friend => {
-                if (friend) {
-                    friend.lastMsg = messageText;
-                    friend.lastTime = getCurrentTimeStr();
-                    friend.lastActivityTimestamp = Date.now();
-                    dbUpdate('friends', friend, () => {
-                        if (document.getElementById('wechat-page').classList.contains('active')) {
-                            renderChatList();
-                        }
-                    });
-                }
-            });
+                    const chatInfoAvatar = document.getElementById('chat-info-avatar');
+                    if (chatInfoAvatar) {
+                        chatInfoAvatar.src = imageUrl;
                     }
-                }
+
+                    if (!currentChatFriendId) return;
+
+                    dbGet('friends', currentChatFriendId, friend => {
+                        if (!friend) return;
+
+                        friend.avatar = imageUrl;
+                        dbUpdate('friends', friend, () => {
+                            renderChatList();
+                            if (document.getElementById('wechat-contacts-page').classList.contains('active')) {
+                                renderContactsList();
+                            }
+                            if (document.getElementById('chat-interface-page').classList.contains('active')) {
+                                renderMessages(currentChatFriendId);
+                            }
+                            const fpAvatar = document.getElementById('fp-avatar');
+                            if (fpAvatar && document.getElementById('friend-profile-page').classList.contains('active')) {
+                                fpAvatar.src = imageUrl;
+                            }
+                        });
+                    });
+                };
                 reader.readAsDataURL(input.files[0]);
             }
         }
