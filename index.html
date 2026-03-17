@@ -9628,7 +9628,12 @@
                 visibleFriends.sort((a, b) => {
                     if (a.isPinned && !b.isPinned) return -1;
                     if (!a.isPinned && b.isPinned) return 1;
-                    return b.id.localeCompare(a.id); // Sort by newest first
+
+                    // Fallback to id if lastActivityTimestamp is missing
+                    const timeA = a.lastActivityTimestamp || (a.id.includes('_') ? parseInt(a.id.split('_').pop()) : parseInt(a.id)) || 0;
+                    const timeB = b.lastActivityTimestamp || (b.id.includes('_') ? parseInt(b.id.split('_').pop()) : parseInt(b.id)) || 0;
+
+                    return timeB - timeA;
                 });
                 
                 visibleFriends.forEach(friend => {
@@ -10001,13 +10006,14 @@
                 addMessageToUI(messagePayload);
                 dbAdd('chat_history', messagePayload);
 
-                dbGet('friends', currentChatFriendId, friend => {
-                    if (friend) {
-                        friend.lastMsg = '[图片]';
-                        friend.lastTime = getCurrentTimeStr();
-                        dbUpdate('friends', friend, renderChatList);
-                    }
-                });
+            dbGet('friends', currentChatFriendId, friend => {
+                if (friend) {
+                    friend.lastMsg = '[图片]';
+                    friend.lastTime = getCurrentTimeStr();
+                    friend.lastActivityTimestamp = Date.now();
+                    dbUpdate('friends', friend, renderChatList);
+                }
+            });
             }
             e.target.value = ''; // Reset input
         });
@@ -12175,6 +12181,7 @@
                                             }
                                             friend.lastMsg = `${senderMember.name}: ${lastMsgPreview}`;
                                             friend.lastTime = getCurrentTimeStr();
+                                            friend.lastActivityTimestamp = Date.now();
                                             
                                             const isChatActive = currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active');
                                             if (!isChatActive) {
@@ -12213,6 +12220,7 @@
                                 const msgPreview = aiResponseText.split('\n')[0].replace(/「|」/g, '');
                                 friend.lastMsg = msgPreview; // Use first line as preview, remove quotes
                                 friend.lastTime = getCurrentTimeStr();
+                                friend.lastActivityTimestamp = Date.now();
                                 
                                 const isChatActive = currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active');
                                 if (!isChatActive) {
@@ -12541,6 +12549,7 @@
                                     }
 
                                     friend.lastTime = getCurrentTimeStr();
+                                    friend.lastActivityTimestamp = Date.now();
                                     
                                     const isChatActive = currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active');
                                     if (!isChatActive) {
@@ -13521,6 +13530,7 @@
                                 }
 
                                 friend.lastTime = getCurrentTimeStr();
+                                friend.lastActivityTimestamp = Date.now();
                                 
                                 const isChatActive = currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active');
                                 if (!isChatActive) {
@@ -15380,17 +15390,18 @@ ${historyText}`;
                     document.getElementById('chat-info-avatar').src = imageUrl;
                     
                     if (currentChatFriendId) {
-                        dbGet('friends', currentChatFriendId, friend => {
-                            if (friend) {
-                                friend.avatar = imageUrl;
-                                dbUpdate('friends', friend, () => {
-                                    // Update Chat List and Chat Interface if needed
-                                    // Chat interface doesn't show avatar in header, but messages do.
-                                    // We should refresh the messages to show new avatar
-                                    renderMessages(currentChatFriendId);
-                                });
-                            }
-                        });
+            dbGet('friends', currentChatFriendId, friend => {
+                if (friend) {
+                    friend.lastMsg = messageText;
+                    friend.lastTime = getCurrentTimeStr();
+                    friend.lastActivityTimestamp = Date.now();
+                    dbUpdate('friends', friend, () => {
+                        if (document.getElementById('wechat-page').classList.contains('active')) {
+                            renderChatList();
+                        }
+                    });
+                }
+            });
                     }
                 }
                 reader.readAsDataURL(input.files[0]);
@@ -15988,6 +15999,7 @@ ${historyText}`;
                 if (friend) {
                     friend.lastMsg = `[转账]`;
                     friend.lastTime = getCurrentTimeStr();
+                    friend.lastActivityTimestamp = Date.now();
                     dbUpdate('friends', friend, () => {
                         if (document.getElementById('wechat-page').classList.contains('active')) {
                             renderChatList();
@@ -16052,6 +16064,7 @@ ${historyText}`;
                                 if (friend) {
                                     friend.lastMsg = `[转账] ${replyText}`;
                                     friend.lastTime = getCurrentTimeStr();
+                                    friend.lastActivityTimestamp = Date.now();
                                     dbUpdate('friends', friend);
                                 }
                             });

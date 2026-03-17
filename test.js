@@ -930,10 +930,10 @@
                                                 rName = myName;
                                             } else if (targetAuthorId) {
                                                 const rf = friends.find(f => f.id === targetAuthorId);
-                                                if (rf) rName = rf.name;
+                                                if (rf) rName = rf.realName || rf.name;
                                             } else if (comment.replyTo) {
                                                 const rf = friends.find(f => f.realName === comment.replyTo || f.name === comment.replyTo);
-                                                if (rf) rName = rf.name;
+                                                if (rf) rName = rf.realName || rf.name;
                                             }
                                             replyText = ` 回复 <span class="discover-comment-name">${rName}</span>`;
                                         }
