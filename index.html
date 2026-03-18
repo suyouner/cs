@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
     <title>蒜皮叽</title>
     <meta name="theme-color" content="#e0e5ec">
     <meta name="mobile-web-app-capable" content="yes">
@@ -12838,7 +12838,7 @@
                 prompt += `    - **动作**: 直接描述，不要加任何符号。\n`;
                 prompt += `    - **心理**: 必须用特殊标签 <thought>...</thought> 包裹。这是你内心的想法，系统会特殊渲染。\n`;
                 if (friend.enableThoughts) {
-                    prompt += `\n【心声生成要求】\n请在每次回复的末尾（最后面），附加当前的心情和心声，格式如下：\n<mood>这里仅允许填写一个Emoji表情或颜文字（例如：😊、(^_^)，严禁包含任何中文或文字描述）</mood>\n<inner_thought>这里写内心的真实想法或吐槽</inner_thought>\n请务必包含这两个标签，系统会将其提取并特殊处理，不要包含在正文中。\n`;
+                    prompt += `\n【心声生成要求】\n请在每次回复的末尾（最后面），附加当前的心情和心声，格式如下：\n<mood>这里仅允许填写一个Emoji表情或颜文字（例如：😊、(^_^)，严禁包含任何中文或文字描述）</mood>\n<inner_thought>这里写内心的真实想法或吐槽</inner_thought>\n【重要】每次回复都【必须】生成 <mood> 标签，否则视为违规。\n`;
                 }
                 prompt += `2.  **内容要求**: \n`;
                 prompt += `    - 须根据场景自然地包含语言、动作和心理描写。\n`;
@@ -12861,7 +12861,7 @@
                 prompt += `3. **共同底线（无论何种人设都必须遵守）**：\n   - **严禁**使用书面语引号「」包裹对话。\n   - **严禁**在正文中出现任何动作、神态描写（如 *叹气*、(笑)、（摸头） 等）。\n   - **严禁**输出 <br> 等 HTML 代码。\n   - 直接输出你想说的话，就像你在用微信打字一样。\n`;
 
                 if (friend.enableThoughts) {
-                    prompt += `\n【心声功能特别强调】\n即便开启了心声功能，你在“线上模式”下的正文也【必须】保持纯粹的聊天格式，【严禁】任何形式的动作或心理描写。心声只能作为附加信息，使用 <mood> 和 <inner_thought> 标签包裹，并【必须】放在所有聊天消息的【最后面】。\n<mood> 标签中仅允许填写一个Emoji表情或颜文字（例如：😊、(^_^)），严禁包含任何中文或文字描述。\n`;
+                    prompt += `\n【心声功能特别强调】\n即便开启了心声功能，你在“线上模式”下的正文也【必须】保持纯粹的聊天格式，【严禁】任何形式的动作或心理描写。心声只能作为附加信息，使用 <mood> 和 <inner_thought> 标签包裹，并【必须】放在所有聊天消息的【最后面】。\n<mood> 标签中仅允许填写一个Emoji表情或颜文字（例如：😊、(^_^)），严禁包含任何中文或文字描述。【重要】每次回复都【必须】生成 <mood> 标签，否则视为违规。\n`;
                 }
                 
                 prompt += `\n【消息发送机制】：\n你可以根据语义、情绪和停顿，在任何地方（如逗号后、句号后，甚至一句话的中间）使用【换行符（回车）】来分隔消息。系统会自动将每一行识别为一条独立的消息发出。请利用这个机制来控制你的说话节奏（刷屏还是长句）。\n`;
@@ -13221,24 +13221,31 @@
                             // Parse Thought Feature Tags
                             let mood = null;
                             let innerThought = null;
-                            const moodRegex = /<mood>(.*?)<\/mood>/s;
-                            const thoughtRegex = /<inner_thought>(.*?)<\/inner_thought>/s;
-
-                            const moodMatch = aiResponseText.match(moodRegex);
-                            if (moodMatch) {
-                                mood = moodMatch[1].replace(/[\u4e00-\u9fa5]/g, '').trim();
+                            
+                            // Handle Mood - support multiple but take the last one, remove all
+                            const moodRegex = /<mood>(.*?)<\/mood>/gis;
+                            let moodMatches = [...aiResponseText.matchAll(moodRegex)];
+                            if (moodMatches.length > 0) {
+                                // Take the content of the last match
+                                mood = moodMatches[moodMatches.length - 1][1].replace(/[\u4e00-\u9fa5]/g, '').trim();
+                                // Remove all mood tags
                                 aiResponseText = aiResponseText.replace(moodRegex, '').trim();
                             }
 
-                            const thoughtMatch = aiResponseText.match(thoughtRegex);
-                            if (thoughtMatch) {
-                                innerThought = thoughtMatch[1].trim();
+                            // Handle Thought
+                            const thoughtRegex = /<(?:inner_thought|thought)>(.*?)<\/(?:inner_thought|thought)>/gis;
+                            let thoughtMatches = [...aiResponseText.matchAll(thoughtRegex)];
+                            
+                            if (thoughtMatches.length > 0) {
+                                // Concatenate all thoughts found
+                                innerThought = thoughtMatches.map(m => m[1].trim()).join(' ');
+                                // Remove all thought tags
                                 aiResponseText = aiResponseText.replace(thoughtRegex, '').trim();
                             }
 
                             if (mood || innerThought) {
-                                friend.latestMood = mood;
-                                friend.latestThought = innerThought;
+                                if (mood) friend.latestMood = mood;
+                                if (innerThought) friend.latestThought = innerThought;
                                 // Will be saved via dbUpdate later in this function
                             }
 
@@ -16881,13 +16888,14 @@ ${historyText}`;
             const modal = document.getElementById('thought-modal');
             document.getElementById('thought-role-name').textContent = friend.name;
             
-            // Sanitize mood to only show kaomoji
-            let moodContent = friend.latestMood || '无';
-            if (moodContent !== '无') {
-                // 移除所有中文字符和逗号、句号等常见标点
-                moodContent = moodContent.replace(/[\u4e00-\u9fa5,.，。]/g, '').trim();
+            let moodContent = friend.latestMood;
+            if (!moodContent || moodContent.trim() === '') {
+                moodContent = '无';
+            } else {
+                // Sanitize mood to only show kaomoji, just in case
+                moodContent = String(moodContent).replace(/[\u4e00-\u9fa5,.，。]/g, '').trim();
                 if (moodContent === '') {
-                    moodContent = '...'; // 如果处理后为空，则显示省略号
+                    moodContent = '无'; // Fallback if it becomes empty after sanitizing
                 }
             }
             document.getElementById('thought-mood-content').textContent = moodContent;
