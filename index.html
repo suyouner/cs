@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
     <title>蒜皮叽</title>
     <meta name="theme-color" content="#e0e5ec">
     <meta name="mobile-web-app-capable" content="yes">
@@ -1885,7 +1885,6 @@
             display: flex;
             align-items: center;
             min-width: 0;
-            overflow-x: hidden;
         }
         .chat-input {
             flex-grow: 1;
@@ -13062,7 +13061,8 @@
                 if (!url.endsWith('/')) url += '/';
                 
                 if (!url.includes('chat/completions')) {
-                    if (url.endsWith('v1/')) {
+                    // Check if URL ends with a version pattern like v1/, v4/, etc.
+                    if (/\/v\d+\/$/.test(url)) {
                         url += 'chat/completions';
                     } else {
                         url += 'v1/chat/completions';
@@ -14695,7 +14695,7 @@ ${historyText}`;
                     let modelsUrl;
                     const baseUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl; // Normalize URL by removing trailing slash
 
-                    if (baseUrl.endsWith('/v1')) {
+                    if (/\/v\d+$/.test(baseUrl)) {
                         // If user provided '.../v1', just add '/models'
                         modelsUrl = `${baseUrl}/models`;
                     } else {
