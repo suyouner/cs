@@ -12861,7 +12861,7 @@
                 prompt += `3. **共同底线（无论何种人设都必须遵守）**：\n   - **严禁**使用书面语引号「」包裹对话。\n   - **严禁**在正文中出现任何动作、神态描写（如 *叹气*、(笑)、（摸头） 等）。\n   - **严禁**输出 <br> 等 HTML 代码。\n   - 直接输出你想说的话，就像你在用微信打字一样。\n`;
 
                 if (friend.enableThoughts) {
-                    prompt += `\n【心声功能特别强调】\n即便开启了心声功能，你在“线上模式”下的正文也【必须】保持纯粹的聊天格式，【严禁】任何形式的动作或心理描写。心声只能作为附加信息，使用 <mood> 和 <inner_thought> 标签包裹，并【必须】放在所有聊天消息的【最后面】。\n`;
+                    prompt += `\n【心声功能特别强调】\n即便开启了心声功能，你在“线上模式”下的正文也【必须】保持纯粹的聊天格式，【严禁】任何形式的动作或心理描写。心声只能作为附加信息，使用 <mood> 和 <inner_thought> 标签包裹，并【必须】放在所有聊天消息的【最后面】。\n<mood> 标签中仅允许填写一个Emoji表情或颜文字（例如：😊、(^_^)），严禁包含任何中文或文字描述。\n`;
                 }
                 
                 prompt += `\n【消息发送机制】：\n你可以根据语义、情绪和停顿，在任何地方（如逗号后、句号后，甚至一句话的中间）使用【换行符（回车）】来分隔消息。系统会自动将每一行识别为一条独立的消息发出。请利用这个机制来控制你的说话节奏（刷屏还是长句）。\n`;
@@ -16880,7 +16880,17 @@ ${historyText}`;
         function showThoughtModal(friend) {
             const modal = document.getElementById('thought-modal');
             document.getElementById('thought-role-name').textContent = friend.name;
-            document.getElementById('thought-mood-content').textContent = friend.latestMood || '无';
+            
+            // Sanitize mood to only show kaomoji
+            let moodContent = friend.latestMood || '无';
+            if (moodContent !== '无') {
+                // 移除所有中文字符和逗号、句号等常见标点
+                moodContent = moodContent.replace(/[\u4e00-\u9fa5,.，。]/g, '').trim();
+                if (moodContent === '') {
+                    moodContent = '...'; // 如果处理后为空，则显示省略号
+                }
+            }
+            document.getElementById('thought-mood-content').textContent = moodContent;
             
             const textSection = document.getElementById('thought-text-section');
             if (friend.showThoughtText !== false) { // Default true
