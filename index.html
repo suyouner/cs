@@ -892,7 +892,7 @@
             display: grid;
             grid-template-columns: 1fr auto 1fr;
             align-items: center;
-            padding: calc(max(34px, env(safe-area-inset-top)) + 2px) 15px 12px 15px;
+            padding: 2px 15px 12px 15px;
             background-color: #ededed;
             position: relative;
             flex-shrink: 0;
@@ -1555,6 +1555,8 @@
             /* position: absolute; removed to fix keyboard layout issues */
             z-index: 10;
             padding-top: 0 !important; /* Remove default page padding for immersive header */
+            padding-bottom: var(--keyboard-offset, 0px);
+            transition: padding-bottom 0.2s ease-out;
         }
 
         .chat-interface-header {
@@ -16750,13 +16752,41 @@ ${historyText}`;
             });
         }
 
-        // The 'interactive-widget=resizes-content' meta tag now handles keyboard behavior natively.
-        // The custom handleViewportResize function has been removed to prevent conflicts and page jumping.
-
-        // 简化后的视口高度逻辑，依赖 CSS 100dvh 和 flex，避免双重垫高冲突
         const fixViewportHeight = () => {
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+            if (isIOS && window.visualViewport) {
+                const vv = window.visualViewport;
+                const root = document.documentElement;
+
+                const handleResize = () => {
+                    const layoutHeight = window.innerHeight;
+                    const keyboardHeight = layoutHeight - vv.height;
+                    
+                    // A threshold to make sure it's the keyboard
+                    if (keyboardHeight > 80) {
+                        root.style.setProperty('--keyboard-offset', `${keyboardHeight}px`);
+                        const messagesContainer = document.getElementById('chat-messages-container');
+                        if (messagesContainer) {
+                            setTimeout(() => {
+                                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                            }, 100);
+                        }
+                    } else {
+                        root.style.setProperty('--keyboard-offset', '0px');
+                    }
+                };
+
+                vv.addEventListener('resize', handleResize);
+                
+                // On blur, explicitly reset the offset.
+                document.getElementById('chat-message-input').addEventListener('blur', () => {
+                    root.style.setProperty('--keyboard-offset', '0px');
+                });
+            }
+
+            // Keep the existing stability logic for all platforms
             if (window.visualViewport) {
-                // 监听系统自动滚动的尝试，并强制其归零
                 window.visualViewport.addEventListener('scroll', () => {
                     if (window.visualViewport.offsetTop > 0) {
                         window.scrollTo(0, 0);
@@ -16764,22 +16794,18 @@ ${historyText}`;
                 });
             }
             
-            // 为了在 focusout 时解决 iOS 键盘收起后页面可能产生的留白问题
             document.addEventListener('focusout', () => {
                 window.scrollTo(0, 0);
             });
             
-            // 全局禁止常规滚动，防止iOS弹簧效应把页面整体顶走
             window.addEventListener('scroll', () => {
                 window.scrollTo(0, 0);
             }, { passive: false });
 
-            // 为主页面锁定高度，防止键盘弹出时缩小或被顶起
             const setVh = () => {
                 document.documentElement.style.setProperty('--fixed-vh', `${window.innerHeight}px`);
             };
             setVh();
-            // 仅在宽度变化（如旋转屏幕）时更新高度，忽略由于键盘导致的单纯高度缩小
             let lastWidth = window.innerWidth;
             window.addEventListener('resize', () => {
                 if (window.innerWidth !== lastWidth) {
