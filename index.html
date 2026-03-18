@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
     <title>蒜皮叽</title>
     <meta name="theme-color" content="#e0e5ec">
     <meta name="mobile-web-app-capable" content="yes">
@@ -1885,6 +1885,7 @@
             display: flex;
             align-items: center;
             min-width: 0;
+            overflow-x: hidden;
         }
         .chat-input {
             flex-grow: 1;
@@ -7664,23 +7665,31 @@
                         }
                         const action = JSON.parse(jsonStr);
 
+                        // Re-fetch the latest post to prevent race conditions
+                        const latestPost = await new Promise(res => dbGet('discover_posts', postId, res));
+                        if (!latestPost) return;
+
                         let updated = false;
                         let newlyAddedLike = false;
-                        if (action.like && !hasLiked) {
-                            if (!post.likes) post.likes = [];
-                            post.likes.push(friend.id);
+                        
+                        // Check if already liked in the latest version
+                        const alreadyLiked = latestPost.likes && (latestPost.likes.includes(friend.id) || latestPost.likes.includes(friend.realName) || latestPost.likes.includes(friend.name));
+
+                        if (action.like && !alreadyLiked) {
+                            if (!latestPost.likes) latestPost.likes = [];
+                            latestPost.likes.push(friend.id);
                             updated = true;
                             newlyAddedLike = true;
                         }
 
                         let newComments = [];
                         if (action.comment && typeof action.comment === 'string' && action.comment.trim() !== '' && action.comment !== 'null') {
-                            if (!post.comments) post.comments = [];
+                            if (!latestPost.comments) latestPost.comments = [];
                             let depth = 0;
                             let shouldBlock = false;
 
                             if (action.replyToId && action.replyToId !== 'null') {
-                                const targetComment = post.comments.find(c => String(c.id) === String(action.replyToId));
+                                const targetComment = latestPost.comments.find(c => String(c.id) === String(action.replyToId));
                                 if (targetComment) {
                                     // 强制拦截非法回复
                                     if (targetComment.authorId !== 'main_user' && (myReplyCounts[targetComment.authorId] || 0) >= 2) {
@@ -7705,24 +7714,25 @@
                                     timestamp: Date.now(),
                                     depth: depth
                                 };
-                                post.comments.push(newComment);
+                                latestPost.comments.push(newComment);
                                 newComments.push(newComment);
                                 updated = true;
                             }
                         }
 
                         if (updated) {
-                            await new Promise(res => dbUpdate('discover_posts', post, res));
+                            await new Promise(res => dbUpdate('discover_posts', latestPost, res));
                             
                             let notifyUser = false;
                             let actionType = '';
                             let actionText = '';
                             
-                            if (post.authorId === 'main_user') {
+                            // Use latestPost for notification logic
+                            if (latestPost.authorId === 'main_user') {
                                 notifyUser = true;
                             } else {
                                 if (newComments.length > 0 && newComments[0].replyToId) {
-                                    const targetComment = post.comments.find(c => String(c.id) === String(newComments[0].replyToId));
+                                    const targetComment = latestPost.comments.find(c => String(c.id) === String(newComments[0].replyToId));
                                     if (targetComment && targetComment.authorId === 'main_user') {
                                         notifyUser = true;
                                     }
@@ -7745,8 +7755,8 @@
                                         fromId: friend.id,
                                         fromName: friend.name,
                                         fromAvatar: friend.avatar,
-                                        postId: post.id,
-                                        postContent: post.text || (post.images && post.images.length > 0 ? '[图片]' : ''),
+                                        postId: latestPost.id,
+                                        postContent: latestPost.text || (latestPost.images && latestPost.images.length > 0 ? '[图片]' : ''),
                                         type: actionType,
                                         text: actionText,
                                         timestamp: Date.now(),
