@@ -16355,24 +16355,6 @@ ${historyText}`;
                         const img = document.createElement('img');
                         img.src = sticker.src;
 
-                        // Original individual delete button (keep for non-batch mode long press if needed, or hide in batch mode)
-                        // In batch mode, we hide this via CSS typically or just don't render/use it.
-                        // The user asked for batch delete, existing functionality (long press to delete) should arguably remain or be replaced?
-                        // "Click edit function... checkbox...". 
-                        // I'll keep the individual delete button for normal mode (long press) logic, 
-                        // but maybe disable it visually in batch mode via CSS.
-                        const deleteBtn = document.createElement('div');
-                        deleteBtn.className = 'sticker-delete-btn';
-                        deleteBtn.innerHTML = '&times;';
-                        
-                        deleteBtn.onclick = (e) => {
-                            e.stopPropagation();
-                            if (isEmojiLibraryEditMode) return; // Disable individual delete button in batch mode
-                            dbDelete('ai_stickers', sticker.id, () => {
-                                renderAiStickers(friendId);
-                            });
-                        };
-
                         // Batch Selection Checkbox
                         const checkbox = document.createElement('div');
                         checkbox.className = 'sticker-select-checkbox';
@@ -16380,44 +16362,15 @@ ${historyText}`;
                             checkbox.classList.add('checked');
                         }
 
-                        let pressTimer;
-                        let wasLongPress = false;
-
-                        const startPress = (e) => {
-                            if (e.button === 2) return;
-                            wasLongPress = false;
-                            pressTimer = setTimeout(() => {
-                                wasLongPress = true;
-                                if (!isEmojiLibraryEditMode) {
-                                    grid.classList.add('edit-mode'); // Local visual edit mode for single delete
-                                }
-                            }, 500);
-                        };
-
-                        const cancelPress = () => {
-                            clearTimeout(pressTimer);
-                        };
-
-                        item.addEventListener('mousedown', startPress);
-                        item.addEventListener('touchstart', startPress, { passive: true });
-                        item.addEventListener('mouseup', cancelPress);
-                        item.addEventListener('mouseleave', cancelPress);
-                        item.addEventListener('touchend', cancelPress);
-                        item.addEventListener('touchcancel', cancelPress);
-
                         item.onclick = (e) => {
                             if (isEmojiLibraryEditMode) {
                                 toggleAiStickerSelection(sticker.id, item);
                             } else {
-                                if (wasLongPress) return;
-                                if (grid.classList.contains('edit-mode')) {
-                                    grid.classList.remove('edit-mode');
-                                }
+                                sendSticker(sticker.src, sticker.description);
                             }
                         };
                         
                         item.appendChild(img);
-                        item.appendChild(deleteBtn);
                         item.appendChild(checkbox);
                         grid.appendChild(item);
                     });
