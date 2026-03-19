@@ -11959,27 +11959,38 @@
                         userPersona = await new Promise(resolve => dbGet('my_personas', friend.myPersonaId, resolve));
                     }
 
-                    // Fetch AI stickers
-                    let aiStickers = await new Promise(resolve => {
+                    // Fetch AI stickers (specific and global)
+                    const friendStickers = await new Promise(resolve => {
                         try {
                             const transaction = db.transaction(['ai_stickers'], 'readonly');
                             const store = transaction.objectStore('ai_stickers');
                             const index = store.index('friendId');
-                            // If group, fetch all stickers or we fetch below. Actually let's fetch by friendId for normal chats,
-                            // but for group chats we'll fetch all.
-                            if (friend.isGroup) {
-                                const req = store.getAll();
-                                req.onsuccess = () => resolve(req.result);
-                                req.onerror = () => resolve([]);
-                            } else {
-                                const req = index.getAll(friend.id);
-                                req.onsuccess = () => resolve(req.result);
-                                req.onerror = () => resolve([]);
-                            }
+                            const req = index.getAll(friend.id);
+                            req.onsuccess = () => resolve(req.result || []);
+                            req.onerror = () => resolve([]);
                         } catch(e) {
                             resolve([]);
                         }
                     });
+
+                    const globalStickers = await new Promise(resolve => {
+                        try {
+                            const transaction = db.transaction(['ai_stickers'], 'readonly');
+                            const store = transaction.objectStore('ai_stickers');
+                            const index = store.index('friendId');
+                            const req = index.getAll('global'); // Fetch global stickers
+                            req.onsuccess = () => resolve(req.result || []);
+                            req.onerror = () => resolve([]);
+                        } catch(e) {
+                            resolve([]);
+                        }
+                    });
+
+                    // Combine and remove duplicates, friend-specific ones take priority
+                    const combinedStickers = [...friendStickers, ...globalStickers];
+                    const aiStickers = combinedStickers.filter((sticker, index, self) =>
+                        index === self.findIndex((s) => s.src === sticker.src)
+                    );
 
                 let visiblePosts = await new Promise(resolve => {
                     dbGetAll('discover_posts', posts => {
@@ -12793,12 +12804,26 @@
             prompt += `   - **拒绝说教**：除非你的人设本身就是老师或喜欢说教的长辈，否则**严禁**对用户的行为进行道德评判、给出教科书式的人生建议或劝导。请像一个真实的朋友/恋人/仇人那样互动。\n\n`;
 
             if (aiStickers && aiStickers.length > 0) {
-                prompt += `【你的专属表情包】\n你可以使用以下表情包来表达情感。请根据语境选择合适的表情包，直接输出对应的 XML 标签（不要修改内部的ID）：\n`;
-                aiStickers.forEach((sticker, index) => {
-                    const desc = sticker.description ? ` (含义：${sticker.description})` : '';
-                    prompt += `${index + 1}. <sticker>${sticker.id}</sticker>${desc}\n`;
-                });
-                prompt += `\n`;
+                const friendStickers = aiStickers.filter(s => s.friendId === friend.id);
+                const globalStickers = aiStickers.filter(s => s.friendId === 'global');
+
+                if (globalStickers.length > 0) {
+                    prompt += `【可用表情包】\n你可以使用以下表情包来表达情感。请根据语境选择合适的表情包，直接输出对应的 XML 标签（不要修改内部的ID）：\n`;
+                    globalStickers.forEach((sticker, index) => {
+                        const desc = sticker.description ? ` (含义：${sticker.description})` : '';
+                        prompt += `${index + 1}. <sticker>${sticker.id}</sticker>${desc}\n`;
+                    });
+                    prompt += `\n`;
+                }
+
+                if (friendStickers.length > 0) {
+                    prompt += `【你的专属表情包】\n你也可以使用以下更符合你人设的专属表情包：\n`;
+                    friendStickers.forEach((sticker, index) => {
+                        const desc = sticker.description ? ` (含义：${sticker.description})` : '';
+                        prompt += `${index + 1}. <sticker>${sticker.id}</sticker>${desc}\n`;
+                    });
+                    prompt += `\n`;
+                }
             }
 
             if (friend.syncReality) {
@@ -16157,29 +16182,27 @@ ${historyText}`;
             dbGetAll('friends', friends => {
                 select.innerHTML = '';
                 
+                // Add Global option first
+                const globalOption = document.createElement('option');
+                globalOption.value = "global";
+                globalOption.textContent = "全局/默认";
+                select.appendChild(globalOption);
+
                 const nonGroupFriends = (friends || []).filter(f => !f.isGroup);
 
-                if (nonGroupFriends.length === 0) {
-                    const defaultOption = document.createElement('option');
-                    defaultOption.value = "";
-                    defaultOption.textContent = "暂无角色";
-                    select.appendChild(defaultOption);
+                nonGroupFriends.forEach(friend => {
+                    const option = document.createElement('option');
+                    option.value = friend.id;
+                    option.textContent = friend.name;
+                    select.appendChild(option);
+                });
+
+                // Restore last selection or default to global
+                if (lastSelectedEmojiCharacter && (lastSelectedEmojiCharacter === 'global' || nonGroupFriends.find(f => f.id === lastSelectedEmojiCharacter))) {
+                    select.value = lastSelectedEmojiCharacter;
                 } else {
-                    nonGroupFriends.forEach(friend => {
-                        const option = document.createElement('option');
-                        option.value = friend.id;
-                        option.textContent = friend.name;
-                        if (friend.id === lastSelectedEmojiCharacter) {
-                            option.selected = true;
-                        }
-                        select.appendChild(option);
-                    });
-                    
-                    // Auto-select first if no selection restored or valid
-                    if ((!lastSelectedEmojiCharacter || !nonGroupFriends.find(f => f.id === lastSelectedEmojiCharacter)) && select.options.length > 0) {
-                        select.options[0].selected = true;
-                        lastSelectedEmojiCharacter = select.value;
-                    }
+                    select.value = 'global';
+                    lastSelectedEmojiCharacter = 'global';
                 }
                 
                 refreshCustomSelect(select);
@@ -16327,7 +16350,7 @@ ${historyText}`;
             }
 
             if (!friendId) {
-                grid.innerHTML = '<div style="grid-column: 1 / -1; text-align:center; color:#999; margin-top:20px;">请先选择一个角色</div>';
+                grid.innerHTML = '<div style="grid-column: 1 / -1; text-align:center; color:#999; margin-top:20px;">请先选择一个角色或全局</div>';
                 return;
             }
             
@@ -16383,7 +16406,7 @@ ${historyText}`;
         function openAiStickerUploadModal() {
             const friendId = document.getElementById('emoji-library-character-select').value;
             if (!friendId) {
-                showToast('请先选择一个角色');
+                showToast('请先选择一个角色或全局');
                 return;
             }
             document.getElementById('ai-sticker-upload-modal').style.display = 'flex';
@@ -16395,7 +16418,10 @@ ${historyText}`;
 
         function handleAiStickerFiles(input) {
             const friendId = document.getElementById('emoji-library-character-select').value;
-            if (!friendId) return;
+            if (!friendId) {
+                showToast('请先选择一个角色或全局');
+                return;
+            }
             
             const files = Array.from(input.files);
             if (files.length === 0) return;
@@ -16536,7 +16562,10 @@ ${historyText}`;
         function openAiStickerUrlModal() {
             closeAiStickerUploadModal();
             const friendId = document.getElementById('emoji-library-character-select').value;
-            if (!friendId) return;
+            if (!friendId) {
+                showToast('请先选择一个角色或全局');
+                return;
+            }
 
             showGenericStickerModal({
                 title: '批量添加链接表情',
