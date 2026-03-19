@@ -1454,8 +1454,9 @@
             color: #fff;
         }
         #custom-confirm-modal .confirm-modal-actions button.cancel-btn {
-            background: #f0f0f0;
+            background: #ffffff;
             color: #000;
+            border: 1px solid #e5e5e5;
         }
 
         /* Toast Notification */
@@ -2122,6 +2123,70 @@
             font-weight: bold;
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
             z-index: 10;
+        }
+
+        .ai-sticker-checkbox {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 22px;
+            height: 22px;
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 11;
+            cursor: pointer;
+        }
+
+        #ai-sticker-grid.edit-mode .ai-sticker-checkbox {
+            display: flex;
+        }
+
+        .ai-sticker-checkbox.checked {
+            background-color: #000;
+            border-color: #000;
+        }
+
+        .ai-sticker-checkbox.checked::after {
+            content: '✓';
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .ai-sticker-checkbox {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 22px;
+            height: 22px;
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 11;
+            cursor: pointer;
+        }
+
+        #ai-sticker-grid.edit-mode .ai-sticker-checkbox {
+            display: flex;
+        }
+
+        .ai-sticker-checkbox.checked {
+            background-color: #000;
+            border-color: #000;
+        }
+
+        .ai-sticker-checkbox.checked::after {
+            content: '✓';
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
         }
 
         /* 编辑模式下仅显示删除按钮，无动画 */
@@ -4878,6 +4943,7 @@
             <div class="theme-header">
                 <span class="back-arrow" onclick="showPage('main-page')"><</span>
                 <span class="title">表情库</span>
+                <span id="emoji-library-edit-btn" style="position: absolute; right: 20px; font-size: 16px; cursor: pointer; color: #333;" onclick="toggleEmojiLibraryEditMode()">编辑</span>
             </div>
             <div style="padding: 15px; flex-shrink: 0; background-color: #fff; border-bottom: 1px solid #eee; position: relative; z-index: 10;">
                 <select id="emoji-library-character-select" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 12px; font-size: 14px; background: white;"></select>
@@ -4885,7 +4951,10 @@
             <div class="sticker-grid-container" id="ai-sticker-grid" style="padding: 15px; padding-bottom: 80px; align-content: flex-start;">
                 <!-- AI stickers will be injected here -->
             </div>
-            <div style="position: absolute; bottom: 30px; right: 20px; width: 50px; height: 50px; background-color: white; color: black; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; font-weight: 300; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); z-index: 20;" onclick="openAiStickerUploadModal()">+</div>
+            <div id="ai-sticker-add-btn" style="position: absolute; bottom: 30px; right: 20px; width: 50px; height: 50px; background-color: white; color: black; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; font-weight: 300; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); z-index: 20;" onclick="openAiStickerUploadModal()">+</div>
+            <div id="ai-sticker-delete-btn" style="position: absolute; bottom: 30px; right: 20px; width: 50px; height: 50px; background-color: #ff3b30; color: white; border-radius: 50%; display: none; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); z-index: 20;" onclick="deleteSelectedAiStickers()">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            </div>
         </div>
 
         <!-- Regex App Page -->
@@ -16148,12 +16217,6 @@ ${historyText}`;
                 return;
             }
             
-            // Default Dice
-            const diceItem = document.createElement('div');
-            diceItem.className = 'sticker-item';
-            diceItem.innerHTML = `<img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 100 100'><g transform='translate(0, -5)'><rect x='5' y='25' width='50' height='50' rx='10' fill='white' stroke='%23333' stroke-width='3'/><circle cx='20' cy='40' r='5' fill='%23333'/><circle cx='45' cy='40' r='5' fill='%23333'/><circle cx='20' cy='65' r='5' fill='%23333'/><circle cx='45' cy='65' r='5' fill='%23333'/><circle cx='32.5' cy='52.5' r='5' fill='%23333'/></g><g transform='translate(35, 25)'><rect x='5' y='25' width='50' height='50' rx='10' fill='white' stroke='%23333' stroke-width='3'/><circle cx='20' cy='40' r='5' fill='%23333'/><circle cx='45' cy='65' r='5' fill='%23333'/></g></svg>" alt="Dice">`;
-            grid.appendChild(diceItem);
-
             try {
                 const transaction = db.transaction(['ai_stickers'], 'readonly');
                 const store = transaction.objectStore('ai_stickers');
@@ -16166,54 +16229,41 @@ ${historyText}`;
                     stickers.forEach(sticker => {
                         const item = document.createElement('div');
                         item.className = 'sticker-item';
+                        item.dataset.stickerId = sticker.id;
                         
                         const img = document.createElement('img');
                         img.src = sticker.src;
 
-                        const deleteBtn = document.createElement('div');
-                        deleteBtn.className = 'sticker-delete-btn';
-                        deleteBtn.innerHTML = '&times;';
-                        
-                        deleteBtn.onclick = (e) => {
-                            e.stopPropagation();
-                            dbDelete('ai_stickers', sticker.id, () => {
-                                renderAiStickers(friendId);
-                            });
-                        };
-
-                        let pressTimer;
-                        let wasLongPress = false;
-
-                        const startPress = (e) => {
-                            if (e.button === 2) return;
-                            wasLongPress = false;
-                            pressTimer = setTimeout(() => {
-                                wasLongPress = true;
-                                grid.classList.add('edit-mode');
-                            }, 500);
-                        };
-
-                        const cancelPress = () => {
-                            clearTimeout(pressTimer);
-                        };
-
-                        item.addEventListener('mousedown', startPress);
-                        item.addEventListener('touchstart', startPress, { passive: true });
-                        item.addEventListener('mouseup', cancelPress);
-                        item.addEventListener('mouseleave', cancelPress);
-                        item.addEventListener('touchend', cancelPress);
-                        item.addEventListener('touchcancel', cancelPress);
-
-                        item.onclick = (e) => {
-                            if (wasLongPress) return;
-                            if (grid.classList.contains('edit-mode')) {
-                                grid.classList.remove('edit-mode');
-                            }
-                        };
+                        const checkbox = document.createElement('div');
+                        checkbox.className = 'ai-sticker-checkbox';
                         
                         item.appendChild(img);
-                        item.appendChild(deleteBtn);
+                        item.appendChild(checkbox);
                         grid.appendChild(item);
+
+                        item.onclick = (e) => {
+                            if (grid.classList.contains('edit-mode')) {
+                                e.stopPropagation();
+                                checkbox.classList.toggle('checked');
+                            } else {
+                                // 在非编辑模式下，点击表情应发送
+                                sendSticker(sticker.src, sticker.description);
+                            }
+                        };
+                    });
+                };
+            } catch(e) {
+                 grid.innerHTML += '<div style="grid-column: 1 / -1; text-align:center; color:#999; margin-top:20px;">请刷新页面重试</div>';
+            }
+        }
+                        };
+                    });
+                };
+            } catch(e) {
+                 grid.innerHTML += '<div style="grid-column: 1 / -1; text-align:center; color:#999; margin-top:20px;">请刷新页面重试</div>';
+            }
+        }
+                        };
                     });
                 };
             } catch(e) {
@@ -16229,6 +16279,62 @@ ${historyText}`;
             }
             document.getElementById('ai-sticker-upload-modal').style.display = 'flex';
         }
+
+    function toggleEmojiLibraryEditMode() {
+        const grid = document.getElementById('ai-sticker-grid');
+        const editBtn = document.getElementById('emoji-library-edit-btn');
+        const addBtn = document.getElementById('ai-sticker-add-btn');
+        const deleteBtn = document.getElementById('ai-sticker-delete-btn');
+        const isEditing = grid.classList.toggle('edit-mode');
+
+        if (isEditing) {
+            editBtn.textContent = '完成';
+            addBtn.style.display = 'none';
+            deleteBtn.style.display = 'flex';
+        } else {
+            editBtn.textContent = '编辑';
+            addBtn.style.display = 'flex';
+            deleteBtn.style.display = 'none';
+            // Clear selections
+            grid.querySelectorAll('.ai-sticker-checkbox.checked').forEach(cb => cb.classList.remove('checked'));
+        }
+    }
+
+    function deleteSelectedAiStickers() {
+        const grid = document.getElementById('ai-sticker-grid');
+        const selected = grid.querySelectorAll('.ai-sticker-checkbox.checked');
+        
+        if (selected.length === 0) {
+            showToast('请选择要删除的表情');
+            return;
+        }
+
+        showCustomConfirm(`确定要删除选中的 ${selected.length} 个表情吗？`, () => {
+            const idsToDelete = Array.from(selected).map(cb => parseInt(cb.parentElement.dataset.stickerId, 10));
+            const friendId = document.getElementById('emoji-library-character-select').value;
+            
+            const transaction = db.transaction(['ai_stickers'], 'readwrite');
+            const store = transaction.objectStore('ai_stickers');
+            let count = 0;
+
+            transaction.oncomplete = () => {
+                showToast('删除成功');
+                toggleEmojiLibraryEditMode(); // Exit edit mode
+                renderAiStickers(friendId); // Re-render
+            };
+            
+            transaction.onerror = (event) => {
+                showToast('删除失败，请重试');
+                console.error("Delete transaction error:", event.target.error);
+            };
+
+            idsToDelete.forEach(id => {
+                if (!isNaN(id)) {
+                    store.delete(id);
+                }
+            });
+        }, '删除表情');
+    }
 
         function closeAiStickerUploadModal() {
             document.getElementById('ai-sticker-upload-modal').style.display = 'none';
@@ -17063,6 +17169,60 @@ ${historyText}`;
         setupFullScreenRestorer();
         document.getElementById('comment-drawer-overlay').addEventListener('click', closeCommentDrawer);
     });
+
+    function toggleEmojiLibraryEditMode() {
+        const grid = document.getElementById('ai-sticker-grid');
+        const editBtn = document.getElementById('emoji-library-edit-btn');
+        const addBtn = document.getElementById('ai-sticker-add-btn');
+        const deleteBtn = document.getElementById('ai-sticker-delete-btn');
+        const isEditing = grid.classList.toggle('edit-mode');
+
+        if (isEditing) {
+            editBtn.textContent = '完成';
+            addBtn.style.display = 'none';
+            deleteBtn.style.display = 'flex';
+        } else {
+            editBtn.textContent = '编辑';
+            addBtn.style.display = 'flex';
+            deleteBtn.style.display = 'none';
+            // Clear selections
+            grid.querySelectorAll('.ai-sticker-checkbox.checked').forEach(cb => cb.classList.remove('checked'));
+        }
+    }
+
+    function deleteSelectedAiStickers() {
+        const grid = document.getElementById('ai-sticker-grid');
+        const selected = grid.querySelectorAll('.ai-sticker-checkbox.checked');
+        
+        if (selected.length === 0) {
+            showToast('请选择要删除的表情');
+            return;
+        }
+
+        showCustomConfirm(`确定要删除选中的 ${selected.length} 个表情吗？`, () => {
+            const idsToDelete = Array.from(selected).map(cb => cb.parentElement.dataset.stickerId);
+            const friendId = document.getElementById('emoji-library-character-select').value;
+            
+            const transaction = db.transaction(['ai_stickers'], 'readwrite');
+            const store = transaction.objectStore('ai_stickers');
+            let count = 0;
+
+            idsToDelete.forEach(id => {
+                const numId = parseInt(id, 10);
+                if (!isNaN(numId)) {
+                    const req = store.delete(numId);
+                    req.onsuccess = () => {
+                        count++;
+                        if (count === idsToDelete.length) {
+                            showToast('删除成功');
+                            toggleEmojiLibraryEditMode(); // Exit edit mode
+                            renderAiStickers(friendId); // Re-render
+                        }
+                    };
+                }
+            });
+        }, '删除表情');
+    }
     </script>
 </body>
 </html>
