@@ -2777,12 +2777,19 @@
         .location-content-bottom {
             height: 90px;
             background-color: #f0f0f0;
-            background-image: url('https://images.unsplash.com/photo-1534353436294-0dbd4bdac845?q=80&w=240&h=90&fit=crop'), 
-                                url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40"><path d="M16 2 C8.268 2 2 8.268 2 16 C2 24.837 16 38 16 38 S30 24.837 30 16 C30 8.268 23.732 2 16 2 Z" fill="%2307c160" stroke="%23ffffff" stroke-width="2"/><circle cx="16" cy="16" r="5" fill="white"/></svg>');
-            background-position: center, center;
-            background-repeat: no-repeat, no-repeat;
-            background-size: cover, 32px 40px;
+            background-image: url('https://i.imgur.com/p2p2Yy2.png');
+            background-position: center;
+            background-repeat: no-repeat;
+            background-size: cover;
             border-top: 1px solid #f0f0f0;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .location-pin-icon {
+            width: 32px;
+            height: 40px;
         }
 
         /* Transfer Bubble Styles */
@@ -2857,6 +2864,20 @@
         }
         .message-bubble.transfer-bubble.returned-state {
             background-color: #f9e2c0 !important;
+        }
+
+        /* Location Modal Styles */
+        #location-modal .modal-content {
+            width: 300px;
+        }
+        #location-modal .modal-actions .cancel-btn {
+            background-color: #fff;
+            color: #000;
+            border: 1px solid #ddd;
+        }
+        #location-modal .modal-actions .confirm-btn {
+            background-color: #000;
+            color: #fff;
         }
         
         /* Custom Select Styles */
@@ -5152,7 +5173,7 @@
 
     <!-- Location Modal -->
     <div class="modal-overlay" id="location-modal">
-        <div class="modal-content" style="width: 300px;">
+        <div class="modal-content">
             <h3 style="text-align: center; font-size: 17px; font-weight: 600; margin-bottom: 15px;">发送位置</h3>
             <div style="display: flex; flex-direction: column; gap: 5px;">
                 <label style="font-size: 14px; font-weight: 500;">位置名称</label>
@@ -10995,6 +11016,156 @@
                         <span class="location-title">${msg.locationName || '位置'}</span>
                         ${msg.locationDetail ? `<span class="location-desc">${msg.locationDetail}</span>` : ''}
                     </div>
+                    <div class="location-content-bottom">
+                        <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='40' viewBox='0 0 32 40'><path d='M16 2 C8.268 2 2 8.268 2 16 C2 24.837 16 38 16 38 S30 24.837 30 16 C30 8.268 23.732 2 16 2 Z' fill='%2307c160' stroke='%23ffffff' stroke-width='2'/><circle cx='16' cy='16' r='5' fill='white'/></svg>" class="location-pin-icon" alt="Location Pin">
+                    </div>
+                `;
+
+                attachMessageEvents(bubble, msg);
+                contentGroup.appendChild(bubble);
+
+                const avatar = document.createElement('img');
+                avatar.className = 'chat-avatar-placeholder';
+                if (msg.type === 'received') {
+                    avatar.onclick = (e) => {
+                        e.stopPropagation();
+                        handleAvatarClick(msg.friendId);
+                    };
+                }
+                
+                const targetFriendId = msg.friendId || currentChatFriendId;
+                dbGet('friends', targetFriendId, friend => {
+                    const hideDisplay = friend ? friend.avatarDisplay : 'show_all';
+                    if (msg.type === 'received' && (hideDisplay === 'hide_other' || hideDisplay === 'hide_both')) {
+                        avatar.style.display = 'none';
+                    } else if (msg.type === 'sent' && (hideDisplay === 'hide_mine' || hideDisplay === 'hide_both')) {
+                        avatar.style.display = 'none';
+                    }
+
+                    if (msg.type === 'received') {
+                        if (friend && friend.isGroup && msg.senderAvatar) {
+                            avatar.src = msg.senderAvatar;
+                        } else {
+                            avatar.src = friend ? friend.avatar : '';
+                        }
+                    } else {
+                        if (friend && friend.myAvatar) avatar.src = friend.myAvatar;
+                        else {
+                            dbGet('user_profile', 'main_user', p => { avatar.src = (p && p.avatar) ? p.avatar : 'https://via.placeholder.com/150'; });
+                        }
+                    }
+                });
+
+                if (msg.type === 'received') {
+                    wrapper.appendChild(avatar);
+                    wrapper.appendChild(contentGroup);
+                } else {
+                    wrapper.appendChild(contentGroup);
+                    wrapper.appendChild(avatar);
+                }
+
+                container.appendChild(wrapper);
+                if (shouldScroll) container.scrollTop = container.scrollHeight;
+                
+                return bubble;
+            }
+
+            // Handle Location messages
+            if (msg.isLocation) {
+                const wrapper = document.createElement('div');
+                wrapper.className = `message-bubble-wrapper ${msg.type}`;
+                wrapper.dataset.msgId = msg.id || msg.timestamp;
+
+                // Selection Checkbox
+                const checkbox = document.createElement('div');
+                checkbox.className = 'message-checkbox';
+                wrapper.appendChild(checkbox);
+
+                const contentGroup = document.createElement('div');
+                contentGroup.className = 'message-content-group';
+
+                const bubble = document.createElement('div');
+                bubble.className = `message-bubble ${msg.type} location-bubble`;
+
+                bubble.innerHTML = `
+                    <div class="location-content-top">
+                        <span class="location-title">${msg.locationName || '位置'}</span>
+                        ${msg.locationDetail ? `<span class="location-desc">${msg.locationDetail}</span>` : ''}
+                    </div>
+                    <div class="location-content-bottom"></div>
+                `;
+
+                attachMessageEvents(bubble, msg);
+                contentGroup.appendChild(bubble);
+
+                const avatar = document.createElement('img');
+                avatar.className = 'chat-avatar-placeholder';
+                if (msg.type === 'received') {
+                    avatar.onclick = (e) => {
+                        e.stopPropagation();
+                        handleAvatarClick(msg.friendId);
+                    };
+                }
+                
+                const targetFriendId = msg.friendId || currentChatFriendId;
+                dbGet('friends', targetFriendId, friend => {
+                    const hideDisplay = friend ? friend.avatarDisplay : 'show_all';
+                    if (msg.type === 'received' && (hideDisplay === 'hide_other' || hideDisplay === 'hide_both')) {
+                        avatar.style.display = 'none';
+                    } else if (msg.type === 'sent' && (hideDisplay === 'hide_mine' || hideDisplay === 'hide_both')) {
+                        avatar.style.display = 'none';
+                    }
+
+                    if (msg.type === 'received') {
+                        if (friend && friend.isGroup && msg.senderAvatar) {
+                            avatar.src = msg.senderAvatar;
+                        } else {
+                            avatar.src = friend ? friend.avatar : '';
+                        }
+                    } else {
+                        if (friend && friend.myAvatar) avatar.src = friend.myAvatar;
+                        else {
+                            dbGet('user_profile', 'main_user', p => { avatar.src = (p && p.avatar) ? p.avatar : 'https://via.placeholder.com/150'; });
+                        }
+                    }
+                });
+
+                if (msg.type === 'received') {
+                    wrapper.appendChild(avatar);
+                    wrapper.appendChild(contentGroup);
+                } else {
+                    wrapper.appendChild(contentGroup);
+                    wrapper.appendChild(avatar);
+                }
+
+                container.appendChild(wrapper);
+                if (shouldScroll) container.scrollTop = container.scrollHeight;
+                
+                return bubble;
+            }
+
+            // Handle Location messages
+            if (msg.isLocation) {
+                const wrapper = document.createElement('div');
+                wrapper.className = `message-bubble-wrapper ${msg.type}`;
+                wrapper.dataset.msgId = msg.id || msg.timestamp;
+
+                // Selection Checkbox
+                const checkbox = document.createElement('div');
+                checkbox.className = 'message-checkbox';
+                wrapper.appendChild(checkbox);
+
+                const contentGroup = document.createElement('div');
+                contentGroup.className = 'message-content-group';
+
+                const bubble = document.createElement('div');
+                bubble.className = `message-bubble ${msg.type} location-bubble`;
+
+                bubble.innerHTML = `
+                    <div class="location-content-top">
+                        <span class="location-title">${msg.locationName || '位置'}</span>
+                        ${msg.locationDetail ? `<span class="location-desc">${msg.locationDetail}</span>` : ''}
+                    </div>
                     <div class="location-content-bottom"></div>
                 `;
 
@@ -16346,6 +16517,59 @@ ${historyText}`;
             document.getElementById('transfer-remark-input').value = '转账给对方';
             document.getElementById('transfer-modal').style.display = 'flex';
             toggleActionPanel(); // Close the + menu
+        }
+
+        function openLocationModal() {
+            if (!currentChatFriendId) {
+                showToast('请先选择一个聊天');
+                return;
+            }
+            document.getElementById('location-name-input').value = '';
+            document.getElementById('location-detail-input').value = '';
+            document.getElementById('location-modal').style.display = 'flex';
+            toggleActionPanel(); // Close the + menu
+        }
+
+        function closeLocationModal() {
+            document.getElementById('location-modal').style.display = 'none';
+        }
+
+        function sendLocation() {
+            const name = document.getElementById('location-name-input').value.trim();
+            const detail = document.getElementById('location-detail-input').value.trim();
+
+            if (!name) {
+                showToast('请输入位置名称');
+                return;
+            }
+
+            const message = {
+                friendId: currentChatFriendId,
+                text: `[位置] ${name}`,
+                type: 'sent',
+                timestamp: Date.now(),
+                isLocation: true,
+                locationName: name,
+                locationDetail: detail
+            };
+
+            addMessageToUI(message);
+            dbAdd('chat_history', message);
+
+            dbGet('friends', currentChatFriendId, friend => {
+                if (friend) {
+                    friend.lastMsg = `[位置] ${name}`;
+                    friend.lastTime = getCurrentTimeStr();
+                    friend.lastActivityTimestamp = Date.now();
+                    dbUpdate('friends', friend, () => {
+                        if (document.getElementById('wechat-page').classList.contains('active')) {
+                            renderChatList();
+                        }
+                    });
+                }
+            });
+
+            closeLocationModal();
         }
 
         function sendTransfer() {
