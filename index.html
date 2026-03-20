@@ -2735,6 +2735,53 @@
         .typing-dot:nth-child(2) { animation-delay: 0.2s; }
         .typing-dot:nth-child(3) { animation-delay: 0.4s; }
 
+        /* Location Bubble Styles */
+        .message-bubble.location-bubble {
+            background-color: #fff !important;
+            color: #333 !important;
+            padding: 0 !important;
+            width: 240px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            cursor: pointer;
+            border: 1px solid #e0e0e0;
+        }
+        .message-bubble.location-bubble:after {
+            display: none;
+        }
+        .location-content-top {
+            padding: 12px 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            background-color: #fff;
+        }
+        .location-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: #000;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .location-desc {
+            font-size: 12px;
+            color: #999;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .location-content-bottom {
+            height: 90px;
+            background-color: #e5e5e5;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><rect width="100%" height="100%" fill="%23f2f2f2"/><path d="M0 20 L240 40 M0 60 L240 30 M80 0 L100 90 M160 0 L150 90" stroke="%23e0e0e0" stroke-width="2"/><circle cx="120" cy="45" r="4" fill="%23ff3b30"/><path d="M120 45 L120 30" stroke="%23ff3b30" stroke-width="2"/></svg>');
+            background-size: cover;
+            background-position: center;
+        }
+
         /* Transfer Bubble Styles */
         .message-bubble.transfer-bubble {
             background-color: #f79c4a !important;
@@ -4650,6 +4697,12 @@
                         </div>
                         <span class="action-name">一起听</span>
                     </div>
+                    <div class="action-item" onclick="openLocationModal()">
+                        <div class="action-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                        </div>
+                        <span class="action-name">位置</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -5090,6 +5143,25 @@
             <div class="confirm-modal-actions">
                 <button class="cancel-btn" id="transfer-return-btn" style="background-color: #fff; color: #ff3b30; border: 1px solid #ddd;" onclick="handleTransferAction('RETURNED')">退还</button>
                 <button class="confirm-btn" id="transfer-accept-btn" style="background-color: #000; color: #fff;" onclick="handleTransferAction('ACCEPTED')">收款</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Location Modal -->
+    <div class="modal-overlay" id="location-modal">
+        <div class="modal-content" style="width: 300px;">
+            <h3 style="text-align: center; font-size: 17px; font-weight: 600; margin-bottom: 15px;">发送位置</h3>
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+                <label style="font-size: 14px; font-weight: 500;">位置名称</label>
+                <input type="text" id="location-name-input" placeholder="例如：某某咖啡馆" style="padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 5px; margin-top: 10px;">
+                <label style="font-size: 14px; font-weight: 500;">详细地址 (可选)</label>
+                <input type="text" id="location-detail-input" placeholder="例如：北京市朝阳区..." style="padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+            </div>
+            <div class="modal-actions" style="margin-top: 15px;">
+                <button class="cancel-btn" style="background-color: #fff; color: #000; border: 1px solid #ddd;" onclick="closeLocationModal()">取消</button>
+                <button class="confirm-btn" style="background-color: #000; color: #fff;" onclick="sendLocation()">发送</button>
             </div>
         </div>
     </div>
@@ -11006,6 +11078,80 @@
                 return bubble;
             }
 
+            // Handle Location messages
+            if (msg.isLocation) {
+                const wrapper = document.createElement('div');
+                wrapper.className = `message-bubble-wrapper ${msg.type}`;
+                wrapper.dataset.msgId = msg.id || msg.timestamp;
+
+                // Selection Checkbox
+                const checkbox = document.createElement('div');
+                checkbox.className = 'message-checkbox';
+                wrapper.appendChild(checkbox);
+
+                const contentGroup = document.createElement('div');
+                contentGroup.className = 'message-content-group';
+
+                const bubble = document.createElement('div');
+                bubble.className = `message-bubble ${msg.type} location-bubble`;
+
+                bubble.innerHTML = `
+                    <div class="location-content-top">
+                        <span class="location-title">${msg.locationName || '位置'}</span>
+                        ${msg.locationDetail ? `<span class="location-desc">${msg.locationDetail}</span>` : ''}
+                    </div>
+                    <div class="location-content-bottom"></div>
+                `;
+
+                attachMessageEvents(bubble, msg);
+                contentGroup.appendChild(bubble);
+
+                const avatar = document.createElement('img');
+                avatar.className = 'chat-avatar-placeholder';
+                if (msg.type === 'received') {
+                    avatar.onclick = (e) => {
+                        e.stopPropagation();
+                        handleAvatarClick(msg.friendId);
+                    };
+                }
+                
+                const targetFriendId = msg.friendId || currentChatFriendId;
+                dbGet('friends', targetFriendId, friend => {
+                    const hideDisplay = friend ? friend.avatarDisplay : 'show_all';
+                    if (msg.type === 'received' && (hideDisplay === 'hide_other' || hideDisplay === 'hide_both')) {
+                        avatar.style.display = 'none';
+                    } else if (msg.type === 'sent' && (hideDisplay === 'hide_mine' || hideDisplay === 'hide_both')) {
+                        avatar.style.display = 'none';
+                    }
+
+                    if (msg.type === 'received') {
+                        if (friend && friend.isGroup && msg.senderAvatar) {
+                            avatar.src = msg.senderAvatar;
+                        } else {
+                            avatar.src = friend ? friend.avatar : '';
+                        }
+                    } else {
+                        if (friend && friend.myAvatar) avatar.src = friend.myAvatar;
+                        else {
+                            dbGet('user_profile', 'main_user', p => { avatar.src = (p && p.avatar) ? p.avatar : 'https://via.placeholder.com/150'; });
+                        }
+                    }
+                });
+
+                if (msg.type === 'received') {
+                    wrapper.appendChild(avatar);
+                    wrapper.appendChild(contentGroup);
+                } else {
+                    wrapper.appendChild(contentGroup);
+                    wrapper.appendChild(avatar);
+                }
+
+                container.appendChild(wrapper);
+                if (shouldScroll) container.scrollTop = container.scrollHeight;
+                
+                return bubble;
+            }
+
             // Handle sticker messages
             if (msg.isSticker) {
                 const wrapper = document.createElement('div');
@@ -12967,7 +13113,9 @@
                 let images = [];
                 let fileUris = msg.fileUris || [];
 
-                if (msg.isSticker) {
+                if (msg.isLocation) {
+                    text = `[发送了位置: ${msg.locationName}${msg.locationDetail ? ` (${msg.locationDetail})` : ''}]`;
+                } else if (msg.isSticker) {
                     const src = msg.text;
                     const desc = msg.stickerDescription ? `(含义: ${msg.stickerDescription})` : '';
                     const idTag = msg.timestamp ? ` (ID: ${msg.timestamp})` : '';
@@ -17010,59 +17158,6 @@ ${historyText}`;
             });
         };
 
-        // 全屏管理逻辑
-        const enterFullScreen = async () => {
-            const docEl = document.documentElement;
-            try {
-                if (docEl.requestFullscreen) {
-                    await docEl.requestFullscreen({ navigationUI: "hide" });
-                } else if (docEl.webkitRequestFullscreen) {
-                    await docEl.webkitRequestFullscreen({ navigationUI: "hide" });
-                }
-            } catch (err) {
-                // 忽略非交互触发的错误，等待下一次交互
-                console.log("进入全屏失败:", err);
-            }
-        };
-
-        const setupFullScreenRestorer = () => {
-            // 检查是否是 PWA 模式
-            if (!(window.matchMedia('(display-mode: standalone)').matches || 
-                  window.matchMedia('(display-mode: fullscreen)').matches)) {
-                return;
-            }
-
-            const restore = () => {
-                if (!document.fullscreenElement) {
-                    enterFullScreen();
-                }
-            };
-
-            // 当全屏状态改变且不是全屏时，绑定一次性点击事件来恢复
-            document.addEventListener('fullscreenchange', () => {
-                if (!document.fullscreenElement) {
-                    document.addEventListener('click', restore, { once: true });
-                    document.addEventListener('touchstart', restore, { once: true });
-                }
-            });
-
-            // 当页面重新可见时（比如从相册返回），也尝试恢复
-            document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'visible' && !document.fullscreenElement) {
-                    // 先尝试直接恢复（有些浏览器允许）
-                    enterFullScreen();
-                    // 以前失败，绑定点击恢复
-                    document.addEventListener('click', restore, { once: true });
-                    document.addEventListener('touchstart', restore, { once: true });
-                }
-            });
-
-            // 页面加载时的初始尝试
-            enterFullScreen();
-            // 以防万一，初始点击也绑定
-            document.addEventListener('click', restore, { once: true });
-            document.addEventListener('touchstart', restore, { once: true });
-        };
 
         function handleAvatarClick(friendId) {
             dbGet('friends', friendId, friend => {
@@ -17248,7 +17343,6 @@ ${historyText}`;
         });
 
         fixViewportHeight();
-        setupFullScreenRestorer();
         document.getElementById('comment-drawer-overlay').addEventListener('click', closeCommentDrawer);
     });
     </script>
