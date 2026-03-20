@@ -2777,7 +2777,7 @@
         .location-content-bottom {
             height: 90px;
             background-color: #f0f0f0;
-            background-image: url('https://i.imgur.com/p2p2Yy2.png');
+            background-image: url('https://img.heliar.top/file/1773988773878_adfb745f4d3119ae34c96c35ad2fb7b9.jpg');
             background-position: center;
             background-repeat: no-repeat;
             background-size: cover;
@@ -11092,7 +11092,9 @@
                         <span class="location-title">${msg.locationName || '位置'}</span>
                         ${msg.locationDetail ? `<span class="location-desc">${msg.locationDetail}</span>` : ''}
                     </div>
-                    <div class="location-content-bottom"></div>
+                    <div class="location-content-bottom">
+                        <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='40' viewBox='0 0 32 40'><path d='M16 2 C8.268 2 2 8.268 2 16 C2 24.837 16 38 16 38 S30 24.837 30 16 C30 8.268 23.732 2 16 2 Z' fill='%2307c160' stroke='%23ffffff' stroke-width='2'/><circle cx='16' cy='16' r='5' fill='white'/></svg>" class="location-pin-icon" alt="Location Pin">
+                    </div>
                 `;
 
                 attachMessageEvents(bubble, msg);
