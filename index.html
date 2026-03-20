@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
     <title>蒜皮叽</title>
     <meta name="theme-color" content="#e0e5ec">
     <meta name="mobile-web-app-capable" content="yes">
@@ -10970,6 +10970,80 @@
                 return;
             }
 
+            // Handle Location messages
+            if (msg.isLocation) {
+                const wrapper = document.createElement('div');
+                wrapper.className = `message-bubble-wrapper ${msg.type}`;
+                wrapper.dataset.msgId = msg.id || msg.timestamp;
+
+                // Selection Checkbox
+                const checkbox = document.createElement('div');
+                checkbox.className = 'message-checkbox';
+                wrapper.appendChild(checkbox);
+
+                const contentGroup = document.createElement('div');
+                contentGroup.className = 'message-content-group';
+
+                const bubble = document.createElement('div');
+                bubble.className = `message-bubble ${msg.type} location-bubble`;
+
+                bubble.innerHTML = `
+                    <div class="location-content-top">
+                        <span class="location-title">${msg.locationName || '位置'}</span>
+                        ${msg.locationDetail ? `<span class="location-desc">${msg.locationDetail}</span>` : ''}
+                    </div>
+                    <div class="location-content-bottom"></div>
+                `;
+
+                attachMessageEvents(bubble, msg);
+                contentGroup.appendChild(bubble);
+
+                const avatar = document.createElement('img');
+                avatar.className = 'chat-avatar-placeholder';
+                if (msg.type === 'received') {
+                    avatar.onclick = (e) => {
+                        e.stopPropagation();
+                        handleAvatarClick(msg.friendId);
+                    };
+                }
+                
+                const targetFriendId = msg.friendId || currentChatFriendId;
+                dbGet('friends', targetFriendId, friend => {
+                    const hideDisplay = friend ? friend.avatarDisplay : 'show_all';
+                    if (msg.type === 'received' && (hideDisplay === 'hide_other' || hideDisplay === 'hide_both')) {
+                        avatar.style.display = 'none';
+                    } else if (msg.type === 'sent' && (hideDisplay === 'hide_mine' || hideDisplay === 'hide_both')) {
+                        avatar.style.display = 'none';
+                    }
+
+                    if (msg.type === 'received') {
+                        if (friend && friend.isGroup && msg.senderAvatar) {
+                            avatar.src = msg.senderAvatar;
+                        } else {
+                            avatar.src = friend ? friend.avatar : '';
+                        }
+                    } else {
+                        if (friend && friend.myAvatar) avatar.src = friend.myAvatar;
+                        else {
+                            dbGet('user_profile', 'main_user', p => { avatar.src = (p && p.avatar) ? p.avatar : 'https://via.placeholder.com/150'; });
+                        }
+                    }
+                });
+
+                if (msg.type === 'received') {
+                    wrapper.appendChild(avatar);
+                    wrapper.appendChild(contentGroup);
+                } else {
+                    wrapper.appendChild(contentGroup);
+                    wrapper.appendChild(avatar);
+                }
+
+                container.appendChild(wrapper);
+                if (shouldScroll) container.scrollTop = container.scrollHeight;
+                
+                return bubble;
+            }
+
             // Handle Transfer messages
             if (msg.isTransfer) {
                 const wrapper = document.createElement('div');
@@ -16201,6 +16275,60 @@ ${historyText}`;
             if (selectedOption) {
                 triggerSpan.textContent = selectedOption.textContent;
             }
+        }
+
+        // --- Location Logic ---
+        function openLocationModal() {
+            if (!currentChatFriendId) {
+                showToast('请先选择一个聊天');
+                return;
+            }
+            document.getElementById('location-name-input').value = '';
+            document.getElementById('location-detail-input').value = '';
+            document.getElementById('location-modal').style.display = 'flex';
+            toggleActionPanel(); // Close the + menu
+        }
+
+        function closeLocationModal() {
+            document.getElementById('location-modal').style.display = 'none';
+        }
+
+        function sendLocation() {
+            const name = document.getElementById('location-name-input').value.trim();
+            const detail = document.getElementById('location-detail-input').value.trim();
+
+            if (!name) {
+                showToast('请输入位置名称');
+                return;
+            }
+
+            const message = {
+                friendId: currentChatFriendId,
+                text: `[位置] ${name}`,
+                type: 'sent',
+                timestamp: Date.now(),
+                isLocation: true,
+                locationName: name,
+                locationDetail: detail
+            };
+
+            addMessageToUI(message);
+            dbAdd('chat_history', message);
+
+            dbGet('friends', currentChatFriendId, friend => {
+                if (friend) {
+                    friend.lastMsg = `[位置] ${name}`;
+                    friend.lastTime = getCurrentTimeStr();
+                    friend.lastActivityTimestamp = Date.now();
+                    dbUpdate('friends', friend, () => {
+                        if (document.getElementById('wechat-page').classList.contains('active')) {
+                            renderChatList();
+                        }
+                    });
+                }
+            });
+
+            closeLocationModal();
         }
 
         // --- Transfer Logic ---
