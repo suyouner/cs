@@ -3,10 +3,9 @@
   "short_name": "蒜皮叽",
   "start_url": "./index.html",
   "scope": "./",
-  "display": "fullscreen",
-  "display_override": ["fullscreen"],
-  "background_color": "#e0e5ec",
-  "theme_color": "#e0e5ec",
+  "display": "standalone",
+  "background_color": "transparent",
+  "theme_color": "transparent",
   "orientation": "portrait-primary",
   "icons": [
     {
