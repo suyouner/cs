@@ -4909,19 +4909,16 @@
             </div>
         </div>
 
-        <div id="offline-chat-page" class="page" style="position: relative;">
+        <div id="offline-chat-page" class="page">
             <div class="offline-chat-header">
                 <span class="back-arrow" onclick="exitOfflineChat()"><</span>
                 <span class="title" id="offline-chat-title"></span>
                 <div style="display: flex; gap: 15px; align-items: center;">
-                    <svg onclick="retryLastOfflineMessage()" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor: pointer; display: none;"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
-                    <svg class="settings-btn" onclick="openOfflineSettingsModal(false)" width="20" height="20" viewBox="0 0 24 24" fill="#333" stroke="none" style="cursor: pointer;"><path d="M22.2,14.4L21,13.7c0.1-0.5,0.1-1.1,0.1-1.7s0-1.2-0.1-1.7l1.2-0.7c0.4-0.2,0.5-0.6,0.3-1l-1.5-2.6c-0.2-0.4-0.7-0.5-1.1-0.4L18.6,6c-0.5-0.4-1.1-0.8-1.7-1.1L16.6,3.5C16.5,3.1,16.1,2.8,15.7,2.8h-3c-0.4,0-0.8,0.3-0.9,0.7L11.5,4.9C10.9,5.2,10.3,5.6,9.8,6L8.4,5.6C8,5.5,7.6,5.6,7.4,6L5.9,8.6C5.7,9,5.8,9.4,6.2,9.6l1.2,0.7C7.3,10.8,7.3,11.4,7.3,12s0,1.2,0.1,1.7l-1.2,0.7c-0.4,0.2-0.5,0.6-0.3,1l1.5,2.6c0.2,0.4,0.7,0.5,1.1,0.4l1.4-0.4c0.5,0.4,1.1,0.8,1.7,1.1l0.3,1.4c0.1,0.4,0.5,0.7,0.9,0.7h3c0.4,0,0.8-0.3,0.9-0.7l0.3-1.4c0.6-0.3,1.2-0.7,1.7-1.1l1.4,0.4c0.4,0.1,0.9-0.1,1.1-0.4l1.5-2.6C22.7,15,22.6,14.6,22.2,14.4z M14.2,14.2c-1.2,1.2-3.2,1.2-4.4,0c-1.2-1.2-1.2-3.2,0-4.4c1.2-1.2,3.2-1.2,4.4,0C15.4,11,15.4,13,14.2,14.2z"></path></svg>
+                    <svg onclick="retryLastOfflineMessage()" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor: pointer;"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                    <span class="settings-btn" onclick="openOfflineSettingsModal(false)">设置</span>
                 </div>
             </div>
             <div id="offline-chat-messages"></div>
-            <div id="offline-floating-reply-btn" onclick="triggerAIResponse()" style="position: absolute; right: 20px; bottom: 75px; width: 45px; height: 45px; background-color: white; border-radius: 50%; box-shadow: 0 4px 10px rgba(0,0,0,0.15); display: flex; justify-content: center; align-items: center; cursor: pointer; z-index: 100;">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-            </div>
             <div class="offline-input-container">
                 <input type="text" id="offline-chat-input" class="offline-input" placeholder="输入...">
                 <button class="offline-send-btn" onclick="sendOfflineMessage()">发送</button>
@@ -9664,7 +9661,10 @@
             const chatPage = document.getElementById('chat-interface-page');
             const offlineChatPage = document.getElementById('offline-chat-page');
             // If user is currently in the chat interface with this friend, don't show banner
-            if ((chatPage.classList.contains('active') || offlineChatPage.classList.contains('active')) && currentChatFriendId === friend.id) {
+            if (chatPage.classList.contains('active') && currentChatFriendId === friend.id) {
+                return; 
+            }
+            if (offlineChatPage.classList.contains('active') && currentChatFriendId === friend.id) {
                 return; 
             }
 
@@ -12907,7 +12907,7 @@
                                             friend.lastTime = getCurrentTimeStr();
                                             friend.lastActivityTimestamp = Date.now();
                                             
-                                            const isChatActive = currentChatFriendId === friend.id && (document.getElementById('chat-interface-page').classList.contains('active') || document.getElementById('offline-chat-page').classList.contains('active'));
+                                            const isChatActive = currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active');
                                             if (!isChatActive) {
                                                 friend.unreadCount = (friend.unreadCount || 0) + 1;
                                             }
@@ -12957,9 +12957,11 @@
 
                                 await new Promise(resolve => dbUpdate('friends', friend, resolve));
 
-                                showBannerNotification(friend, msgPreview);
+                                if (!isChatActive) {
+                                    showBannerNotification(friend, msgPreview);
+                                }
 
-                                if (document.getElementById('wechat-page').classList.contains('active')) {
+                                if (document.getElementById('wechat-page').classList.contains('active') || document.getElementById('wechat-contacts-page').classList.contains('active')) {
                                     renderChatList();
                                 }
                             } else {
@@ -13320,7 +13322,7 @@
                                     friend.lastTime = getCurrentTimeStr();
                                     friend.lastActivityTimestamp = Date.now();
                                     
-                                    const isChatActive = currentChatFriendId === friend.id && (document.getElementById('chat-interface-page').classList.contains('active') || document.getElementById('offline-chat-page').classList.contains('active'));
+                                    const isChatActive = currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active');
                                     if (!isChatActive) {
                                         friend.unreadCount = (friend.unreadCount || 0) + 1;
                                     }
@@ -16450,10 +16452,6 @@ ${historyText}`;
                         const bubbleContainer = document.createElement('div');
                         bubbleContainer.className = 'offline-bubble-container left';
                         
-                        const avatar = document.createElement('img');
-                        avatar.className = 'offline-avatar';
-                        avatar.src = friend.avatar;
-                        
                         const contentGroup = document.createElement('div');
                         contentGroup.className = 'offline-bubble-content-group';
                         
@@ -16461,6 +16459,10 @@ ${historyText}`;
                         nameLabel.className = 'offline-user-name';
                         nameLabel.style.textAlign = 'left';
                         nameLabel.textContent = friend.name;
+                        
+                        const avatar = document.createElement('img');
+                        avatar.className = 'offline-avatar';
+                        avatar.src = friend.avatar;
                         
                         const bubble = document.createElement('div');
                         bubble.className = 'offline-bubble left';
@@ -16553,7 +16555,7 @@ ${historyText}`;
                     if (friend) {
                         appendOfflineMessage(message, friend);
                         input.value = '';
-                        // Do not auto-trigger AI response here, wait for floating button click
+                        triggerAIResponse();
                     }
                 });
             });
