@@ -6057,6 +6057,8 @@
             }
         }
 
+        let currentChatFriend = null;
+        let currentUserProfile = null;
         let currentChatThemeFriendId = '';
 
         function renderChatThemePage() {
@@ -11190,6 +11192,9 @@
             const container = document.getElementById('chat-messages-container');
             const msgDate = new Date(msg.timestamp);
 
+            const friend = currentChatFriend;
+            const profile = currentUserProfile;
+
             // New Offline Mode Handling
             if (msg.isOffline) {
                 if (lastMessageTimestamp === null || msg.timestamp - lastMessageTimestamp > 5 * 60 * 1000) {
@@ -11237,74 +11242,71 @@
 
                 container.appendChild(wrapper);
 
-                dbGet('friends', msg.friendId, friend => {
-                    if (friend && friend.isGroup && msg.type === 'received' && msg.senderName) {
-                        const nameLabel = document.createElement('div');
-                        nameLabel.style.fontSize = '12px';
-                        nameLabel.style.color = '#999';
-                        nameLabel.style.marginBottom = '2px';
-                        nameLabel.style.marginLeft = '2px';
-                        nameLabel.textContent = msg.senderName;
-                        contentGroup.insertBefore(nameLabel, contentGroup.firstChild);
-                    }
+                if (friend && friend.isGroup && msg.type === 'received' && msg.senderName) {
+                    const nameLabel = document.createElement('div');
+                    nameLabel.style.fontSize = '12px';
+                    nameLabel.style.color = '#999';
+                    nameLabel.style.marginBottom = '2px';
+                    nameLabel.style.marginLeft = '2px';
+                    nameLabel.textContent = msg.senderName;
+                    contentGroup.insertBefore(nameLabel, contentGroup.firstChild);
+                }
 
-                    if (!friend || !friend.offlineSettings) {
-                        bubble.innerHTML = msg.text.replace(/\n/g, '<br>');
-                        if (msg.type === 'received') {
-                            if (friend && friend.isGroup && msg.senderAvatar) {
-                                avatar.src = msg.senderAvatar;
-                            } else {
-                                avatar.src = friend ? friend.avatar : '';
-                            }
-                            if (friend && (friend.avatarDisplay === 'hide_other' || friend.avatarDisplay === 'hide_both')) {
-                                avatar.style.display = 'none';
-                            }
-                        }
-                        return; 
-                    }
-
-                    // Sanitize and format the text
-                    let sanitizedText = sanitizeThoughtTags(msg.text);
-                    let formattedHtml = sanitizedText;
-                    
-                    if (friend.offlineSettings.showThoughts) {
-                        formattedHtml = formattedHtml.replace(/<thought>([\s\S]*?)<\/thought>/g, '<span class="message-thought">$1</span>');
-                    } else {
-                        // 如果隐藏心声，移除整个标签，并尝试吃掉周围多余的换行
-                        formattedHtml = formattedHtml.replace(/\n*<thought>[\s\S]*?<\/thought>\n*/g, '\n');
-                    }
-                    
-                    // 修复可能产生的多余换行 (连续3个以上的换行缩减为2个)
-                    formattedHtml = formattedHtml.replace(/\n{3,}/g, '\n\n').trim();
-                    
-                    formattedHtml = formattedHtml.replace(/\n/g, '<br>');
-
-                    bubble.innerHTML = formattedHtml;
-
+                if (!friend || !friend.offlineSettings) {
+                    bubble.innerHTML = msg.text.replace(/\n/g, '<br>');
                     if (msg.type === 'received') {
                         if (friend && friend.isGroup && msg.senderAvatar) {
                             avatar.src = msg.senderAvatar;
                         } else {
-                            avatar.src = friend.avatar;
+                            avatar.src = friend ? friend.avatar : '';
                         }
-                        if (friend.avatarDisplay === 'hide_other' || friend.avatarDisplay === 'hide_both') {
+                        if (friend && (friend.avatarDisplay === 'hide_other' || friend.avatarDisplay === 'hide_both')) {
                             avatar.style.display = 'none';
-                        }
-                    } else {
-                        if (friend.avatarDisplay === 'hide_mine' || friend.avatarDisplay === 'hide_both') {
-                            avatar.style.display = 'none';
-                        }
-                        if (friend.myAvatar) {
-                            avatar.src = friend.myAvatar;
-                        } else {
-                            dbGet('user_profile', 'main_user', profile => {
-                                avatar.src = (profile && profile.avatar) ? profile.avatar : 'https://via.placeholder.com/150/B5EAD7/ffffff?text=Me';
-                            });
                         }
                     }
-
                     if (shouldScroll) container.scrollTop = container.scrollHeight;
-                });
+                    return; 
+                }
+
+                // Sanitize and format the text
+                let sanitizedText = sanitizeThoughtTags(msg.text);
+                let formattedHtml = sanitizedText;
+                
+                if (friend.offlineSettings.showThoughts) {
+                    formattedHtml = formattedHtml.replace(/<thought>([\s\S]*?)<\/thought>/g, '<span class="message-thought">$1</span>');
+                } else {
+                    // 如果隐藏心声，移除整个标签，并尝试吃掉周围多余的换行
+                    formattedHtml = formattedHtml.replace(/\n*<thought>[\s\S]*?<\/thought>\n*/g, '\n');
+                }
+                
+                // 修复可能产生的多余换行 (连续3个以上的换行缩减为2个)
+                formattedHtml = formattedHtml.replace(/\n{3,}/g, '\n\n').trim();
+                
+                formattedHtml = formattedHtml.replace(/\n/g, '<br>');
+
+                bubble.innerHTML = formattedHtml;
+
+                if (msg.type === 'received') {
+                    if (friend && friend.isGroup && msg.senderAvatar) {
+                        avatar.src = msg.senderAvatar;
+                    } else {
+                        avatar.src = friend.avatar;
+                    }
+                    if (friend.avatarDisplay === 'hide_other' || friend.avatarDisplay === 'hide_both') {
+                        avatar.style.display = 'none';
+                    }
+                } else {
+                    if (friend.avatarDisplay === 'hide_mine' || friend.avatarDisplay === 'hide_both') {
+                        avatar.style.display = 'none';
+                    }
+                    if (friend.myAvatar) {
+                        avatar.src = friend.myAvatar;
+                    } else {
+                        avatar.src = (profile && profile.avatar) ? profile.avatar : 'https://via.placeholder.com/150/B5EAD7/ffffff?text=Me';
+                    }
+                }
+
+                if (shouldScroll) container.scrollTop = container.scrollHeight;
                 
                 return; // End execution for this message
             }
@@ -11381,28 +11383,25 @@
                     };
                 }
                 
-                const targetFriendId = msg.friendId || currentChatFriendId;
-                dbGet('friends', targetFriendId, friend => {
-                    const hideDisplay = friend ? friend.avatarDisplay : 'show_all';
-                    if (msg.type === 'received' && (hideDisplay === 'hide_other' || hideDisplay === 'hide_both')) {
-                        avatar.style.display = 'none';
-                    } else if (msg.type === 'sent' && (hideDisplay === 'hide_mine' || hideDisplay === 'hide_both')) {
-                        avatar.style.display = 'none';
-                    }
+                const hideDisplay = friend ? friend.avatarDisplay : 'show_all';
+                if (msg.type === 'received' && (hideDisplay === 'hide_other' || hideDisplay === 'hide_both')) {
+                    avatar.style.display = 'none';
+                } else if (msg.type === 'sent' && (hideDisplay === 'hide_mine' || hideDisplay === 'hide_both')) {
+                    avatar.style.display = 'none';
+                }
 
-                    if (msg.type === 'received') {
-                        if (friend && friend.isGroup && msg.senderAvatar) {
-                            avatar.src = msg.senderAvatar;
-                        } else {
-                            avatar.src = friend ? friend.avatar : '';
-                        }
+                if (msg.type === 'received') {
+                    if (friend && friend.isGroup && msg.senderAvatar) {
+                        avatar.src = msg.senderAvatar;
                     } else {
-                        if (friend && friend.myAvatar) avatar.src = friend.myAvatar;
-                        else {
-                            dbGet('user_profile', 'main_user', p => { avatar.src = (p && p.avatar) ? p.avatar : 'https://via.placeholder.com/150'; });
-                        }
+                        avatar.src = friend ? friend.avatar : '';
                     }
-                });
+                } else {
+                    if (friend && friend.myAvatar) avatar.src = friend.myAvatar;
+                    else {
+                        avatar.src = (profile && profile.avatar) ? profile.avatar : 'https://via.placeholder.com/150';
+                    }
+                }
 
                 if (msg.type === 'received') {
                     wrapper.appendChild(avatar);
@@ -11457,28 +11456,25 @@
                     };
                 }
                 
-                const targetFriendId = msg.friendId || currentChatFriendId;
-                dbGet('friends', targetFriendId, friend => {
-                    const hideDisplay = friend ? friend.avatarDisplay : 'show_all';
-                    if (msg.type === 'received' && (hideDisplay === 'hide_other' || hideDisplay === 'hide_both')) {
-                        avatar.style.display = 'none';
-                    } else if (msg.type === 'sent' && (hideDisplay === 'hide_mine' || hideDisplay === 'hide_both')) {
-                        avatar.style.display = 'none';
-                    }
+                const hideDisplay = friend ? friend.avatarDisplay : 'show_all';
+                if (msg.type === 'received' && (hideDisplay === 'hide_other' || hideDisplay === 'hide_both')) {
+                    avatar.style.display = 'none';
+                } else if (msg.type === 'sent' && (hideDisplay === 'hide_mine' || hideDisplay === 'hide_both')) {
+                    avatar.style.display = 'none';
+                }
 
-                    if (msg.type === 'received') {
-                        if (friend && friend.isGroup && msg.senderAvatar) {
-                            avatar.src = msg.senderAvatar;
-                        } else {
-                            avatar.src = friend ? friend.avatar : '';
-                        }
+                if (msg.type === 'received') {
+                    if (friend && friend.isGroup && msg.senderAvatar) {
+                        avatar.src = msg.senderAvatar;
                     } else {
-                        if (friend && friend.myAvatar) avatar.src = friend.myAvatar;
-                        else {
-                            dbGet('user_profile', 'main_user', p => { avatar.src = (p && p.avatar) ? p.avatar : 'https://via.placeholder.com/150'; });
-                        }
+                        avatar.src = friend ? friend.avatar : '';
                     }
-                });
+                } else {
+                    if (friend && friend.myAvatar) avatar.src = friend.myAvatar;
+                    else {
+                        avatar.src = (profile && profile.avatar) ? profile.avatar : 'https://via.placeholder.com/150';
+                    }
+                }
 
                 if (msg.type === 'received') {
                     wrapper.appendChild(avatar);
@@ -11531,28 +11527,25 @@
                     };
                 }
                 
-                const targetFriendId = msg.friendId || currentChatFriendId;
-                dbGet('friends', targetFriendId, friend => {
-                    const hideDisplay = friend ? friend.avatarDisplay : 'show_all';
-                    if (msg.type === 'received' && (hideDisplay === 'hide_other' || hideDisplay === 'hide_both')) {
-                        avatar.style.display = 'none';
-                    } else if (msg.type === 'sent' && (hideDisplay === 'hide_mine' || hideDisplay === 'hide_both')) {
-                        avatar.style.display = 'none';
-                    }
+                const hideDisplay = friend ? friend.avatarDisplay : 'show_all';
+                if (msg.type === 'received' && (hideDisplay === 'hide_other' || hideDisplay === 'hide_both')) {
+                    avatar.style.display = 'none';
+                } else if (msg.type === 'sent' && (hideDisplay === 'hide_mine' || hideDisplay === 'hide_both')) {
+                    avatar.style.display = 'none';
+                }
 
-                    if (msg.type === 'received') {
-                        if (friend && friend.isGroup && msg.senderAvatar) {
-                            avatar.src = msg.senderAvatar;
-                        } else {
-                            avatar.src = friend ? friend.avatar : '';
-                        }
+                if (msg.type === 'received') {
+                    if (friend && friend.isGroup && msg.senderAvatar) {
+                        avatar.src = msg.senderAvatar;
                     } else {
-                        if (friend && friend.myAvatar) avatar.src = friend.myAvatar;
-                        else {
-                            dbGet('user_profile', 'main_user', p => { avatar.src = (p && p.avatar) ? p.avatar : 'https://via.placeholder.com/150'; });
-                        }
+                        avatar.src = friend ? friend.avatar : '';
                     }
-                });
+                } else {
+                    if (friend && friend.myAvatar) avatar.src = friend.myAvatar;
+                    else {
+                        avatar.src = (profile && profile.avatar) ? profile.avatar : 'https://via.placeholder.com/150';
+                    }
+                }
 
                 if (msg.type === 'received') {
                     wrapper.appendChild(avatar);
@@ -11639,28 +11632,25 @@
                     };
                 }
                 
-                const targetFriendId = msg.friendId || currentChatFriendId;
-                dbGet('friends', targetFriendId, friend => {
-                    const hideDisplay = friend ? friend.avatarDisplay : 'show_all';
-                    if (msg.type === 'received' && (hideDisplay === 'hide_other' || hideDisplay === 'hide_both')) {
-                        avatar.style.display = 'none';
-                    } else if (msg.type === 'sent' && (hideDisplay === 'hide_mine' || hideDisplay === 'hide_both')) {
-                        avatar.style.display = 'none';
-                    }
+                const hideDisplay = friend ? friend.avatarDisplay : 'show_all';
+                if (msg.type === 'received' && (hideDisplay === 'hide_other' || hideDisplay === 'hide_both')) {
+                    avatar.style.display = 'none';
+                } else if (msg.type === 'sent' && (hideDisplay === 'hide_mine' || hideDisplay === 'hide_both')) {
+                    avatar.style.display = 'none';
+                }
 
-                    if (msg.type === 'received') {
-                        if (friend && friend.isGroup && msg.senderAvatar) {
-                            avatar.src = msg.senderAvatar;
-                        } else {
-                            avatar.src = friend ? friend.avatar : '';
-                        }
+                if (msg.type === 'received') {
+                    if (friend && friend.isGroup && msg.senderAvatar) {
+                        avatar.src = msg.senderAvatar;
                     } else {
-                        if (friend && friend.myAvatar) avatar.src = friend.myAvatar;
-                        else {
-                            dbGet('user_profile', 'main_user', p => { avatar.src = (p && p.avatar) ? p.avatar : 'https://via.placeholder.com/150'; });
-                        }
+                        avatar.src = friend ? friend.avatar : '';
                     }
-                });
+                } else {
+                    if (friend && friend.myAvatar) avatar.src = friend.myAvatar;
+                    else {
+                        avatar.src = (profile && profile.avatar) ? profile.avatar : 'https://via.placeholder.com/150';
+                    }
+                }
 
                 if (msg.type === 'received') {
                     wrapper.appendChild(avatar);
@@ -12531,31 +12521,38 @@
             container.innerHTML = '';
             lastMessageTimestamp = null;
 
-            const transaction = db.transaction(['chat_history'], 'readonly');
-            const store = transaction.objectStore('chat_history');
-            const index = store.index('friendId');
-            const request = index.getAll(friendId);
+            dbGet('friends', friendId, friend => {
+                currentChatFriend = friend;
+                dbGet('user_profile', 'main_user', profile => {
+                    currentUserProfile = profile;
+                    
+                    const transaction = db.transaction(['chat_history'], 'readonly');
+                    const store = transaction.objectStore('chat_history');
+                    const index = store.index('friendId');
+                    const request = index.getAll(friendId);
 
-            request.onsuccess = () => {
-                let messages = request.result;
-                messages = messages.filter(msg => !msg.isOfflineSeparate);
-                if (messages.length > 0) {
-                    messages.forEach(msg => addMessageToUI(msg, false));
-                }
-                
-                if (targetMsgId) {
-                    // Slight delay to ensure DOM is ready
-                    setTimeout(() => {
-                        // Try finding by dataset
-                        let targetEl = document.querySelector(`.message-bubble-wrapper[data-msg-id="${targetMsgId}"]`);
-                        if (targetEl) {
-                            targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    request.onsuccess = () => {
+                        let messages = request.result;
+                        messages = messages.filter(msg => !msg.isOfflineSeparate);
+                        if (messages.length > 0) {
+                            messages.forEach(msg => addMessageToUI(msg, false));
                         }
-                    }, 100);
-                } else {
-                    container.scrollTop = container.scrollHeight;
-                }
-            };
+                        
+                        if (targetMsgId) {
+                            // Slight delay to ensure DOM is ready
+                            setTimeout(() => {
+                                // Try finding by dataset
+                                let targetEl = document.querySelector(`.message-bubble-wrapper[data-msg-id="${targetMsgId}"]`);
+                                if (targetEl) {
+                                    targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                }
+                            }, 100);
+                        } else {
+                            container.scrollTop = container.scrollHeight;
+                        }
+                    };
+                });
+            });
         }
 
         chatInput.addEventListener('input', () => {
