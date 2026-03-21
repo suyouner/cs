@@ -12516,11 +12516,12 @@
             });
         }
 
-        function renderMessages(friendId, targetMsgId = null) {
-            const container = document.getElementById('chat-messages-container');
-            container.innerHTML = '';
-            lastMessageTimestamp = null;
+        let currentChatLoadedCount = 0;
+        const CHAT_LOAD_LIMIT = 30;
 
+        function renderMessages(friendId, targetMsgId = null, isLoadMore = false) {
+            const container = document.getElementById('chat-messages-container');
+            
             dbGet('friends', friendId, friend => {
                 currentChatFriend = friend;
                 dbGet('user_profile', 'main_user', profile => {
@@ -12534,11 +12535,41 @@
                     request.onsuccess = () => {
                         let messages = request.result;
                         messages = messages.filter(msg => !msg.isOfflineSeparate);
-                        if (messages.length > 0) {
-                            messages.forEach(msg => addMessageToUI(msg, false));
+                        
+                        let previousScrollHeight = 0;
+                        let previousScrollTop = 0;
+
+                        if (isLoadMore) {
+                            previousScrollHeight = container.scrollHeight;
+                            previousScrollTop = container.scrollTop;
+                            currentChatLoadedCount += CHAT_LOAD_LIMIT;
+                        } else {
+                            if (targetMsgId) {
+                                const targetIndex = messages.findIndex(m => String(m.id) === String(targetMsgId) || String(m.timestamp) === String(targetMsgId));
+                                if (targetIndex !== -1) {
+                                    const messagesAfterTarget = messages.length - targetIndex;
+                                    currentChatLoadedCount = Math.max(CHAT_LOAD_LIMIT, messagesAfterTarget + 10);
+                                } else {
+                                    currentChatLoadedCount = CHAT_LOAD_LIMIT;
+                                }
+                            } else {
+                                currentChatLoadedCount = CHAT_LOAD_LIMIT;
+                            }
+                        }
+
+                        container.innerHTML = '';
+                        lastMessageTimestamp = null;
+
+                        const sliceStart = Math.max(0, messages.length - currentChatLoadedCount);
+                        const messagesToRender = messages.slice(sliceStart);
+
+                        if (messagesToRender.length > 0) {
+                            messagesToRender.forEach(msg => addMessageToUI(msg, false));
                         }
                         
-                        if (targetMsgId) {
+                        if (isLoadMore) {
+                            container.scrollTop = container.scrollHeight - previousScrollHeight + previousScrollTop;
+                        } else if (targetMsgId) {
                             // Slight delay to ensure DOM is ready
                             setTimeout(() => {
                                 // Try finding by dataset
@@ -12550,6 +12581,13 @@
                         } else {
                             container.scrollTop = container.scrollHeight;
                         }
+
+                        container.onscroll = () => {
+                            if (container.scrollTop === 0 && currentChatLoadedCount < messages.length) {
+                                container.onscroll = null;
+                                renderMessages(friendId, null, true);
+                            }
+                        };
                     };
                 });
             });
@@ -16505,9 +16543,10 @@ ${historyText}`;
             }
         }
 
-        function renderOfflineChat(friendId) {
+        let currentOfflineLoadedCount = 0;
+
+        function renderOfflineChat(friendId, isLoadMore = false) {
             const container = document.getElementById('offline-chat-messages');
-            container.innerHTML = '';
             
             const transaction = db.transaction(['chat_history'], 'readonly');
             const store = transaction.objectStore('chat_history');
@@ -16519,10 +16558,38 @@ ${historyText}`;
                 messages = messages.filter(msg => msg.isOfflineSeparate);
                 
                 dbGet('friends', friendId, friend => {
-                    if (messages.length > 0) {
-                        messages.forEach(msg => appendOfflineMessage(msg, friend, false, false));
+                    let previousScrollHeight = 0;
+                    let previousScrollTop = 0;
+
+                    if (isLoadMore) {
+                        previousScrollHeight = container.scrollHeight;
+                        previousScrollTop = container.scrollTop;
+                        currentOfflineLoadedCount += CHAT_LOAD_LIMIT;
+                    } else {
+                        currentOfflineLoadedCount = CHAT_LOAD_LIMIT;
                     }
-                    container.scrollTop = container.scrollHeight;
+
+                    container.innerHTML = '';
+
+                    const sliceStart = Math.max(0, messages.length - currentOfflineLoadedCount);
+                    const messagesToRender = messages.slice(sliceStart);
+
+                    if (messagesToRender.length > 0) {
+                        messagesToRender.forEach(msg => appendOfflineMessage(msg, friend, false, false));
+                    }
+                    
+                    if (isLoadMore) {
+                        container.scrollTop = container.scrollHeight - previousScrollHeight + previousScrollTop;
+                    } else {
+                        container.scrollTop = container.scrollHeight;
+                    }
+
+                    container.onscroll = () => {
+                        if (container.scrollTop === 0 && currentOfflineLoadedCount < messages.length) {
+                            container.onscroll = null;
+                            renderOfflineChat(friendId, true);
+                        }
+                    };
                 });
             };
         }
