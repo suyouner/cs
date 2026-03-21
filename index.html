@@ -13037,17 +13037,6 @@
                                     partText = partText.replace(/<dice><\/dice>/g, '').trim();
                                 }
 
-                                // Parse Location (for proactive messages)
-                                const locationRegex = /<location name="([^"]+)">([^<]*)<\/location>/;
-                                const locationMatch = partText.match(locationRegex);
-                                let locationData = null;
-                                if (locationMatch) {
-                                    locationData = {
-                                        name: locationMatch[1],
-                                        detail: locationMatch[2] || ''
-                                    };
-                                    partText = partText.replace(locationRegex, '').trim();
-                                }
 
                                 // Parse Music Control
                                 const musicControlRegex = /<music_control>(.*?)<\/music_control>/;
