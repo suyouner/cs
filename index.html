@@ -3358,6 +3358,54 @@
         #music-player-page { display: none; }
         #music-player-page.active { display: flex; }
 
+        /* Music Avatars Blending */
+        .music-avatars-container {
+            position: relative;
+            width: 130px;
+            height: 75px;
+            margin: 0 auto;
+            cursor: pointer;
+            z-index: 2;
+        }
+
+        .music-avatar {
+            width: 75px;
+            height: 75px;
+            border-radius: 50%;
+            object-fit: cover;
+            position: absolute;
+            top: 0;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .music-avatar.friend {
+            left: 0;
+            z-index: 2;
+            -webkit-mask-image: linear-gradient(to right, black 65%, transparent 100%);
+            mask-image: linear-gradient(to right, black 65%, transparent 100%);
+        }
+
+        .music-avatar.me {
+            left: 55px;
+            z-index: 3;
+            -webkit-mask-image: linear-gradient(to left, black 65%, transparent 100%);
+            mask-image: linear-gradient(to left, black 65%, transparent 100%);
+        }
+
+        .music-avatars-container.swapped .music-avatar.friend {
+            left: 55px;
+            z-index: 3;
+            -webkit-mask-image: linear-gradient(to left, black 65%, transparent 100%);
+            mask-image: linear-gradient(to left, black 65%, transparent 100%);
+        }
+
+        .music-avatars-container.swapped .music-avatar.me {
+            left: 0;
+            z-index: 2;
+            -webkit-mask-image: linear-gradient(to right, black 65%, transparent 100%);
+            mask-image: linear-gradient(to right, black 65%, transparent 100%);
+        }
+
         /* Music Playlist Modal */
         #music-playlist-sheet-overlay {
             z-index: 2000;
@@ -5591,11 +5639,11 @@
         <!-- Connection / Avatars -->
         <div style="display: flex; flex-direction: column; align-items: center; margin-top: 20px; z-index: 10; position: relative;">
             <!-- Avatars -->
-            <div class="music-avatars-container" style="position: relative; display: flex; align-items: center; justify-content: center; height: 80px; z-index: 2;">
-                <!-- 左头像：Me -->
-                <img id="music-my-avatar" src="https://via.placeholder.com/150/B5EAD7/ffffff?text=Me" alt="My Avatar" style="width: 75px; height: 75px; border-radius: 50%; border: 2px solid #2b2b2b; object-fit: cover; transform: translateX(6px); z-index: 2;">
-                <!-- 右头像：Friend -->
-                <img id="music-friend-avatar" src="https://via.placeholder.com/150/FFB7B2/ffffff?text=You" alt="Friend Avatar" style="width: 75px; height: 75px; border-radius: 50%; border: 2px solid #2b2b2b; object-fit: cover; transform: translateX(-6px); z-index: 3;">
+            <div class="music-avatars-container" onclick="this.classList.toggle('swapped')">
+                <!-- 角色头像 (Friend) -->
+                <img id="music-friend-avatar" class="music-avatar friend" src="https://via.placeholder.com/150/FFB7B2/ffffff?text=You" alt="Friend Avatar">
+                <!-- 用户头像 (Me) -->
+                <img id="music-my-avatar" class="music-avatar me" src="https://via.placeholder.com/150/B5EAD7/ffffff?text=Me" alt="My Avatar">
             </div>
 
             <!-- Text -->
@@ -9025,13 +9073,20 @@
 
         function initMusicPlayerView() {
             // Setup Avatars
-            dbGet('user_profile', 'main_user', profile => {
-                document.getElementById('music-my-avatar').src = profile && profile.avatar ? profile.avatar : 'https://via.placeholder.com/150/B5EAD7/ffffff?text=Me';
-            });
-
             dbGet('friends', currentChatFriendId, friend => {
                 if (friend) {
                     document.getElementById('music-friend-avatar').src = friend.avatar;
+                    if (friend.myAvatar) {
+                        document.getElementById('music-my-avatar').src = friend.myAvatar;
+                    } else {
+                        dbGet('user_profile', 'main_user', profile => {
+                            document.getElementById('music-my-avatar').src = profile && profile.avatar ? profile.avatar : 'https://via.placeholder.com/150/B5EAD7/ffffff?text=Me';
+                        });
+                    }
+                } else {
+                    dbGet('user_profile', 'main_user', profile => {
+                        document.getElementById('music-my-avatar').src = profile && profile.avatar ? profile.avatar : 'https://via.placeholder.com/150/B5EAD7/ffffff?text=Me';
+                    });
                 }
             });
 
