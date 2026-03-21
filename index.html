@@ -12999,7 +12999,7 @@
                                 };
 
                                 if (isSeparateUI && currentChatFriendId === friend.id) {
-                                    appendOfflineMessage(responseMsg, friend);
+                                    await appendOfflineMessage(responseMsg, friend, true, true);
                                 } else if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
                                     addMessageToUI(responseMsg);
                                 }
@@ -16452,14 +16452,14 @@ ${historyText}`;
                 
                 dbGet('friends', friendId, friend => {
                     if (messages.length > 0) {
-                        messages.forEach(msg => appendOfflineMessage(msg, friend, false));
+                        messages.forEach(msg => appendOfflineMessage(msg, friend, false, false));
                     }
                     container.scrollTop = container.scrollHeight;
                 });
             };
         }
 
-        function appendOfflineMessage(msg, friend, shouldScroll = true) {
+        async function appendOfflineMessage(msg, friend, shouldScroll = true, isNew = false) {
             const container = document.getElementById('offline-chat-messages');
             const row = document.createElement('div');
             row.className = 'offline-message-row';
@@ -16507,8 +16507,31 @@ ${historyText}`;
                 
             } else {
                 const parsedSegments = parseOfflineMessage(msg.text);
+                container.appendChild(row);
                 
-                parsedSegments.forEach((seg, index) => {
+                for (let index = 0; index < parsedSegments.length; index++) {
+                    const seg = parsedSegments[index];
+                    
+                    if (isNew && index > 0) {
+                        const isActive = document.getElementById('offline-chat-page').classList.contains('active') && currentChatFriendId === msg.friendId;
+                        if (isActive) {
+                            if (shouldScroll) container.scrollTop = container.scrollHeight;
+                            const delay = Math.random() * 500 + 500;
+                            await new Promise(res => {
+                                let start = Date.now();
+                                let timer = setInterval(() => {
+                                    if (!document.getElementById('offline-chat-page').classList.contains('active')) {
+                                        clearInterval(timer);
+                                        res();
+                                    } else if (Date.now() - start >= delay) {
+                                        clearInterval(timer);
+                                        res();
+                                    }
+                                }, 50);
+                            });
+                        }
+                    }
+                    
                     const segmentInfo = { index: index, type: seg.type, content: seg.content };
 
                     if (seg.type === 'dialogue') {
@@ -16552,7 +16575,12 @@ ${historyText}`;
                         attachMessageEvents(thoughtDiv, msg, segmentInfo);
                         row.appendChild(thoughtDiv);
                     }
-                });
+                    
+                    if (shouldScroll) {
+                        container.scrollTop = container.scrollHeight;
+                    }
+                }
+                return; // Early return since we already appended the row
             }
 
             container.appendChild(row);
