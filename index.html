@@ -5113,6 +5113,15 @@
                 </div>
 
                 <div class="settings-card" id="chat-info-thought-section" style="width: 100%; margin-top: 15px;">
+                    <div class="settings-item" style="border-bottom: 1px solid #f5f5f5; padding-bottom: 15px; margin-bottom: 15px;">
+                        <div class="notification-toggle">
+                            <label style="font-size: 16px; font-weight: 500; color: #333;">线下模式单独界面</label>
+                            <label class="switch">
+                                <input type="checkbox" id="separate-offline-ui-toggle" onchange="updateFriendInfo('separateOfflineUI', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
                     <div class="settings-item">
                         <div class="notification-toggle">
                             <label style="font-size: 16px; font-weight: 500; color: #333;">心声功能</label>
@@ -5126,13 +5135,6 @@
                                 <label style="font-size: 14px; font-weight: 500; color: #666;">显示心声文字</label>
                                 <label class="switch" style="transform: scale(0.9);">
                                     <input type="checkbox" id="show-thought-text-toggle" onchange="updateFriendInfo('showThoughtText', this.checked)">
-                                    <span class="slider"></span>
-                                </label>
-                            </div>
-                            <div class="notification-toggle" style="margin-top: 10px;">
-                                <label style="font-size: 14px; font-weight: 500; color: #666;">线下模式单独界面</label>
-                                <label class="switch" style="transform: scale(0.9);">
-                                    <input type="checkbox" id="separate-offline-ui-toggle" onchange="updateFriendInfo('separateOfflineUI', this.checked)">
                                     <span class="slider"></span>
                                 </label>
                             </div>
@@ -14511,6 +14513,8 @@
             }
         }
 
+        const summarizingFriends = new Set();
+
         function runAutoSummarization() {
             const configStr = localStorage.getItem('globalConfig');
             if (!configStr) return;
@@ -14533,8 +14537,8 @@
                             
                             const CHUNK_SIZE = parseInt(friend.summarizeInterval || '20', 10);
                             if (unsummarized.length >= CHUNK_SIZE) {
-                                if (friend._isSummarizing) return;
-                                friend._isSummarizing = true;
+                                if (summarizingFriends.has(friend.id)) return;
+                                summarizingFriends.add(friend.id);
                                 
                                 const toSummarize = unsummarized.slice(0, CHUNK_SIZE);
                                 
@@ -14565,6 +14569,10 @@ ${historyText}`;
                                             createdAt: Date.now()
                                         });
                                         
+                                        if (friend._isSummarizing !== undefined) {
+                                            delete friend._isSummarizing;
+                                        }
+                                        
                                         await new Promise(res => dbUpdate('friends', friend, res));
                                         
                                         const tx2 = db.transaction(['chat_history'], 'readwrite');
@@ -14581,7 +14589,7 @@ ${historyText}`;
                                 } catch (e) {
                                     console.error("Summarization failed:", e);
                                 } finally {
-                                    friend._isSummarizing = false;
+                                    summarizingFriends.delete(friend.id);
                                 }
                             }
                         };
@@ -16482,8 +16490,22 @@ ${historyText}`;
         }
 
         function exitOfflineChat() {
-            showPage('chat-interface-page');
-            renderMessages(currentChatFriendId);
+            if (currentChatFriendId) {
+                dbGet('friends', currentChatFriendId, friend => {
+                    if (friend && friend.offlineSettings) {
+                        friend.offlineSettings.enabled = false;
+                        dbUpdate('friends', friend, () => {
+                            showPage('chat-interface-page');
+                            renderMessages(currentChatFriendId);
+                        });
+                    } else {
+                        showPage('chat-interface-page');
+                        renderMessages(currentChatFriendId);
+                    }
+                });
+            } else {
+                showPage('chat-interface-page');
+            }
         }
 
         function renderOfflineChat(friendId) {
@@ -17695,8 +17717,15 @@ ${historyText}`;
 
             dbGet('friends', currentChatFriendId, friend => {
                 if (friend && friend.separateOfflineUI) {
-                    openOfflineChat(friend.id);
-                    toggleActionPanel();
+                    if (!friend.offlineSettings) {
+                        friend.offlineSettings = { enabled: true };
+                    } else {
+                        friend.offlineSettings.enabled = true;
+                    }
+                    dbUpdate('friends', friend, () => {
+                        openOfflineChat(friend.id);
+                        toggleActionPanel();
+                    });
                     return;
                 }
                 
