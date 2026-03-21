@@ -4913,7 +4913,10 @@
             <div class="offline-chat-header">
                 <span class="back-arrow" onclick="exitOfflineChat()"><</span>
                 <span class="title" id="offline-chat-title"></span>
-                <span class="settings-btn" onclick="openOfflineSettingsModal(false)">设置</span>
+                <div style="display: flex; gap: 15px; align-items: center;">
+                    <svg onclick="retryLastOfflineMessage()" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor: pointer;"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                    <span class="settings-btn" onclick="openOfflineSettingsModal(false)">设置</span>
+                </div>
             </div>
             <div id="offline-chat-messages"></div>
             <div class="offline-input-container">
@@ -10704,9 +10707,25 @@
         function showMessageContextMenu(e, msg) {
             activeMessage = msg;
             
-            // Toggle buttons based on message type
-            document.getElementById('msg-ctx-retry').style.display = (msg.type === 'received') ? 'block' : 'none';
-            document.getElementById('msg-ctx-recall').style.display = (msg.type === 'sent') ? 'block' : 'none';
+            const isOfflineModeUI = document.getElementById('offline-chat-page').classList.contains('active');
+
+            if (isOfflineModeUI) {
+                document.getElementById('msg-ctx-multiselect').style.display = 'none';
+                document.getElementById('msg-ctx-retry').style.display = 'none'; // The retry button is in the header
+                document.getElementById('msg-ctx-copy').style.display = 'block';
+                document.getElementById('msg-ctx-edit').style.display = 'block';
+                document.getElementById('msg-ctx-quote').style.display = 'none';
+                document.getElementById('msg-ctx-recall').style.display = 'none';
+                document.getElementById('msg-ctx-delete').style.display = 'block';
+            } else {
+                document.getElementById('msg-ctx-multiselect').style.display = 'block';
+                document.getElementById('msg-ctx-retry').style.display = (msg.type === 'received') ? 'block' : 'none';
+                document.getElementById('msg-ctx-copy').style.display = 'block';
+                document.getElementById('msg-ctx-edit').style.display = 'block';
+                document.getElementById('msg-ctx-quote').style.display = 'block';
+                document.getElementById('msg-ctx-recall').style.display = (msg.type === 'sent') ? 'block' : 'none';
+                document.getElementById('msg-ctx-delete').style.display = 'block';
+            }
             
             const phoneContainer = document.querySelector('.phone-container');
             const phoneRect = phoneContainer.getBoundingClientRect();
@@ -10767,7 +10786,12 @@
                         const dbMsg = allMsgs.find(m => m.friendId === activeMessage.friendId && m.timestamp === activeMessage.timestamp);
                         if (dbMsg) {
                             dbDelete('chat_history', dbMsg.id, () => {
-                                renderMessages(currentChatFriendId);
+                                const isOfflineModeUI = document.getElementById('offline-chat-page').classList.contains('active');
+                                if (isOfflineModeUI) {
+                                    renderOfflineChat(currentChatFriendId);
+                                } else {
+                                    renderMessages(currentChatFriendId);
+                                }
                             });
                         }
                     });
@@ -10802,7 +10826,12 @@
                             dbDelete('chat_history', msg.id, () => {
                                 deletedCount++;
                                 if (deletedCount === messagesToDelete.length) {
-                                    renderMessages(currentChatFriendId);
+                                    const isOfflineModeUI = document.getElementById('offline-chat-page').classList.contains('active');
+                                    if (isOfflineModeUI) {
+                                        renderOfflineChat(currentChatFriendId);
+                                    } else {
+                                        renderMessages(currentChatFriendId);
+                                    }
                                     triggerAIResponse();
                                 }
                             });
@@ -10908,7 +10937,12 @@
                             if (deletedCount === msgsToDelete.length) {
                                 showToast('删除成功');
                                 exitSelectionMode();
-                                renderMessages(currentChatFriendId);
+                                const isOfflineModeUI = document.getElementById('offline-chat-page').classList.contains('active');
+                                if (isOfflineModeUI) {
+                                    renderOfflineChat(currentChatFriendId);
+                                } else {
+                                    renderMessages(currentChatFriendId);
+                                }
                             }
                         });
                     });
@@ -16386,6 +16420,8 @@ ${historyText}`;
                 bubble.className = 'offline-bubble right';
                 bubble.innerHTML = msg.text.replace(/\n/g, '<br>');
                 
+                attachMessageEvents(bubble, msg);
+                
                 contentGroup.appendChild(nameLabel);
                 contentGroup.appendChild(bubble);
                 
@@ -16418,6 +16454,8 @@ ${historyText}`;
                         bubble.className = 'offline-bubble left';
                         bubble.innerHTML = seg.content.replace(/\n/g, '<br>');
                         
+                        attachMessageEvents(bubble, msg);
+                        
                         bubbleContainer.appendChild(avatar);
                         bubbleContainer.appendChild(bubble);
                         row.appendChild(bubbleContainer);
@@ -16425,11 +16463,13 @@ ${historyText}`;
                         const actionDiv = document.createElement('div');
                         actionDiv.className = 'offline-action';
                         actionDiv.innerHTML = seg.content.replace(/\n/g, '<br>');
+                        attachMessageEvents(actionDiv, msg);
                         row.appendChild(actionDiv);
                     } else if (seg.type === 'thought') {
                         const thoughtDiv = document.createElement('div');
                         thoughtDiv.className = 'offline-thought';
                         thoughtDiv.innerHTML = seg.content.replace(/\n/g, '<br>');
+                        attachMessageEvents(thoughtDiv, msg);
                         row.appendChild(thoughtDiv);
                     }
                 });
@@ -16501,6 +16541,30 @@ ${historyText}`;
                         triggerAIResponse();
                     }
                 });
+            });
+        }
+
+        function retryLastOfflineMessage() {
+            if (!currentChatFriendId) return;
+            
+            dbGetAll('chat_history', allMsgs => {
+                const friendMsgs = allMsgs.filter(m => m.friendId === currentChatFriendId && m.isOfflineSeparate);
+                if (friendMsgs.length === 0) {
+                    showToast('没有可重新生成的回复');
+                    return;
+                }
+                
+                const lastMsg = friendMsgs[friendMsgs.length - 1];
+                if (lastMsg.type === 'received') {
+                    showCustomConfirm('确定要重新生成上一条回复吗？', () => {
+                        dbDelete('chat_history', lastMsg.id || lastMsg.timestamp, () => {
+                            renderOfflineChat(currentChatFriendId);
+                            triggerAIResponse();
+                        });
+                    }, '重新生成');
+                } else {
+                    showToast('只能重新生成角色的回复');
+                }
             });
         }
         
