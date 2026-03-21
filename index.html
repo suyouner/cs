@@ -12501,9 +12501,16 @@
                             container.scrollTop = container.scrollHeight;
                         }
                     } else {
-                        const titleEl = document.getElementById('chat-interface-title');
-                        if (titleEl) {
-                            titleEl.textContent = '对方正在输入...';
+                        if (document.getElementById('offline-chat-page').classList.contains('active')) {
+                            const titleEl = document.getElementById('offline-chat-title');
+                            if (titleEl) {
+                                titleEl.textContent = '...';
+                            }
+                        } else {
+                            const titleEl = document.getElementById('chat-interface-title');
+                            if (titleEl) {
+                                titleEl.textContent = '对方正在输入...';
+                            }
                         }
                     }
                 });
@@ -12517,9 +12524,16 @@
                         const indicators = document.querySelectorAll('.group-typing-indicator');
                         indicators.forEach(el => el.remove());
                     } else {
-                        const titleEl = document.getElementById('chat-interface-title');
-                        if (titleEl && friend) {
-                            titleEl.textContent = friend.name;
+                        if (document.getElementById('offline-chat-page').classList.contains('active')) {
+                            const titleEl = document.getElementById('offline-chat-title');
+                            if (titleEl) {
+                                titleEl.textContent = '';
+                            }
+                        } else {
+                            const titleEl = document.getElementById('chat-interface-title');
+                            if (titleEl && friend) {
+                                titleEl.textContent = friend.name;
+                            }
                         }
                     }
                 });
@@ -12701,7 +12715,7 @@
                             // Sanitize thought tags immediately to standardize various bracket forms to <thought>
                             aiResponseText = sanitizeThoughtTags(aiResponseText);
 
-                            const isOfflineMode = friend.offlineSettings && friend.offlineSettings.enabled;
+                            const isOfflineMode = (friend.offlineSettings && friend.offlineSettings.enabled) || (friend.separateOfflineUI && document.getElementById('offline-chat-page').classList.contains('active'));
 
                             // Parse Thought Feature Tags
                             let mood = null;
@@ -13431,7 +13445,7 @@
 
         function buildSystemPrompt(friend, userPersona = null, aiStickers = [], visiblePosts = []) {
             let prompt = `你现在的身份是：${friend.realName || friend.name}。\n`;
-            const isOfflineMode = friend.offlineSettings && friend.offlineSettings.enabled;
+            const isOfflineMode = (friend.offlineSettings && friend.offlineSettings.enabled) || (friend.separateOfflineUI && document.getElementById('offline-chat-page').classList.contains('active'));
 
             // --- 核心互动原则 (最高优先级) ---
             prompt += `\n【核心互动原则与禁忌】\n`;
@@ -13548,7 +13562,7 @@
             }
 
             if (isOfflineMode) {
-                const settings = friend.offlineSettings;
+                const settings = friend.offlineSettings || {};
                 prompt += `\n【重要：当前为线下模式，请严格遵守以下所有规则】\n`;
                 prompt += `1.  **输出格式**: 你的回复必须合并为【一条完整的消息】，不能拆分成多条发送。\n`;
                 prompt += `    - **灵活组合**: 在这条消息内，你可以自由组合、穿插【语言】、【动作】和【心理描写】。不需要固定的顺序（如不必须是语言+动作+心理），也不需要各部分字数相当。例如可以是：语言+心理+动作+心理+语言，或者动作+心理+语言等等。\n`;
@@ -16311,7 +16325,7 @@ ${historyText}`;
             currentChatFriendId = friendId;
             dbGet('friends', friendId, friend => {
                 if (!friend) return;
-                document.getElementById('offline-chat-title').textContent = friend.name;
+                document.getElementById('offline-chat-title').textContent = '';
                 showPage('offline-chat-page');
                 renderOfflineChat(friendId);
             });
