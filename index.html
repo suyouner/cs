@@ -3361,7 +3361,7 @@
         /* Music Avatars Blending */
         .music-avatars-container {
             position: relative;
-            width: 130px;
+            width: 140px;
             height: 75px;
             margin: 0 auto;
             cursor: pointer;
@@ -3376,34 +3376,28 @@
             position: absolute;
             top: 0;
             transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 2px solid #2b2b2b;
+            box-sizing: border-box;
         }
 
         .music-avatar.friend {
             left: 0;
             z-index: 2;
-            -webkit-mask-image: linear-gradient(to right, black 65%, transparent 100%);
-            mask-image: linear-gradient(to right, black 65%, transparent 100%);
         }
 
         .music-avatar.me {
-            left: 55px;
+            left: 65px;
             z-index: 3;
-            -webkit-mask-image: linear-gradient(to left, black 65%, transparent 100%);
-            mask-image: linear-gradient(to left, black 65%, transparent 100%);
         }
 
         .music-avatars-container.swapped .music-avatar.friend {
-            left: 55px;
+            left: 65px;
             z-index: 3;
-            -webkit-mask-image: linear-gradient(to left, black 65%, transparent 100%);
-            mask-image: linear-gradient(to left, black 65%, transparent 100%);
         }
 
         .music-avatars-container.swapped .music-avatar.me {
             left: 0;
             z-index: 2;
-            -webkit-mask-image: linear-gradient(to right, black 65%, transparent 100%);
-            mask-image: linear-gradient(to right, black 65%, transparent 100%);
         }
 
         /* Music Playlist Modal */
