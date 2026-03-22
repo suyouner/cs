@@ -3286,10 +3286,18 @@
             height: 36px;
             border-radius: 18px;
             border: none;
-            padding: 0 15px;
+            padding: 8px 15px;
             font-size: 15px;
+            line-height: 20px;
             outline: none;
             background: #fff;
+            resize: none;
+            box-sizing: border-box;
+            font-family: inherit;
+            scrollbar-width: none;
+        }
+        .comment-input::-webkit-scrollbar {
+            display: none;
         }
         .comment-send-btn {
             background-color: #07c160;
@@ -5571,7 +5579,7 @@
     <!-- Comment Drawer -->
     <div class="comment-drawer-overlay" id="comment-drawer-overlay">
         <div class="comment-drawer" onclick="event.stopPropagation()">
-            <input type="text" class="comment-input" id="comment-input" placeholder="评论..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            <textarea rows="1" class="comment-input" id="comment-input" placeholder="评论..." autocomplete="nope" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
             <button class="comment-send-btn" id="comment-send-btn" onclick="submitComment()">发送</button>
         </div>
     </div>
@@ -18825,6 +18833,14 @@ ${historyText}`;
 
         fixViewportHeight();
         document.getElementById('comment-drawer-overlay').addEventListener('click', closeCommentDrawer);
+
+        // 为评论框添加回车发送功能
+        document.getElementById('comment-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                submitComment();
+            }
+        });
 
         // 全局禁用所有输入框的系统自动填充（针对安卓的钥匙、信用卡、密码小人图标等）
         const disableAutofill = (el) => {
