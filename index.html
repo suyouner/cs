@@ -4995,7 +4995,7 @@
             </div>
         </div>
 
-        <div id="offline-chat-page" class="page" style="position: relative;">
+        <div id="offline-chat-page" class="page">
             <div class="offline-chat-header">
                 <span class="back-arrow" onclick="exitOfflineChat()"><</span>
                 <span class="title" id="offline-chat-title"></span>
@@ -5009,7 +5009,9 @@
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform: translate(-1px, 1px);"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
             </div>
             <div class="offline-input-container">
-                <textarea rows="1" id="offline-chat-input" class="offline-input" placeholder="输入..." autocomplete="off"></textarea>
+                <div class="chat-input-wrapper">
+                    <textarea rows="1" id="offline-chat-input" class="offline-input" placeholder="输入..." autocomplete="off"></textarea>
+                </div>
                 <button class="offline-send-btn" onmousedown="event.preventDefault(); sendOfflineMessage();" ontouchstart="event.preventDefault(); sendOfflineMessage();" onclick="event.preventDefault();">发送</button>
             </div>
         </div>
