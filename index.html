@@ -3760,6 +3760,8 @@
 
         .offline-input {
             flex: 1;
+            min-width: 0;
+            width: 100%;
             padding: 10px 15px;
             border-radius: 20px;
             border: 1px solid #ddd;
@@ -3772,7 +3774,6 @@
             font-family: inherit;
             scrollbar-width: none;
             box-sizing: border-box;
-            overflow: hidden;
         }
 
         .offline-input::-webkit-scrollbar {
@@ -5009,7 +5010,7 @@
             </div>
             <div class="offline-input-container">
                 <textarea rows="1" id="offline-chat-input" class="offline-input" placeholder="输入..." autocomplete="off"></textarea>
-                <button class="offline-send-btn" onclick="sendOfflineMessage()">发送</button>
+                <button class="offline-send-btn" onmousedown="event.preventDefault(); sendOfflineMessage();" ontouchstart="event.preventDefault(); sendOfflineMessage();" onclick="event.preventDefault();">发送</button>
             </div>
         </div>
 
