@@ -3641,13 +3641,17 @@
         }
 
         #offline-chat-messages {
-            flex: 1;
+            flex: 1 1 0;
+            height: 0;
+            min-height: 0;
             overflow-y: auto;
+            overflow-x: hidden;
             padding: 20px 15px;
             display: flex;
             flex-direction: column;
             gap: 15px;
             background-color: #fff;
+            -webkit-overflow-scrolling: touch;
         }
 
         /* Offline Chat specific message styles */
@@ -3736,6 +3740,7 @@
         }
 
         .offline-input-container {
+            flex-shrink: 0;
             padding: 10px 15px;
             padding-bottom: calc(10px + env(safe-area-inset-bottom));
             background-color: #fff;
@@ -4898,7 +4903,7 @@
                     <svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="none" stroke-width="2"></circle><line x1="12" y1="13" x2="12" y2="19" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"></line><line x1="16" y1="10" x2="16" y2="22" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"></line><line x1="20" y1="13" x2="20" y2="19" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"></line></svg>
                 </div>
                 <div class="chat-input-wrapper">
-                    <textarea rows="1" class="chat-input" id="chat-message-input" placeholder="" onfocus="hideAllInputPanels()"></textarea>
+                    <textarea rows="1" class="chat-input" id="chat-message-input" placeholder="" onfocus="hideAllInputPanels()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
                 </div>
                 <div class="chat-input-icon" id="emoji-icon">
                     <svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="none" stroke="currentColor" stroke-width="2"></circle><circle cx="11" cy="13" r="1.5" fill="currentColor" stroke="none"></circle><circle cx="21" cy="13" r="1.5" fill="currentColor" stroke="none"></circle><path d="M10 19 A8 8 0 0 0 22 19" stroke="currentColor" stroke-width="2" fill="none"></path></svg>
@@ -5540,7 +5545,7 @@
     <div class="post-discover-modal" id="post-discover-modal">
         <div class="post-discover-content">
             <div class="post-discover-header">发朋友圈</div>
-            <textarea class="post-discover-textarea" id="post-text-input" placeholder="想法..."></textarea>
+            <textarea class="post-discover-textarea" id="post-text-input" placeholder="想法..." autocomplete="off"></textarea>
             
             <div class="post-image-upload-row">
                 <div class="post-image-upload-btn" onclick="triggerPostImageUpload()">
@@ -5566,7 +5571,7 @@
     <!-- Comment Drawer -->
     <div class="comment-drawer-overlay" id="comment-drawer-overlay">
         <div class="comment-drawer" onclick="event.stopPropagation()">
-            <input type="text" class="comment-input" id="comment-input" placeholder="评论...">
+            <input type="text" class="comment-input" id="comment-input" placeholder="评论..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
             <button class="comment-send-btn" id="comment-send-btn" onclick="submitComment()">发送</button>
         </div>
     </div>
@@ -17109,6 +17114,15 @@ ${historyText}`;
             }
         });
 
+        document.getElementById('offline-chat-input').addEventListener('focus', () => {
+            setTimeout(() => {
+                const container = document.getElementById('offline-chat-messages');
+                if (container) {
+                    container.scrollTop = container.scrollHeight;
+                }
+            }, 300);
+        });
+
         // --- Memory Management Logic ---
         let currentEditingMemoryId = null;
 
@@ -18587,6 +18601,12 @@ ${historyText}`;
                 document.getElementById('chat-message-input').addEventListener('blur', () => {
                     root.style.setProperty('--keyboard-offset', '0px');
                 });
+                const offlineInput = document.getElementById('offline-chat-input');
+                if (offlineInput) {
+                    offlineInput.addEventListener('blur', () => {
+                        root.style.setProperty('--keyboard-offset', '0px');
+                    });
+                }
             }
 
             // Keep the existing stability logic for all platforms
@@ -18805,7 +18825,36 @@ ${historyText}`;
 
         fixViewportHeight();
         document.getElementById('comment-drawer-overlay').addEventListener('click', closeCommentDrawer);
+
+        // 全局禁用所有输入框的系统自动填充（针对安卓的钥匙、信用卡、密码小人图标等）
+        const disableAutofill = (el) => {
+            // 使用 new-password 是绕过现代浏览器强制提示密码填充的最有效方法
+            el.setAttribute('autocomplete', 'new-password');
+            el.setAttribute('autocorrect', 'off');
+            el.setAttribute('autocapitalize', 'off');
+            el.setAttribute('spellcheck', 'false');
+            // 对于部分顽固的输入框，添加只读属性，聚焦时再移除（可选策略，暂用标准属性拦截）
+        };
+
+        document.querySelectorAll('input, textarea').forEach(disableAutofill);
+
+        // 监控动态创建的输入框（如打开弹窗时生成的元素）
+        const observer = new MutationObserver(mutations => {
+            mutations.forEach(mutation => {
+                mutation.addedNodes.forEach(node => {
+                    if (node.nodeType === 1) { // ELEMENT_NODE
+                        if (node.tagName === 'INPUT' || node.tagName === 'TEXTAREA') {
+                            disableAutofill(node);
+                        }
+                        if (node.querySelectorAll) {
+                            node.querySelectorAll('input, textarea').forEach(disableAutofill);
+                        }
+                    }
+                });
+            });
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
     });
-    </script>
+</script>
 </body>
 </html>
