@@ -3749,31 +3749,38 @@
 
         .offline-input-container {
             flex-shrink: 0;
-            padding: 10px 15px;
-            padding-bottom: calc(10px + env(safe-area-inset-bottom));
+            padding: 8px;
+            padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+            padding-right: calc(8px + env(safe-area-inset-right, 0px));
+            padding-left: calc(8px + env(safe-area-inset-left, 0px));
             background-color: #fff;
             border-top: 1px solid #f0f0f0;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
+            width: 100%;
+            min-height: 52px;
+            transition: padding-bottom 0.2s ease-out;
+            box-sizing: border-box;
         }
 
         .offline-input {
-            flex: 1;
+            flex-grow: 1;
             min-width: 0;
             width: 100%;
-            padding: 10px 15px;
+            padding: 8px 16px;
             border-radius: 20px;
             border: 1px solid #ddd;
             background-color: #f9f9f9;
             font-size: 16px;
             outline: none;
             resize: none;
-            height: 44px;
+            height: 36px;
             line-height: 1.4;
             font-family: inherit;
             scrollbar-width: none;
             box-sizing: border-box;
+            touch-action: manipulation;
         }
 
         .offline-input::-webkit-scrollbar {
@@ -3785,11 +3792,16 @@
             color: #333; /* Dark text for contrast */
             border: none;
             border-radius: 20px;
-            padding: 10px 20px;
+            padding: 8px 16px;
             font-size: 15px;
             font-weight: 600;
             cursor: pointer;
             transition: background-color 0.2s;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: manipulation;
         }
         
         .offline-send-btn:active {
@@ -5010,7 +5022,7 @@
             </div>
             <div class="offline-input-container">
                 <div class="chat-input-wrapper">
-                    <textarea rows="1" id="offline-chat-input" class="offline-input" placeholder="输入..." autocomplete="off"></textarea>
+                    <textarea rows="1" id="offline-chat-input" class="offline-input" placeholder="输入..." autocomplete="nope" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
                 </div>
                 <button class="offline-send-btn" onmousedown="event.preventDefault(); sendOfflineMessage();" ontouchstart="event.preventDefault(); sendOfflineMessage();" onclick="event.preventDefault();">发送</button>
             </div>
