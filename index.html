@@ -3753,6 +3753,17 @@
             background-color: #f9f9f9;
             font-size: 16px;
             outline: none;
+            resize: none;
+            height: 44px;
+            line-height: 1.4;
+            font-family: inherit;
+            scrollbar-width: none;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
+        .offline-input::-webkit-scrollbar {
+            display: none;
         }
 
         .offline-send-btn {
@@ -3774,6 +3785,25 @@
 </head>
 <body>
     <div class="toast-container" id="toast-container"></div>
+
+    <!-- Discover Comment Context Menu -->
+    <div class="message-context-menu" id="discover-comment-context-menu">
+        <button class="message-context-menu-item" id="dc-ctx-retry">重试</button>
+        <button class="message-context-menu-item" id="dc-ctx-edit">编辑</button>
+        <button class="message-context-menu-item" id="dc-ctx-delete">删除</button>
+    </div>
+
+    <!-- Edit Discover Comment Modal -->
+    <div class="modal-overlay" id="edit-discover-comment-modal">
+        <div class="modal-content" style="width: 300px;">
+            <h3 style="text-align: center; font-size: 17px; font-weight: 600; margin-bottom: 10px;">编辑评论</h3>
+            <textarea id="edit-discover-comment-content" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; resize: none; height: 120px; font-size: 14px; box-sizing: border-box;"></textarea>
+            <div class="modal-actions" style="margin-top: 15px;">
+                <button class="cancel-btn" onclick="document.getElementById('edit-discover-comment-modal').style.display='none'">取消</button>
+                <button class="confirm-btn" onclick="saveEditedDiscoverComment()">保存</button>
+            </div>
+        </div>
+    </div>
 
     <div id="activation-page" style="display: none;">
         <div class="activation-content">
@@ -4965,7 +4995,7 @@
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform: translate(-1px, 1px);"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
             </div>
             <div class="offline-input-container">
-                <input type="text" id="offline-chat-input" class="offline-input" placeholder="输入...">
+                <textarea rows="1" id="offline-chat-input" class="offline-input" placeholder="输入..." autocomplete="off"></textarea>
                 <button class="offline-send-btn" onclick="sendOfflineMessage()">发送</button>
             </div>
         </div>
@@ -5050,24 +5080,26 @@
                 </div>
 
                 <div class="settings-card" id="chat-info-ai-settings-section" style="width: 100%; margin-top: 15px;">
-                    <div class="settings-item" style="border-bottom: 1px solid #f5f5f5; padding-bottom: 15px;">
+                    <div class="settings-item" id="short-term-memory-container" style="border-bottom: 1px solid #f5f5f5; padding-bottom: 15px;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <label style="font-size: 16px; font-weight: 500; color: #333;">短期记忆 (上下文条数)</label>
                             <input type="number" id="short-term-memory-input" placeholder="20" style="width: 60px; text-align: right; border: none; font-size: 16px; color: #888; outline: none; background: transparent;" onchange="updateFriendInfo('shortTermMemory', this.value)">
                         </div>
                     </div>
-                    <div class="settings-item" style="padding-top: 15px;">
-                        <div class="notification-toggle">
-                            <label style="font-size: 16px; font-weight: 500; color: #333;">自动总结长期记忆</label>
-                            <label class="switch">
-                                <input type="checkbox" id="auto-summarize-memory-toggle" onchange="toggleAutoSummarizeConfig(this.checked)">
-                                <span class="slider"></span>
-                            </label>
-                        </div>
-                        <div id="auto-summarize-interval-container" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 1px dashed #eee;">
-                            <div class="settings-item">
-                                <label style="font-size: 14px; font-weight: 500; color: #666; margin-bottom: 5px;">触发总结消息条数</label>
-                                <input type="number" id="summarize-interval-input" placeholder="默认: 20" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px;" onchange="updateFriendInfo('summarizeInterval', this.value)">
+                    <div id="auto-summarize-settings-container">
+                        <div class="settings-item" style="padding-top: 15px;">
+                            <div class="notification-toggle">
+                                <label style="font-size: 16px; font-weight: 500; color: #333;">自动总结长期记忆</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="auto-summarize-memory-toggle" onchange="toggleAutoSummarizeConfig(this.checked)">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div id="auto-summarize-interval-container" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 1px dashed #eee;">
+                                <div class="settings-item">
+                                    <label style="font-size: 14px; font-weight: 500; color: #666; margin-bottom: 5px;">触发总结消息条数</label>
+                                    <input type="number" id="summarize-interval-input" placeholder="默认: 20" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px;" onchange="updateFriendInfo('summarizeInterval', this.value)">
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -7930,7 +7962,7 @@
                 if (!post) return;
 
                 dbGetAll('friends', friends => {
-                    const eligibleFriends = friends.filter(f => canBotSeePost(f, post, friends));
+                    const eligibleFriends = friends.filter(f => !f.isGroup && canBotSeePost(f, post, friends));
                     if (eligibleFriends.length === 0) return;
 
                     const grouped = {};
@@ -8375,10 +8407,10 @@
                                             replyText = ` 回复 <span class="discover-comment-name">${rName}</span>`;
                                         }
                                         
-                                        // Pass comment.id to openCommentDrawer, and cAuthorName (display name)
+                                        // Use data attributes for event binding later
                                         interactionsHtml += `
-                                            <div class="discover-comment-item" onclick="openCommentDrawer('${post.id}', '${cAuthorName}', '${comment.id || ''}', ${comment.depth || 0})">
-                                                <span class="discover-comment-name">${cAuthorName}</span>${replyText}：${comment.text}
+                                            <div class="discover-comment-item" data-post-id="${post.id}" data-comment-id="${comment.id || ''}" data-author-id="${comment.authorId}" data-author-name="${cAuthorName}" data-depth="${comment.depth || 0}">
+                                                <span class="discover-comment-name">${cAuthorName}</span>${replyText}：<span class="discover-comment-text">${comment.text}</span>
                                             </div>
                                         `;
                                     });
@@ -8408,6 +8440,72 @@
                                 </div>
                             `;
                             container.appendChild(postEl);
+                            
+                            // Bind events for comments in this post
+                            postEl.querySelectorAll('.discover-comment-item').forEach(item => {
+                                let pressTimer;
+                                let isLongPress = false;
+                                let startX, startY;
+                                
+                                const postId = item.dataset.postId;
+                                const commentId = item.dataset.commentId;
+                                const authorId = item.dataset.authorId;
+                                const authorName = item.dataset.authorName;
+                                const depth = item.dataset.depth;
+                                
+                                const startPress = (e) => {
+                                    if (e.button === 2) return;
+                                    isLongPress = false;
+                                    startX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+                                    startY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+                                    
+                                    pressTimer = setTimeout(() => {
+                                        isLongPress = true;
+                                        e.preventDefault();
+                                        showDiscoverCommentContextMenu(e, postId, commentId, authorId);
+                                    }, 500);
+                                };
+
+                                const cancelPress = (moveEvent) => {
+                                    let moveX = moveEvent.type.includes('touch') ? moveEvent.touches[0].clientX : moveEvent.clientX;
+                                    let moveY = moveEvent.type.includes('touch') ? moveEvent.touches[0].clientY : moveEvent.clientY;
+                                    if (Math.abs(moveX - startX) > 10 || Math.abs(moveY - startY) > 10) {
+                                        clearTimeout(pressTimer);
+                                    }
+                                };
+
+                                const endPress = (e) => {
+                                    clearTimeout(pressTimer);
+                                    if (isLongPress) {
+                                        if (e.cancelable) e.preventDefault();
+                                    }
+                                };
+                                
+                                const onClick = (e) => {
+                                    if (isLongPress) {
+                                        e.preventDefault();
+                                        isLongPress = false;
+                                    } else {
+                                        openCommentDrawer(postId, authorName, commentId, depth);
+                                    }
+                                };
+
+                                item.addEventListener('mousedown', startPress);
+                                item.addEventListener('touchstart', startPress, { passive: false });
+                                item.addEventListener('mouseup', endPress);
+                                item.addEventListener('mouseleave', endPress);
+                                item.addEventListener('touchend', endPress);
+                                item.addEventListener('touchcancel', endPress);
+                                item.addEventListener('mousemove', cancelPress);
+                                item.addEventListener('touchmove', cancelPress);
+                                item.addEventListener('contextmenu', (e) => { 
+                                    e.preventDefault(); 
+                                    if (!isLongPress) {
+                                        showDiscoverCommentContextMenu(e, postId, commentId, authorId); 
+                                    }
+                                });
+                                item.addEventListener('click', onClick);
+                            });
                         });
                     });
                 });
@@ -8479,6 +8577,131 @@
                 }
             });
         }
+
+        let activeDcPostId = null;
+        let activeDcCommentId = null;
+        const dcContextMenu = document.getElementById('discover-comment-context-menu');
+
+        document.addEventListener('click', (e) => {
+            if (dcContextMenu && dcContextMenu.style.display === 'flex' && !e.target.closest('.message-context-menu')) {
+                dcContextMenu.style.display = 'none';
+                activeDcPostId = null;
+                activeDcCommentId = null;
+            }
+        });
+
+        function showDiscoverCommentContextMenu(e, postId, commentId, authorId) {
+            activeDcPostId = postId;
+            activeDcCommentId = commentId;
+
+            // 如果是用户自己发的评论，不显示重试按钮
+            const isMe = authorId === 'main_user';
+            document.getElementById('dc-ctx-retry').style.display = isMe ? 'none' : 'block';
+
+            dcContextMenu.style.display = 'flex';
+            
+            const phoneContainer = document.querySelector('.phone-container');
+            const phoneRect = phoneContainer.getBoundingClientRect();
+            
+            let top = (e.clientY || e.touches[0].clientY) - phoneRect.top;
+            let left = (e.clientX || e.touches[0].clientX) - phoneRect.left;
+
+            if (top + dcContextMenu.offsetHeight > phoneContainer.clientHeight) {
+                top = phoneContainer.clientHeight - dcContextMenu.offsetHeight - 10;
+            }
+            if (left + dcContextMenu.offsetWidth > phoneContainer.clientWidth) {
+                left = phoneContainer.clientWidth - dcContextMenu.offsetWidth - 10;
+            }
+
+            dcContextMenu.style.top = `${top}px`;
+            dcContextMenu.style.left = `${left}px`;
+        }
+
+        document.getElementById('dc-ctx-delete').addEventListener('click', () => {
+            if (activeDcPostId && activeDcCommentId) {
+                showCustomConfirm('确定要删除这条评论吗？', () => {
+                    dbGet('discover_posts', activeDcPostId, post => {
+                        if (post && post.comments) {
+                            post.comments = post.comments.filter(c => String(c.id) !== String(activeDcCommentId));
+                            dbUpdate('discover_posts', post, () => {
+                                renderDiscoverFeed();
+                            });
+                        }
+                    });
+                }, '删除评论');
+            }
+            dcContextMenu.style.display = 'none';
+        });
+
+        document.getElementById('dc-ctx-edit').addEventListener('click', () => {
+            if (activeDcPostId && activeDcCommentId) {
+                dbGet('discover_posts', activeDcPostId, post => {
+                    if (post && post.comments) {
+                        const comment = post.comments.find(c => String(c.id) === String(activeDcCommentId));
+                        if (comment) {
+                            document.getElementById('edit-discover-comment-content').value = comment.text;
+                            document.getElementById('edit-discover-comment-modal').style.display = 'flex';
+                        }
+                    }
+                });
+            }
+            dcContextMenu.style.display = 'none';
+        });
+
+        function saveEditedDiscoverComment() {
+            const newText = document.getElementById('edit-discover-comment-content').value.trim();
+            if (!newText) {
+                showToast('评论内容不能为空');
+                return;
+            }
+            if (activeDcPostId && activeDcCommentId) {
+                dbGet('discover_posts', activeDcPostId, post => {
+                    if (post && post.comments) {
+                        const comment = post.comments.find(c => String(c.id) === String(activeDcCommentId));
+                        if (comment) {
+                            comment.text = newText;
+                            dbUpdate('discover_posts', post, () => {
+                                document.getElementById('edit-discover-comment-modal').style.display = 'none';
+                                renderDiscoverFeed();
+                            });
+                        }
+                    }
+                });
+            }
+        }
+
+        document.getElementById('dc-ctx-retry').addEventListener('click', () => {
+            if (activeDcPostId && activeDcCommentId) {
+                showCustomConfirm('确定要让该角色重新评论吗？(将删除此评论并重新生成)', () => {
+                    dbGet('discover_posts', activeDcPostId, post => {
+                        if (post && post.comments) {
+                            const commentIndex = post.comments.findIndex(c => String(c.id) === String(activeDcCommentId));
+                            if (commentIndex !== -1) {
+                                const authorId = post.comments[commentIndex].authorId;
+                                post.comments.splice(commentIndex, 1);
+                                dbUpdate('discover_posts', post, () => {
+                                    renderDiscoverFeed();
+                                    
+                                    // 重新触发该角色的评论
+                                    const configStr = localStorage.getItem('globalConfig');
+                                    if (!configStr) return;
+                                    const config = JSON.parse(configStr);
+                                    if (!config.apiKey || !config.model) return;
+                                    
+                                    dbGet('friends', authorId, friend => {
+                                        if (friend) {
+                                            processGroupInteractions(activeDcPostId, [friend], config);
+                                            showToast('已请求重新生成评论');
+                                        }
+                                    });
+                                });
+                            }
+                        }
+                    });
+                }, '重试评论');
+            }
+            dcContextMenu.style.display = 'none';
+        });
 
         let activeCommentPostId = null;
         let activeCommentReplyTo = null;
@@ -12848,6 +13071,32 @@
 如果你认为此时不需要任何人发言，请直接输出“无”。严禁代替用户发言，严禁输出用户的动作。`;
                     } else {
                         systemPrompt = buildSystemPrompt(friend, userPersona, aiStickers, visiblePosts);
+
+                        const relevantGroups = allFriendsList.filter(f => f.isGroup && f.memoryInterop && (f.memoryInteropRoles || []).includes(friend.id));
+                        if (relevantGroups.length > 0) {
+                            let groupHistoryText = "";
+                            for (const group of relevantGroups) {
+                                const groupHistory = await new Promise(res => {
+                                    const tx = db.transaction(['chat_history'], 'readonly');
+                                    const store = tx.objectStore('chat_history');
+                                    const idx = store.index('friendId');
+                                    const req = idx.getAll(group.id);
+                                    req.onsuccess = () => res(req.result.slice(-10));
+                                    req.onerror = () => res([]);
+                                });
+                                if (groupHistory.length > 0) {
+                                    groupHistoryText += `\n[群聊：${group.name} 的最近记忆]：\n`;
+                                    groupHistory.forEach(msg => {
+                                        const sender = msg.type === 'sent' ? '用户' : (msg.senderName || '未知成员');
+                                        const txt = msg.isSticker ? (msg.text.startsWith('dice:') ? '[骰子]' : '[图片/表情]') : msg.text;
+                                        groupHistoryText += `${sender}: ${txt}\n`;
+                                    });
+                                }
+                            }
+                            if (groupHistoryText) {
+                                systemPrompt += `\n【最近的群聊记忆（记忆互通）】\n你最近在以下群聊中参与了互动，这是最近的群消息。你可以在与用户的私聊中自然地提及或顺着这些话题聊（如果相关的话）：${groupHistoryText}\n`;
+                            }
+                        }
                     }
 
                     const shortTermCount = parseInt(friend.shortTermMemory || '20', 10);
@@ -12862,8 +13111,8 @@
                         if (!friend.isGroup) {
                             history = history.slice(-shortTermCount);
                         } else {
-                            // 群聊取最近30条
-                            history = history.slice(-30);
+                            // 群聊取设置的上下文条数
+                            history = history.slice(-shortTermCount);
                             // 将群聊记录包装成 LLM 容易理解的格式
                             history = history.map(msg => {
                                 const sender = msg.type === 'sent' ? '用户' : (msg.senderName || '未知成员');
@@ -14557,18 +14806,20 @@
             if (!config.apiKey || !config.model) return;
 
             dbGetAll('friends', friends => {
-                friends.forEach(friend => {
-                    if (friend.autoSummarizeMemory) {
-                        const transaction = db.transaction(['chat_history'], 'readwrite');
-                        const store = transaction.objectStore('chat_history');
-                        const index = store.index('friendId');
-                        const request = index.getAll(friend.id);
-
-                        request.onsuccess = async () => {
-                            let history = request.result;
+                dbGetAll('chat_history', allMsgs => {
+                    friends.forEach(friend => {
+                        if (friend.autoSummarizeMemory && !friend.isGroup) {
+                            const groupIds = friends.filter(f => f.isGroup && f.memoryInterop && (f.memoryInteropRoles || []).includes(friend.id)).map(f => f.id);
+                            const allRelevantIds = [friend.id, ...groupIds];
+                            
+                            let history = allMsgs.filter(m => allRelevantIds.includes(m.friendId));
                             history.sort((a, b) => a.timestamp - b.timestamp);
                             
-                            let unsummarized = history.filter(msg => !msg.isSummarized);
+                            let unsummarized = history.filter(msg => {
+                                if (msg.summarizedBy && msg.summarizedBy.includes(friend.id)) return false;
+                                if (msg.friendId === friend.id && msg.isSummarized) return false;
+                                return true;
+                            });
                             
                             const CHUNK_SIZE = parseInt(friend.summarizeInterval || '20', 10);
                             if (unsummarized.length >= CHUNK_SIZE) {
@@ -14580,55 +14831,87 @@
                                 let historyText = toSummarize.map(msg => {
                                     const date = new Date(msg.timestamp);
                                     const timeStr = `${date.getMonth()+1}-${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-                                    const sender = msg.type === 'sent' ? '用户' : friend.realName;
+                                    
+                                    let contextPrefix = '';
+                                    let sender = '';
+                                    if (msg.friendId === friend.id) {
+                                        contextPrefix = '[私聊] ';
+                                        sender = msg.type === 'sent' ? '用户' : friend.realName;
+                                    } else {
+                                        const group = friends.find(f => f.id === msg.friendId);
+                                        contextPrefix = `[群聊：${group ? group.name : '未知群'}] `;
+                                        sender = msg.type === 'sent' ? '用户' : (msg.senderName || '未知成员');
+                                    }
+                                    
                                     const content = msg.isSticker ? '[图片/表情]' : msg.text;
-                                    return `[${timeStr}] ${sender}: ${content}`;
+                                    return `${contextPrefix}[${timeStr}] ${sender}: ${content}`;
                                 }).join('\n');
 
                                 const summarizePrompt = `你是一个负责提取记忆的助手。请将以下对话历史总结为一条简短的长期记忆（50-100字）。
 要求：
 1. 以第一人称视角（作为“${friend.realName}”）来记录。
 2. 只提取关键事件、新得知的信息或情感变化，忽略无意义的闲聊。
-${friend.syncReality ? '3. 总结的开头或内容中必须包含这件事发生的具体时间背景（根据提供的对话时间戳推断是哪天、上午下午或具体时间段），这是最重要的要求。\n' : '\n'}
+3. 请注意区分【私聊】和【群聊】中发生的事情。
+${friend.syncReality ? '4. 总结的开头或内容中必须包含这件事发生的具体时间背景（根据提供的对话时间戳推断是哪天、上午下午或具体时间段），这是最重要的要求。\n' : '\n'}
 对话内容如下：
 ${historyText}`;
 
-                                try {
-                                    const summaryText = await callLLM(config, "严格按照要求总结，不要输出多余的解释。", [{ type: 'sent', text: summarizePrompt, isSticker: false }]);
-                                    
-                                    if (summaryText) {
-                                        if (!friend.memories) friend.memories = [];
-                                        friend.memories.push({
-                                            id: Date.now().toString(),
-                                            content: summaryText.trim(),
-                                            createdAt: Date.now()
-                                        });
-                                        
-                                        if (friend._isSummarizing !== undefined) {
-                                            delete friend._isSummarizing;
+                                callLLM(config, "严格按照要求总结，不要输出多余的解释。", [{ type: 'sent', text: summarizePrompt, isSticker: false }])
+                                    .then(async summaryText => {
+                                        if (summaryText) {
+                                            if (!friend.memories) friend.memories = [];
+                                            friend.memories.push({
+                                                id: Date.now().toString(),
+                                                content: summaryText.trim(),
+                                                createdAt: Date.now()
+                                            });
+                                            
+                                            if (friend._isSummarizing !== undefined) {
+                                                delete friend._isSummarizing;
+                                            }
+                                            
+                                            await new Promise(res => dbUpdate('friends', friend, res));
+                                            
+                                            const tx2 = db.transaction(['chat_history'], 'readwrite');
+                                            const store2 = tx2.objectStore('chat_history');
+                                            
+                                            let updates = 0;
+                                            toSummarize.forEach(msg => {
+                                                if (!msg.summarizedBy) msg.summarizedBy = [];
+                                                if (!msg.summarizedBy.includes(friend.id)) {
+                                                    msg.summarizedBy.push(friend.id);
+                                                }
+                                                if (msg.friendId === friend.id) {
+                                                    msg.isSummarized = true;
+                                                }
+                                                const req = store2.put(msg);
+                                                req.onsuccess = () => {
+                                                    updates++;
+                                                    if (updates === toSummarize.length) {
+                                                        if (document.getElementById('memory-management-page').classList.contains('active') && currentChatFriendId === friend.id) {
+                                                            renderMemoryList();
+                                                        }
+                                                        summarizingFriends.delete(friend.id);
+                                                    }
+                                                };
+                                                req.onerror = () => {
+                                                    updates++;
+                                                    if (updates === toSummarize.length) {
+                                                        summarizingFriends.delete(friend.id);
+                                                    }
+                                                };
+                                            });
+                                        } else {
+                                            summarizingFriends.delete(friend.id);
                                         }
-                                        
-                                        await new Promise(res => dbUpdate('friends', friend, res));
-                                        
-                                        const tx2 = db.transaction(['chat_history'], 'readwrite');
-                                        const store2 = tx2.objectStore('chat_history');
-                                        toSummarize.forEach(msg => {
-                                            msg.isSummarized = true;
-                                            store2.put(msg);
-                                        });
-                                        
-                                        if (document.getElementById('memory-management-page').classList.contains('active') && currentChatFriendId === friend.id) {
-                                            renderMemoryList();
-                                        }
-                                    }
-                                } catch (e) {
-                                    console.error("Summarization failed:", e);
-                                } finally {
-                                    summarizingFriends.delete(friend.id);
-                                }
+                                    })
+                                    .catch(e => {
+                                        console.error("Summarization failed:", e);
+                                        summarizingFriends.delete(friend.id);
+                                    });
                             }
-                        };
-                    }
+                        }
+                    });
                 });
             });
         }
@@ -15893,12 +16176,14 @@ ${historyText}`;
                     if (friend.isGroup) {
                         document.getElementById('chat-info-personal-section').style.display = 'none';
                         document.getElementById('chat-info-my-avatar-section').style.display = 'none';
-                        document.getElementById('chat-info-ai-settings-section').style.display = 'none';
+                        document.getElementById('chat-info-ai-settings-section').style.display = 'flex';
+                        document.getElementById('auto-summarize-settings-container').style.display = 'none';
                         document.getElementById('chat-info-active-chat-section').style.display = 'none';
                         document.getElementById('chat-info-thought-section').style.display = 'none';
                         document.getElementById('chat-info-group-section').style.display = 'block';
                         
                         document.getElementById('group-info-name').value = friend.name;
+                        document.getElementById('short-term-memory-input').value = friend.shortTermMemory || '';
                         
                         // Render Group Members
                         const membersDisplay = document.getElementById('group-members-display');
@@ -15954,6 +16239,7 @@ ${historyText}`;
                         document.getElementById('chat-info-personal-section').style.display = 'block';
                         document.getElementById('chat-info-my-avatar-section').style.display = 'flex';
                         document.getElementById('chat-info-ai-settings-section').style.display = 'flex';
+                        document.getElementById('auto-summarize-settings-container').style.display = 'block';
                         document.getElementById('chat-info-active-chat-section').style.display = 'flex';
                         document.getElementById('chat-info-thought-section').style.display = 'flex';
                         document.getElementById('chat-info-group-section').style.display = 'none';
@@ -16460,8 +16746,10 @@ ${historyText}`;
                     if (friend.isGroup) {
                         friend.name = document.getElementById('group-info-name').value.trim();
                         friend.realName = friend.name;
+                        friend.memoryInterop = document.getElementById('group-memory-interop-toggle').checked;
                         const checkboxes = document.querySelectorAll('#group-memory-interop-list input[type="checkbox"]:checked');
                         friend.memoryInteropRoles = Array.from(checkboxes).map(cb => cb.value);
+                        friend.shortTermMemory = document.getElementById('short-term-memory-input').value;
                     } else {
                         friend.name = document.getElementById('chat-info-remark').value.trim();
                         friend.realName = document.getElementById('chat-info-realname').value.trim();
@@ -16704,11 +16992,13 @@ ${historyText}`;
                         attachMessageEvents(actionDiv, msg, segmentInfo);
                         row.appendChild(actionDiv);
                     } else if (seg.type === 'thought') {
-                        const thoughtDiv = document.createElement('div');
-                        thoughtDiv.className = 'offline-thought';
-                        thoughtDiv.innerHTML = seg.content.replace(/\n/g, '<br>');
-                        attachMessageEvents(thoughtDiv, msg, segmentInfo);
-                        row.appendChild(thoughtDiv);
+                        if (friend && friend.offlineSettings && friend.offlineSettings.showThoughts !== false) {
+                            const thoughtDiv = document.createElement('div');
+                            thoughtDiv.className = 'offline-thought';
+                            thoughtDiv.innerHTML = seg.content.replace(/\n/g, '<br>');
+                            attachMessageEvents(thoughtDiv, msg, segmentInfo);
+                            row.appendChild(thoughtDiv);
+                        }
                     }
                     
                     if (shouldScroll) {
@@ -17868,6 +18158,11 @@ ${historyText}`;
                     dbUpdate('friends', friend, () => {
                         showToast('线下模式设置已保存');
                         closeOfflineModeModal();
+                        
+                        // If we are currently in the separate offline UI, re-render to apply the showThoughts setting immediately
+                        if (document.getElementById('offline-chat-page').classList.contains('active')) {
+                            renderOfflineChat(currentChatFriendId);
+                        }
                     });
                 }
             });
