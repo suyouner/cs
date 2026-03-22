@@ -3813,7 +3813,7 @@
     <div id="activation-page" style="display: none;">
         <div class="activation-content">
             <div class="activation-title">请输入激活码</div>
-            <input type="password" id="activation-code-input" class="activation-input" placeholder="输入激活码">
+            <input type="text" id="activation-code-input" class="activation-input" placeholder="输入激活码" style="-webkit-text-security: disc;">
             <button class="activation-btn" onclick="checkActivationCode()">进入</button>
         </div>
     </div>
@@ -4392,7 +4392,7 @@
                     </div>
                     <div class="settings-item">
                         <label for="api-key">API Key</label>
-                        <input type="password" id="api-key" placeholder="••••••••••••••••••••••••••••••••">
+                        <input type="text" id="api-key" placeholder="••••••••••••••••••••••••••••••••" style="-webkit-text-security: disc;">
                     </div>
                 </div>
 
@@ -18828,12 +18828,14 @@ ${historyText}`;
 
         // 全局禁用所有输入框的系统自动填充（针对安卓的钥匙、信用卡、密码小人图标等）
         const disableAutofill = (el) => {
-            // 使用 new-password 是绕过现代浏览器强制提示密码填充的最有效方法
-            el.setAttribute('autocomplete', 'new-password');
+            // 避免使用 off 或 new-password，现代安卓系统和浏览器经常忽略 off，且 new-password 会明确唤起密码管理器
+            // 使用一个随机/无效的值可以有效绕过大部分启发式自动填充
+            el.setAttribute('autocomplete', 'nope');
             el.setAttribute('autocorrect', 'off');
             el.setAttribute('autocapitalize', 'off');
             el.setAttribute('spellcheck', 'false');
-            // 对于部分顽固的输入框，添加只读属性，聚焦时再移除（可选策略，暂用标准属性拦截）
+            el.setAttribute('data-form-type', 'other');
+            el.setAttribute('data-lpignore', 'true'); // 针对部分第三方密码管理器
         };
 
         document.querySelectorAll('input, textarea').forEach(disableAutofill);
