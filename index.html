@@ -1320,7 +1320,7 @@
             background-color: #000;
             border-radius: 8px;
             padding: 5px;
-            z-index: 250;
+            z-index: 2500;
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             min-width: 120px;
         }
@@ -1348,7 +1348,7 @@
             background-color: #4c4c4c;
             border-radius: 8px;
             padding: 5px 0;
-            z-index: 250;
+            z-index: 2500;
             box-shadow: 0 4px 12px rgba(0,0,0,0.2);
             min-width: 100px;
         }
@@ -1380,7 +1380,7 @@
             display: none;
             justify-content: center;
             align-items: center;
-            z-index: 300;
+            z-index: 3000;
         }
         .confirm-modal-content {
             background: #fff;
@@ -1426,7 +1426,7 @@
 
         /* Custom Confirm Modal */
         #custom-confirm-modal {
-            z-index: 900;
+            z-index: 3000;
         }
         #custom-confirm-modal .confirm-modal-content {
             background: #ffffff;
@@ -5602,7 +5602,7 @@
     </div>
 
     <!-- Edit Message Modal -->
-    <div class="modal-overlay" id="edit-message-modal">
+    <div class="modal-overlay" id="edit-message-modal" style="z-index: 2500;">
         <div class="modal-content" style="width: 300px;">
             <h3 style="text-align: center; font-size: 17px; font-weight: 600; margin-bottom: 10px;">编辑消息</h3>
             <textarea id="edit-message-content" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; resize: none; height: 120px; font-size: 14px; box-sizing: border-box;"></textarea>
@@ -11217,9 +11217,9 @@
             activeMessage = msg;
             activeMessageSegment = segmentInfo;
             
-            const isOfflineModeUI = document.getElementById('offline-chat-page').classList.contains('active');
+            const isOfflineMessage = e.target.closest('#offline-chat-messages') !== null;
 
-            if (isOfflineModeUI) {
+            if (isOfflineMessage) {
                 document.getElementById('msg-ctx-multiselect').style.display = 'none';
                 document.getElementById('msg-ctx-retry').style.display = 'none'; // The retry button is in the header
                 document.getElementById('msg-ctx-copy').style.display = 'block';
@@ -11329,11 +11329,10 @@
                             const dbMsg = allMsgs.find(m => m.friendId === activeMessage.friendId && m.timestamp === activeMessage.timestamp);
                             if (dbMsg) {
                                 dbDelete('chat_history', dbMsg.id, () => {
-                                    const isOfflineModeUI = document.getElementById('offline-chat-page').classList.contains('active');
-                                    if (isOfflineModeUI) {
-                                        renderOfflineChat(currentChatFriendId);
+                                    if (dbMsg.isOfflineSeparate) {
+                                        renderOfflineChat(dbMsg.friendId);
                                     } else {
-                                        renderMessages(currentChatFriendId);
+                                        renderMessages(dbMsg.friendId);
                                     }
                                 });
                             }
@@ -11370,11 +11369,10 @@
                             dbDelete('chat_history', msg.id, () => {
                                 deletedCount++;
                                 if (deletedCount === messagesToDelete.length) {
-                                    const isOfflineModeUI = document.getElementById('offline-chat-page').classList.contains('active');
-                                    if (isOfflineModeUI) {
-                                        renderOfflineChat(currentChatFriendId);
+                                    if (activeMessage.isOfflineSeparate) {
+                                        renderOfflineChat(activeMessage.friendId);
                                     } else {
-                                        renderMessages(currentChatFriendId);
+                                        renderMessages(activeMessage.friendId);
                                     }
                                     triggerAIResponse();
                                 }
@@ -11485,12 +11483,7 @@
                             if (deletedCount === msgsToDelete.length) {
                                 showToast('删除成功');
                                 exitSelectionMode();
-                                const isOfflineModeUI = document.getElementById('offline-chat-page').classList.contains('active');
-                                if (isOfflineModeUI) {
-                                    renderOfflineChat(currentChatFriendId);
-                                } else {
-                                    renderMessages(currentChatFriendId);
-                                }
+                                renderMessages(currentChatFriendId);
                             }
                         });
                     });
