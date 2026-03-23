@@ -8449,7 +8449,7 @@
                                 }
                             }
 
-                            const isLikedByMe = post.likes && (post.likes.includes('main_user') || post.likes.includes(myName) || post.likes.includes(profile?.name) || post.likes.includes('未定义'));
+                            const isLikedByMe = post.likes && (post.likes.includes('main_user') || post.likes.includes(myName) || (profile && profile.name && post.likes.includes(profile.name)) || post.likes.includes('未定义'));
 
                             if (hasLikes || hasComments) {
                                 interactionsHtml = `<div class="discover-post-interactions">`;
