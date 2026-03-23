@@ -19476,18 +19476,40 @@ ${historyText}`;
             }
         });
 
-        // 全局禁用所有输入框的系统自动填充（针对安卓的钥匙、信用卡、密码小人图标等）
+        // 动态代理 document.getElementById，以兼容剥离了真实 ID 的输入框
+        const originalGetElementById = document.getElementById.bind(document);
+        document.getElementById = function(id) {
+            let el = originalGetElementById(id);
+            if (el) return el;
+            if (id) {
+                const safeId = String(id).replace(/"/g, '\\"');
+                return document.querySelector(`[data-original-id="${safeId}"]`);
+            }
+            return null;
+        };
+
+        // 全局禁用所有输入框的系统自动填充（深度混淆）
         const disableAutofill = (el) => {
-            // 避免使用 off 或 new-password，现代安卓系统和浏览器经常忽略 off，且 new-password 会明确唤起密码管理器
-            // 使用一个随机/无效的值可以有效绕过大部分启发式自动填充
-            el.setAttribute('autocomplete', 'nope');
+            if (el.dataset.autofillDisabled) return;
+
+            // 覆盖自动填充相关属性
+            el.setAttribute('autocomplete', 'new-password');
             el.setAttribute('autocorrect', 'off');
             el.setAttribute('autocapitalize', 'off');
             el.setAttribute('spellcheck', 'false');
             el.setAttribute('data-form-type', 'other');
-            el.setAttribute('data-lpignore', 'true'); // 针对部分第三方密码管理器
-            // 覆盖或设置一个随机的 name 属性，彻底打断系统基于 id 猜测字段类型的启发式检测（屏蔽小人、钱包等图标）
-            el.setAttribute('name', 'nofill_' + Math.random().toString(36).substring(2, 8));
+            el.setAttribute('data-lpignore', 'true');
+
+            // 深度混淆 name 和 id
+            const randomStr = Math.random().toString(36).substring(2, 10);
+            el.setAttribute('name', 'nofill_' + randomStr);
+            
+            if (el.id && !el.id.startsWith('nofill_')) {
+                el.dataset.originalId = el.id; // 备份真实ID
+                el.id = 'nofill_id_' + randomStr; // 修改为随机ID，欺骗浏览器
+            }
+
+            el.dataset.autofillDisabled = 'true';
         };
 
         document.querySelectorAll('input, textarea').forEach(disableAutofill);
