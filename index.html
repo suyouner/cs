@@ -13073,8 +13073,10 @@
             if (currentChatFriendId === friendId) {
                 dbGet('friends', friendId, friend => {
                     if (friend && friend.isGroup) {
-                        const container = document.getElementById('chat-messages-container');
-                        if (!container.querySelector('.group-typing-indicator')) {
+                        const isOfflineModeUI = document.getElementById('offline-chat-page').classList.contains('active');
+                        const containerId = isOfflineModeUI ? 'offline-chat-messages' : 'chat-messages-container';
+                        const container = document.getElementById(containerId);
+                        if (container && !container.querySelector('.group-typing-indicator')) {
                             const indicator = document.createElement('div');
                             indicator.className = 'message-time-divider group-typing-indicator';
                             indicator.textContent = '......';
@@ -13385,16 +13387,29 @@
                                 const isSeparateUI = friend.separateOfflineUI && document.getElementById('offline-chat-page').classList.contains('active');
                                 
                                 const lines = aiResponseText.split('\n').map(s => s.trim()).filter(s => s !== '');
+                                let fallbackMember = groupMembers.length > 0 ? groupMembers[0] : null;
+
                                 for (const line of lines) {
                                     if (line === '无' || line === '') continue;
                                     
+                                    let senderName = null;
+                                    let text = line;
                                     const match = line.match(/^([^:：]+)[:：]\s*(.*)$/);
                                     if (match) {
-                                        const senderName = match[1].trim();
-                                        let text = match[2].trim();
-                                        
-                                        const senderMember = groupMembers.find(m => m.name === senderName || m.realName === senderName);
-                                        if (senderMember) {
+                                        senderName = match[1].trim();
+                                        text = match[2].trim();
+                                    }
+                                    
+                                    let senderMember = fallbackMember;
+                                    if (senderName) {
+                                        const found = groupMembers.find(m => m.name === senderName || m.realName === senderName || senderName.includes(m.name) || (m.name && m.name.includes(senderName)));
+                                        if (found) {
+                                            senderMember = found;
+                                            fallbackMember = found;
+                                        }
+                                    }
+                                    
+                                    if (senderMember && text) {
                                             const stickerRegex = /<sticker>(.*?)<\/sticker>/;
                                             const stickerMatch = text.match(stickerRegex);
                                             let stickerUrl = null;
@@ -13531,7 +13546,6 @@
                                             await new Promise(res => setTimeout(res, 1500));
                                             hideTypingIndicator(friend.id);
                                         }
-                                    }
                                 }
                             } else if (isOfflineMode) {
                                 // Offline mode: handle as a single message
@@ -17180,11 +17194,11 @@ ${historyText}`;
                         const nameLabel = document.createElement('div');
                         nameLabel.className = 'offline-user-name';
                         nameLabel.style.textAlign = 'left';
-                        nameLabel.textContent = friend.name;
+                        nameLabel.textContent = msg.senderName || friend.name;
                         
                         const avatar = document.createElement('img');
                         avatar.className = 'offline-avatar';
-                        avatar.src = friend.avatar;
+                        avatar.src = msg.senderAvatar || friend.avatar;
                         
                         const bubble = document.createElement('div');
                         bubble.className = 'offline-bubble left';
