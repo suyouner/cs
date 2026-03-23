@@ -19488,20 +19488,65 @@ ${historyText}`;
             return null;
         };
 
+        // 深度混淆文本（插入零宽字符）
+        const obfuscateText = (text) => {
+            if (!text) return text;
+            if (text.includes('\u200B')) return text; 
+            return text.split('').join('\u200B');
+        };
+
+        const confuseLabels = (root) => {
+            if (!root.querySelectorAll) return;
+            const labels = root.querySelectorAll('label, .af-field-label, .gm-field label, .wb-field label, .chat-info-label, .settings-item label, .post-visibility-label, .offline-modal-item label, .offline-modal-field label');
+            labels.forEach(label => {
+                if (!label.dataset.obfuscated) {
+                    label.childNodes.forEach(child => {
+                        if (child.nodeType === 3 && child.nodeValue.trim() !== '') {
+                            child.nodeValue = obfuscateText(child.nodeValue.trim());
+                        }
+                    });
+                    label.dataset.obfuscated = 'true';
+                }
+            });
+        };
+
         // 全局禁用所有输入框的系统自动填充（深度混淆）
         const disableAutofill = (el) => {
             if (el.dataset.autofillDisabled) return;
 
-            // 覆盖自动填充相关属性
-            el.setAttribute('autocomplete', 'new-password');
+            const randomStr = Math.random().toString(36).substring(2, 10);
+
+            // 1. 绝对无效的 autocomplete
+            el.setAttribute('autocomplete', 'nope_' + randomStr);
             el.setAttribute('autocorrect', 'off');
             el.setAttribute('autocapitalize', 'off');
             el.setAttribute('spellcheck', 'false');
             el.setAttribute('data-form-type', 'other');
             el.setAttribute('data-lpignore', 'true');
 
+            // 2. 混淆 placeholder
+            if (el.getAttribute('placeholder')) {
+                el.setAttribute('placeholder', obfuscateText(el.getAttribute('placeholder')));
+            }
+
+            // 3. readonly 聚焦解锁机制 (规避初始化扫描)
+            if (!el.hasAttribute('readonly') && el.type !== 'checkbox' && el.type !== 'radio' && el.type !== 'range' && el.type !== 'color' && el.type !== 'file') {
+                el.setAttribute('readonly', 'true');
+                el.dataset.tempReadonly = 'true';
+                
+                const removeReadonly = () => {
+                    if (el.dataset.tempReadonly) {
+                        el.removeAttribute('readonly');
+                        delete el.dataset.tempReadonly;
+                    }
+                };
+                
+                el.addEventListener('focus', removeReadonly, { once: true });
+                el.addEventListener('touchstart', removeReadonly, { once: true });
+                el.addEventListener('click', removeReadonly, { once: true });
+            }
+
             // 深度混淆 name 和 id
-            const randomStr = Math.random().toString(36).substring(2, 10);
             el.setAttribute('name', 'nofill_' + randomStr);
             
             if (el.id && !el.id.startsWith('nofill_')) {
@@ -19513,23 +19558,33 @@ ${historyText}`;
         };
 
         document.querySelectorAll('input, textarea').forEach(disableAutofill);
+        confuseLabels(document.body);
 
-        // 监控动态创建的输入框（如打开弹窗时生成的元素）
+        // 监控动态创建的输入框（如打开弹窗时生成的元素）及属性变化
         const observer = new MutationObserver(mutations => {
             mutations.forEach(mutation => {
-                mutation.addedNodes.forEach(node => {
-                    if (node.nodeType === 1) { // ELEMENT_NODE
-                        if (node.tagName === 'INPUT' || node.tagName === 'TEXTAREA') {
-                            disableAutofill(node);
+                if (mutation.type === 'childList') {
+                    mutation.addedNodes.forEach(node => {
+                        if (node.nodeType === 1) { // ELEMENT_NODE
+                            if (node.tagName === 'INPUT' || node.tagName === 'TEXTAREA') {
+                                disableAutofill(node);
+                            }
+                            if (node.querySelectorAll) {
+                                node.querySelectorAll('input, textarea').forEach(disableAutofill);
+                            }
+                            confuseLabels(node);
                         }
-                        if (node.querySelectorAll) {
-                            node.querySelectorAll('input, textarea').forEach(disableAutofill);
-                        }
+                    });
+                } else if (mutation.type === 'attributes' && mutation.attributeName === 'placeholder') {
+                    const el = mutation.target;
+                    const val = el.getAttribute('placeholder');
+                    if (val && !val.includes('\u200B')) {
+                        el.setAttribute('placeholder', obfuscateText(val));
                     }
-                });
+                }
             });
         });
-        observer.observe(document.body, { childList: true, subtree: true });
+        observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['placeholder'] });
     });
 </script>
 </body>
