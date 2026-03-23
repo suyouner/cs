@@ -17661,12 +17661,26 @@ ${historyText}`;
                     return;
                 }
                 
-                const lastMsg = friendMsgs[friendMsgs.length - 1];
-                if (lastMsg.type === 'received') {
-                    showCustomConfirm('确定要重新生成上一条回复吗？', () => {
-                        dbDelete('chat_history', lastMsg.id || lastMsg.timestamp, () => {
-                            renderOfflineChat(currentChatFriendId);
-                            triggerAIResponse();
+                let lastReceivedMsgs = [];
+                for (let i = friendMsgs.length - 1; i >= 0; i--) {
+                    if (friendMsgs[i].type === 'received') {
+                        lastReceivedMsgs.push(friendMsgs[i]);
+                    } else {
+                        break;
+                    }
+                }
+
+                if (lastReceivedMsgs.length > 0) {
+                    showCustomConfirm('确定要重新生成上一次的完整回复吗？', () => {
+                        let deleteCount = 0;
+                        lastReceivedMsgs.forEach(msg => {
+                            dbDelete('chat_history', msg.id || msg.timestamp, () => {
+                                deleteCount++;
+                                if (deleteCount === lastReceivedMsgs.length) {
+                                    renderOfflineChat(currentChatFriendId);
+                                    triggerAIResponse();
+                                }
+                            });
                         });
                     }, '重新生成');
                 } else {
