@@ -3833,6 +3833,56 @@
             zoom: 0.85;
         }
 
+        #chat-interface-page.in-mini-phone #action-panel,
+        #chat-interface-page.in-mini-phone #emoji-panel {
+            height: 180px;
+        }
+        #chat-interface-page.in-mini-phone .action-grid-container {
+            padding: 15px;
+            gap: 10px;
+        }
+        #chat-interface-page.in-mini-phone .action-icon {
+            width: 45px;
+            height: 45px;
+            border-radius: 12px;
+        }
+        #chat-interface-page.in-mini-phone .action-icon svg {
+            width: 22px;
+            height: 22px;
+        }
+
+        #music-player-page.in-mini-phone {
+            display: flex !important;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 60;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+        }
+        #music-player-page.in-mini-phone #music-player-header {
+            padding-top: 10px !important;
+        }
+        #music-player-page.in-mini-phone #music-vinyl-disc {
+            width: 180px !important;
+            height: 180px !important;
+            border-width: 4px !important;
+        }
+        #music-player-page.in-mini-phone #music-vinyl-disc > div {
+            width: 160px !important;
+            height: 160px !important;
+        }
+        #music-player-page.in-mini-phone #music-album-cover {
+            width: 110px !important;
+            height: 110px !important;
+        }
+        #music-player-page.in-mini-phone #music-bottom-controls {
+            padding: 10px 20px 20px 20px !important;
+            gap: 15px !important;
+        }
+
         .thought-popup-overlay {
             position: fixed;
             top: 0;
@@ -5775,7 +5825,7 @@
         </div>
 
         <!-- Bottom Controls (No interaction as requested) -->
-        <div style="padding: 20px 30px 40px 30px; display: flex; flex-direction: column; gap: 25px; z-index: 10; flex-shrink: 0;">
+        <div id="music-bottom-controls" style="padding: 20px 30px 40px 30px; display: flex; flex-direction: column; gap: 25px; z-index: 10; flex-shrink: 0;">
             <!-- Actions Row -->
             <div style="display: flex; justify-content: space-between; align-items: center; pointer-events: none; opacity: 0.8;">
                 <div style="display: flex; gap: 20px;">
@@ -9421,9 +9471,17 @@
 
             document.getElementById('music-vinyl-disc').classList.remove('spin-anim');
 
-            showPage('music-player-page');
-            document.querySelector('.status-bar').style.backgroundColor = 'transparent';
-            document.querySelector('.status-bar').style.color = 'white';
+            const isMiniPhone = document.getElementById('chat-interface-page').classList.contains('in-mini-phone');
+            if (isMiniPhone) {
+                const musicPage = document.getElementById('music-player-page');
+                document.getElementById('mini-phone-screen').appendChild(musicPage);
+                musicPage.classList.add('in-mini-phone', 'active');
+                musicPage.style.display = 'flex';
+            } else {
+                showPage('music-player-page');
+                document.querySelector('.status-bar').style.backgroundColor = 'transparent';
+                document.querySelector('.status-bar').style.color = 'white';
+            }
 
             // Timer Logic
             if (togetherListenLastPlayTs === null && !musicAudio.paused) {
@@ -9474,7 +9532,14 @@
         }
 
         function closeMusicPlayer() {
-            showPage('chat-interface-page');
+            const musicPage = document.getElementById('music-player-page');
+            if (musicPage.classList.contains('in-mini-phone')) {
+                document.getElementById('main-app-container').appendChild(musicPage);
+                musicPage.classList.remove('in-mini-phone', 'active');
+                musicPage.style.display = '';
+            } else {
+                showPage('chat-interface-page');
+            }
             // Music keeps playing in background
         }
 
@@ -17242,6 +17307,14 @@ ${historyText}`;
             if (document.getElementById('chat-interface-page').classList.contains('in-mini-phone')) {
                 closeMiniPhoneChat();
             }
+            
+            const musicPage = document.getElementById('music-player-page');
+            if (musicPage.classList.contains('in-mini-phone')) {
+                document.getElementById('main-app-container').appendChild(musicPage);
+                musicPage.classList.remove('in-mini-phone', 'active');
+                musicPage.style.display = '';
+            }
+            
             document.getElementById('mini-phone-modal').style.display = 'none';
             if(miniPhonePollTimer) clearInterval(miniPhonePollTimer);
         }
