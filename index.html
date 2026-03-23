@@ -3826,7 +3826,7 @@
             visibility: hidden;
             pointer-events: none;
         }
-        #chat-interface-page.in-mini-phone .chat-interface-header .back-arrow {
+        #chat-interface-page.in-mini-phone:not(.is-group-chat) .chat-interface-header .back-arrow {
             display: none !important;
         }
         #chat-interface-page.in-mini-phone .action-item.offline-mode-btn {
@@ -17332,6 +17332,12 @@ ${historyText}`;
                 chatPage.classList.add('in-mini-phone');
                 chatPage.classList.add('active'); // active so it receives AI messages
                 
+                if (friend.isGroup) {
+                    chatPage.classList.add('is-group-chat');
+                } else {
+                    chatPage.classList.remove('is-group-chat');
+                }
+                
                 document.getElementById('chat-interface-title').textContent = friend.name;
                 renderMessages(friendId);
                 applyChatTheme(friend);
@@ -17345,6 +17351,7 @@ ${historyText}`;
             document.getElementById('main-app-container').appendChild(chatPage);
             chatPage.style.display = 'none';
             chatPage.classList.remove('in-mini-phone');
+            chatPage.classList.remove('is-group-chat');
             chatPage.classList.remove('active');
             
             if (offlineChatFriendIdCache !== null) {
