@@ -3808,6 +3808,21 @@
             background-color: #b3e5fc;
         }
 
+        #chat-interface-page.in-mini-phone {
+            display: flex !important;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 50;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+        }
+        #chat-interface-page.in-mini-phone .chat-interface-header {
+            padding-top: 10px !important;
+        }
+
         .thought-popup-overlay {
             position: fixed;
             top: 0;
@@ -5832,17 +5847,6 @@
                     <div id="mini-phone-chat-list" style="flex: 1; overflow-y: auto; background: #fff;"></div>
                 </div>
 
-                <div id="mini-phone-chat-page" style="display: none; flex-direction: column; height: 100%; background: #ededed;">
-                    <div style="padding: 10px 15px; display: flex; align-items: center; background: #ededed; border-bottom: 1px solid #d7d7d7;">
-                        <span style="font-weight: bold; font-size: 18px; cursor: pointer; margin-right: 10px; width: 20px;" onclick="closeMiniPhoneChat()"><</span>
-                        <span id="mini-phone-chat-title" style="font-weight: 600; font-size: 15px; flex: 1; text-align: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding-right: 30px;"></span>
-                    </div>
-                    <div id="mini-phone-chat-messages" style="flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 10px;"></div>
-                    <div style="padding: 8px; background: #f7f7f7; border-top: 1px solid #e0e0e0; display: flex; gap: 5px;">
-                        <input type="text" id="mp-chat-input" style="flex: 1; border: none; border-radius: 4px; padding: 6px 10px; font-size: 14px; outline: none;" placeholder="发消息..." autocomplete="nope" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other">
-                        <button style="background: #07c160; color: white; border: none; border-radius: 4px; padding: 0 10px; cursor: pointer; font-size: 13px;" onclick="sendMiniPhoneMessage()">发送</button>
-                    </div>
-                </div>
             </div>
             <div style="position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%); width: 80px; height: 4px; background: #999; border-radius: 2px; z-index: 10; cursor: pointer;" onclick="closeMiniPhoneModal()"></div>
         </div>
@@ -11360,11 +11364,13 @@
             }, '删除消息');
         }
 
-        // Add a back button interceptor for selection mode
+        // Add a back button interceptor for selection mode and mini phone
         const originalBackArrowClick = document.querySelector('.chat-interface-header .back-arrow').onclick;
         document.querySelector('.chat-interface-header .back-arrow').onclick = (e) => {
             if (isSelectionMode) {
                 exitSelectionMode();
+            } else if (document.getElementById('chat-interface-page').classList.contains('in-mini-phone')) {
+                closeMiniPhoneChat();
             } else {
                 if (originalBackArrowClick) originalBackArrowClick(e);
                 else showPage('wechat-page');
@@ -12803,6 +12809,10 @@
         }
 
         function openChat(friendId, targetMsgId = null) {
+            if (document.getElementById('mini-phone-modal').style.display === 'flex') {
+                closeMiniPhoneModal();
+            }
+
             currentChatFriendId = friendId;
             dbGet('friends', friendId, friend => {
                 if (!friend) return;
@@ -17183,6 +17193,7 @@ ${historyText}`;
         // --- Mini Phone Logic ---
         let currentMiniPhoneFriendId = null;
         let miniPhonePollTimer = null;
+        let offlineChatFriendIdCache = null;
 
         function openMiniPhoneModal() {
             document.getElementById('mini-phone-modal').style.display = 'flex';
@@ -17191,11 +17202,9 @@ ${historyText}`;
                 dbGet('friends', currentChatFriendId, friend => {
                     if (friend && !friend.isGroup) {
                         document.getElementById('mini-phone-list-page').style.display = 'none';
-                        document.getElementById('mini-phone-chat-page').style.display = 'flex';
                         openMiniPhoneChat(friend.id);
                     } else {
                         document.getElementById('mini-phone-list-page').style.display = 'flex';
-                        document.getElementById('mini-phone-chat-page').style.display = 'none';
                         renderMiniPhoneChatList();
                     }
                     
@@ -17203,30 +17212,27 @@ ${historyText}`;
                     miniPhonePollTimer = setInterval(() => {
                         if (document.getElementById('mini-phone-list-page').style.display === 'flex') {
                             renderMiniPhoneChatList();
-                        } else if (document.getElementById('mini-phone-chat-page').style.display === 'flex') {
-                            renderMiniPhoneMessages();
                         }
                     }, 2000);
                 });
             } else {
                 document.getElementById('mini-phone-list-page').style.display = 'flex';
-                document.getElementById('mini-phone-chat-page').style.display = 'none';
                 renderMiniPhoneChatList();
                 
                 if(miniPhonePollTimer) clearInterval(miniPhonePollTimer);
                 miniPhonePollTimer = setInterval(() => {
                     if (document.getElementById('mini-phone-list-page').style.display === 'flex') {
                         renderMiniPhoneChatList();
-                    } else if (document.getElementById('mini-phone-chat-page').style.display === 'flex') {
-                        renderMiniPhoneMessages();
                     }
                 }, 2000);
             }
         }
 
         function closeMiniPhoneModal() {
+            if (document.getElementById('chat-interface-page').classList.contains('in-mini-phone')) {
+                closeMiniPhoneChat();
+            }
             document.getElementById('mini-phone-modal').style.display = 'none';
-            currentMiniPhoneFriendId = null;
             if(miniPhonePollTimer) clearInterval(miniPhonePollTimer);
         }
 
@@ -17292,174 +17298,53 @@ ${historyText}`;
         }
 
         function openMiniPhoneChat(friendId) {
-            currentMiniPhoneFriendId = friendId;
+            if (!document.getElementById('chat-interface-page').classList.contains('in-mini-phone')) {
+                offlineChatFriendIdCache = currentChatFriendId;
+            }
+            currentChatFriendId = friendId;
+            
             dbGet('friends', friendId, friend => {
                 if (!friend) return;
                 
-                // Clear unread count when opening
                 if (friend.unreadCount) {
                     friend.unreadCount = 0;
                     dbUpdate('friends', friend);
                 }
                 
                 document.getElementById('mini-phone-list-page').style.display = 'none';
-                document.getElementById('mini-phone-chat-page').style.display = 'flex';
-                document.getElementById('mini-phone-chat-title').textContent = friend.name;
                 
-                renderMiniPhoneMessages();
+                const chatPage = document.getElementById('chat-interface-page');
+                document.getElementById('mini-phone-screen').appendChild(chatPage);
+                chatPage.style.display = 'flex';
+                chatPage.classList.add('in-mini-phone');
+                chatPage.classList.add('active'); // active so it receives AI messages
+                
+                document.getElementById('chat-interface-title').textContent = friend.name;
+                renderMessages(friendId);
+                applyChatTheme(friend);
             });
         }
 
         function closeMiniPhoneChat() {
             document.getElementById('mini-phone-list-page').style.display = 'flex';
-            document.getElementById('mini-phone-chat-page').style.display = 'none';
-            currentMiniPhoneFriendId = null;
+            
+            const chatPage = document.getElementById('chat-interface-page');
+            document.getElementById('main-app-container').appendChild(chatPage);
+            chatPage.style.display = 'none';
+            chatPage.classList.remove('in-mini-phone');
+            chatPage.classList.remove('active');
+            
+            if (offlineChatFriendIdCache !== null) {
+                currentChatFriendId = offlineChatFriendIdCache;
+                offlineChatFriendIdCache = null;
+                
+                if (document.getElementById('offline-chat-page').classList.contains('active')) {
+                    renderOfflineChat(currentChatFriendId);
+                }
+            }
+            
             renderMiniPhoneChatList();
         }
-
-        function renderMiniPhoneMessages() {
-            if (!currentMiniPhoneFriendId) return;
-            const container = document.getElementById('mini-phone-chat-messages');
-            
-            dbGet('friends', currentMiniPhoneFriendId, friend => {
-                const transaction = db.transaction(['chat_history'], 'readonly');
-                const store = transaction.objectStore('chat_history');
-                const index = store.index('friendId');
-                const request = index.getAll(currentMiniPhoneFriendId);
-
-                request.onsuccess = () => {
-                    let messages = request.result;
-                    messages = messages.filter(msg => !msg.isOfflineSeparate);
-                    
-                    // We only need to completely re-render if count changed drastically,
-                    // but for simplicity and reliability, we can re-render last 30 msgs
-                    // Let's check if the last message is the same to avoid constant re-rendering scroll jumps
-                    if (container.dataset.lastMsgId === (messages.length > 0 ? messages[messages.length-1].id || messages[messages.length-1].timestamp : '')) {
-                        return;
-                    }
-                    
-                    if (messages.length > 0) {
-                        container.dataset.lastMsgId = messages[messages.length-1].id || messages[messages.length-1].timestamp;
-                    } else {
-                        container.dataset.lastMsgId = '';
-                    }
-
-                    container.innerHTML = '';
-                    
-                    const messagesToRender = messages.slice(-30);
-
-                    dbGet('user_profile', 'main_user', profile => {
-                        messagesToRender.forEach(msg => {
-                            if (msg.type === 'system') return;
-
-                            const wrapper = document.createElement('div');
-                            wrapper.style.display = 'flex';
-                            wrapper.style.width = '100%';
-                            wrapper.style.marginBottom = '10px';
-
-                            const bubble = document.createElement('div');
-                            bubble.style.maxWidth = '75%';
-                            bubble.style.padding = '8px 10px';
-                            bubble.style.borderRadius = '8px';
-                            bubble.style.fontSize = '13px';
-                            bubble.style.lineHeight = '1.4';
-                            bubble.style.wordWrap = 'break-word';
-
-                            if (msg.isSticker) {
-                                bubble.style.padding = '0';
-                                bubble.style.backgroundColor = 'transparent';
-                                if (msg.text && msg.text.startsWith('dice:')) {
-                                    bubble.innerHTML = '[骰子]';
-                                } else {
-                                    bubble.innerHTML = `<img src="${msg.text}" style="max-width: 100px; max-height: 100px; object-fit: contain; border-radius: 8px;">`;
-                                }
-                            } else {
-                                bubble.innerHTML = msg.text.replace(/\\n/g, '<br>');
-                            }
-
-                            if (msg.type === 'sent') {
-                                wrapper.style.justifyContent = 'flex-end';
-                                bubble.style.backgroundColor = '#a9e979';
-                                bubble.style.color = '#000';
-                                
-                                wrapper.appendChild(bubble);
-                                
-                                const avatar = document.createElement('img');
-                                avatar.style.width = '30px';
-                                avatar.style.height = '30px';
-                                avatar.style.borderRadius = '4px';
-                                avatar.style.objectFit = 'cover';
-                                avatar.style.marginLeft = '8px';
-                                avatar.style.flexShrink = '0';
-                                avatar.src = (profile && profile.avatar) ? profile.avatar : 'https://via.placeholder.com/150';
-                                wrapper.appendChild(avatar);
-                            } else {
-                                wrapper.style.justifyContent = 'flex-start';
-                                bubble.style.backgroundColor = '#fff';
-                                bubble.style.color = '#000';
-                                
-                                const avatar = document.createElement('img');
-                                avatar.style.width = '30px';
-                                avatar.style.height = '30px';
-                                avatar.style.borderRadius = '4px';
-                                avatar.style.objectFit = 'cover';
-                                avatar.style.marginRight = '8px';
-                                avatar.style.flexShrink = '0';
-                                
-                                if (friend.isGroup && msg.senderAvatar) {
-                                    avatar.src = msg.senderAvatar;
-                                } else {
-                                    avatar.src = friend.avatar;
-                                }
-                                
-                                wrapper.appendChild(avatar);
-                                wrapper.appendChild(bubble);
-                            }
-                            
-                            container.appendChild(wrapper);
-                        });
-                        
-                        container.scrollTop = container.scrollHeight;
-                    });
-                };
-            });
-        }
-
-        function sendMiniPhoneMessage() {
-            const input = document.getElementById('mp-chat-input');
-            const messageText = input.value.trim();
-            if (messageText === '' || !currentMiniPhoneFriendId) return;
-
-            const message = {
-                friendId: currentMiniPhoneFriendId,
-                text: messageText,
-                type: 'sent',
-                timestamp: Date.now()
-            };
-
-            dbAdd('chat_history', message, () => {
-                dbGet('friends', currentMiniPhoneFriendId, friend => {
-                    if (friend) {
-                        friend.lastMsg = messageText;
-                        friend.lastTime = getCurrentTimeStr();
-                        friend.lastActivityTimestamp = Date.now();
-                        dbUpdate('friends', friend, () => {
-                            input.value = '';
-                            renderMiniPhoneMessages();
-                            
-                            // Trigger AI response for the mini phone character
-                            triggerAIResponse(false, currentMiniPhoneFriendId);
-                        });
-                    }
-                });
-            });
-        }
-
-        document.getElementById('mp-chat-input').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                sendMiniPhoneMessage();
-            }
-        });
 
         function sendOfflineMessage() {
             const input = document.getElementById('offline-chat-input');
