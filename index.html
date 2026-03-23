@@ -3908,6 +3908,39 @@
             border-left: 4px solid #82c982;
             font-family: 'Comic Sans MS', cursive, sans-serif;
         }
+
+        /* 浅绿色便利贴弹窗 */
+        .sticky-note-popup {
+            position: absolute;
+            background-color: rgba(220, 255, 220, 0.95); /* 浅绿色微微透明 */
+            border: 1px solid #c8e6c9;
+            padding: 15px;
+            border-radius: 8px; /* 轻微圆角，像便利贴 */
+            box-shadow: 2px 4px 10px rgba(0,0,0,0.15);
+            font-size: 14px;
+            color: #333;
+            max-width: 220px;
+            z-index: 1000;
+            font-family: "Comic Sans MS", cursive, sans-serif; /* 手写体风格 */
+            pointer-events: none; /* 让点击穿透，或者点击后消失 */
+            transform-origin: bottom left;
+            animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        
+        .sticky-note-popup::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 20px;
+            border-width: 8px 8px 0;
+            border-style: solid;
+            border-color: rgba(220, 255, 220, 0.95) transparent transparent transparent;
+        }
+
+        @keyframes popIn {
+            from { opacity: 0; transform: scale(0.8) translateY(10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
     </style>
 </head>
 <body>
@@ -13238,18 +13271,16 @@
                         if (isOfflineMode) {
                             systemPrompt += `--- \n当前为【群聊线下模式】。请根据群聊当前的上下文，决定接下来由哪些群成员发言。为了还原真实的群聊氛围，你可以让多个不同角色互相附和、抢答，也可以让同一个角色连续发送多条消息。
 请严格按照以下格式输出成员的发言内容（每行代表一条独立的气泡，必须以成员名字开头，加英文冒号）：
-角色A的名字: 「他说的话」
-角色A的名字: <thought>他心里的想法</thought>
+角色A的名字: 「他说的话」<thought>他心里的想法</thought>
 角色A的名字: 他的动作描写
 角色B的名字: 「她回复的话」
 角色C的名字: <thought>她默默想着</thought>
 
-1. 每次只允许输出一个类型的段落（对话、动作、或心理描写）。
-2. 【对话】必须使用「」包裹。
-3. 【心理描写】必须使用 <thought></thought> 包裹。
-4. 【动作描写】直接输出，不使用任何符号。
-5. 所有输出的每一行都必须以【角色名字:】开头！即使是动作或心理描写也必须加上名字前缀，以此来指明这个动作或想法属于谁。
-6. 如果你认为此时不需要任何人发言，请直接输出“无”。严禁代替用户发言，严禁输出用户的动作。`;
+1. 【对话】必须使用「」包裹。
+2. 【心理描写】必须使用 <thought></thought> 包裹。建议将心理描写紧跟在对话之后（同一行），以便于阅读。
+3. 【动作描写】直接输出，不使用任何符号。动作描写可以独立一行。
+4. 所有输出的每一行都必须以【角色名字:】开头！即使是动作或心理描写也必须加上名字前缀，以此来指明这个动作或想法属于谁。
+5. 如果你认为此时不需要任何人发言，请直接输出“无”。严禁代替用户发言，严禁输出用户的动作。`;
                         } else {
                             systemPrompt += `--- \n请根据群聊当前的上下文，决定接下来由哪些群成员发言。为了还原真实的群聊氛围，你可以让多个不同角色互相附和、抢答，也可以让同一个角色连续发送多条消息（断句发送）。
 请严格按照以下格式输出成员的发言内容（每行代表一条独立的气泡，必须以成员名字开头，加英文冒号）：
@@ -17159,6 +17190,19 @@ ${historyText}`;
                 const parsedSegments = parseOfflineMessage(msg.text);
                 container.appendChild(row);
                 
+                // 将心理描写数据绑定到头像上
+                let currentThoughts = [];
+                let hasDialogue = false;
+                for (let seg of parsedSegments) {
+                    if (seg.type === 'thought') currentThoughts.push(seg.content);
+                    if (seg.type === 'dialogue') hasDialogue = true;
+                }
+
+                // 如果有心声但没有对话，添加一个占位对话以便显示头像
+                if (currentThoughts.length > 0 && !hasDialogue) {
+                    parsedSegments.push({ type: 'dialogue', content: '...' });
+                }
+
                 for (let index = 0; index < parsedSegments.length; index++) {
                     const seg = parsedSegments[index];
                     
@@ -17200,10 +17244,27 @@ ${historyText}`;
                         avatar.className = 'offline-avatar';
                         avatar.src = msg.senderAvatar || friend.avatar;
                         
+                        // 绑定点击事件显示便利贴
+                        if (currentThoughts.length > 0) {
+                            avatar.onclick = (e) => {
+                                e.stopPropagation();
+                                if (friend.offlineSettings && friend.offlineSettings.showThoughts !== false) {
+                                    showStickyNote(e, currentThoughts.join('<br>'));
+                                }
+                            };
+                        }
+                        
                         const bubble = document.createElement('div');
                         bubble.className = 'offline-bubble left';
                         bubble.innerHTML = seg.content.replace(/\n/g, '<br>');
                         
+                        // 如果是占位符，稍微淡一点
+                        if (seg.content === '...') {
+                            bubble.style.color = '#ccc';
+                            bubble.style.backgroundColor = 'transparent';
+                            bubble.style.border = '1px dashed #eee';
+                        }
+
                         attachMessageEvents(bubble, msg, segmentInfo);
                         
                         contentGroup.appendChild(nameLabel);
@@ -17219,13 +17280,7 @@ ${historyText}`;
                         attachMessageEvents(actionDiv, msg, segmentInfo);
                         row.appendChild(actionDiv);
                     } else if (seg.type === 'thought') {
-                        if (friend && friend.offlineSettings && friend.offlineSettings.showThoughts !== false) {
-                            const thoughtDiv = document.createElement('div');
-                            thoughtDiv.className = 'offline-thought';
-                            thoughtDiv.innerHTML = seg.content.replace(/\n/g, '<br>');
-                            attachMessageEvents(thoughtDiv, msg, segmentInfo);
-                            row.appendChild(thoughtDiv);
-                        }
+                        continue;
                     }
                     
                     if (shouldScroll) {
@@ -17239,6 +17294,85 @@ ${historyText}`;
             if (shouldScroll) {
                 container.scrollTop = container.scrollHeight;
             }
+        }
+
+        function showStickyNote(e, content) {
+            // Remove existing note if any
+            const existing = document.querySelector('.sticky-note-popup');
+            if (existing) existing.remove();
+
+            // 如果点击的是自己的头像或者没有心理描写内容，则不显示
+            if (!content) return;
+
+            const note = document.createElement('div');
+            note.className = 'sticky-note-popup';
+            note.innerHTML = content;
+            
+            document.body.appendChild(note);
+            
+            // Positioning logic
+            const rect = e.target.getBoundingClientRect();
+            
+            // 初始隐藏以计算尺寸
+            note.style.visibility = 'hidden'; 
+            
+            // Force reflow
+            const noteHeight = note.offsetHeight;
+            const noteWidth = note.offsetWidth;
+            note.style.visibility = 'visible';
+
+            // Default: show above-right of avatar
+            let top = rect.top - noteHeight - 10;
+            let left = rect.right + 5;
+            
+            // Adjust if out of bounds
+            if (left + noteWidth > window.innerWidth) {
+                left = rect.left - noteWidth - 5; 
+                // Modify style for left placement if needed
+                note.style.transformOrigin = 'bottom right';
+                // Move the little arrow triangle to right
+                const styleId = 'sticky-note-dynamic-style';
+                let style = document.getElementById(styleId);
+                if (!style) {
+                    style = document.createElement('style');
+                    style.id = styleId;
+                    document.head.appendChild(style);
+                }
+                style.innerHTML = `.sticky-note-popup::after { left: auto; right: 20px; }`;
+            } else {
+                // Reset arrow to left
+                const style = document.getElementById('sticky-note-dynamic-style');
+                if (style) style.innerHTML = `.sticky-note-popup::after { left: 20px; right: auto; }`;
+            }
+
+            if (top < 0) {
+                top = rect.bottom + 10; // Show below
+                // Adjust arrow to top if showing below? For now simple logic.
+            }
+            
+            note.style.top = top + 'px';
+            note.style.left = left + 'px';
+            
+            // Click to dismiss
+            note.onclick = () => note.remove();
+
+            // Auto remove after 5s
+            setTimeout(() => {
+                if (note.parentNode) {
+                    note.style.transition = 'opacity 0.3s';
+                    note.style.opacity = '0';
+                    setTimeout(() => note.remove(), 300);
+                }
+            }, 5000);
+            
+            // Global click to dismiss
+            const dismiss = (ev) => {
+                if (ev.target !== note && !note.contains(ev.target) && ev.target !== e.target) {
+                    note.remove();
+                    document.removeEventListener('click', dismiss);
+                }
+            };
+            setTimeout(() => document.addEventListener('click', dismiss), 0);
         }
 
         function parseOfflineMessage(text) {
