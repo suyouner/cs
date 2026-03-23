@@ -19482,6 +19482,8 @@ ${historyText}`;
             el.setAttribute('spellcheck', 'false');
             el.setAttribute('data-form-type', 'other');
             el.setAttribute('data-lpignore', 'true'); // 针对部分第三方密码管理器
+            // 覆盖或设置一个随机的 name 属性，彻底打断系统基于 id 猜测字段类型的启发式检测（屏蔽小人、钱包等图标）
+            el.setAttribute('name', 'nofill_' + Math.random().toString(36).substring(2, 8));
         };
 
         document.querySelectorAll('input, textarea').forEach(disableAutofill);
