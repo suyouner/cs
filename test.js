@@ -3988,18 +3988,24 @@
                 prompt += `1.  **输出格式**: 你的回复必须合并为【一条完整的消息】，不能拆分成多条发送。\n`;
                 prompt += `    - **灵活组合**: 在这条消息内，你可以自由组合、穿插【语言】、【动作】和【心理描写】。不需要固定的顺序（如不必须是语言+动作+心理），也不需要各部分字数相当。例如可以是：语言+心理+动作+心理+语言，或者动作+心理+语言等等。\n`;
                 prompt += `    - **语言**: 必须用中文引号「」包裹。\n`;
-                prompt += `    - **动作**: 直接描述，不要加任何符号。\n`;
+                prompt += `    - **动作**: 直接描述，不要加任何符号，不要加括号，也不要在动作前加名字和冒号（如“张三：”）。\n`;
                 prompt += `    - **心理**: 必须用特殊标签 <thought>...</thought> 包裹。这是你内心的想法，系统会特殊渲染。\n`;
                 prompt += `2.  **内容要求**: \n`;
                 prompt += `    - 须根据场景自然地包含语言、动作和心理描写。\n`;
+                prompt += `    - **拒绝混淆**: 你只能扮演“${friend.realName || friend.name}”。请时刻保持清醒，你的所有语言和动作必须属于该角色。严禁扮演用户或其他角色说话/行动。\n`;
                 if (settings.showThoughts === false) {
                      prompt += `    - **注意**: 虽然用户设置了不显示心理描写，但你仍然必须生成 <thought>...</thought> 标签，系统会自动隐藏它。\n`;
                 }
                 const minWords = settings.replyWordCountMin || '无';
                 const maxWords = settings.replyWordCountMax || '无';
                 prompt += `    - **字数限制**: 你的总回复字数（包括语言、动作、心理）应在 ${minWords} 到 ${maxWords} 字之间。请务必遵守。\n`;
-                prompt += `3.  **视角**: \n`;
-                prompt += `    - 你的视角是【${settings.characterPerspective === 'first_person' ? '第一人称 (我)' : '第三人称 (他/她)'}】。\n`;
+                prompt += `3.  **视角与代词**: \n`;
+                prompt += `    - 你的视角是【${settings.characterPerspective === 'first_person' ? '第一人称 (我)' : '第三人称'}】。\n`;
+                if (settings.characterPerspective !== 'first_person') {
+                    prompt += `    - **关键**: 在描写你的【动作】时，请务必直接使用你的名字【${friend.realName || friend.name}】作为主语，**禁止**使用“他/她”等代词，以免产生指代歧义。例如：应写“${friend.realName || friend.name}微微一笑”，而不要写“他微微一笑”。\n`;
+                } else {
+                    prompt += `    - 在描写你的【动作】时，请使用“我”。\n`;
+                }
                 prompt += `    - 用户的视角是【${settings.yourPerspective === 'second_person' ? '第二人称 (你)' : '第一人称 (我)'}】。\n`;
 
             } else {

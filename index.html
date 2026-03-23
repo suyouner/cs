@@ -5163,7 +5163,7 @@
                 <span class="title" id="offline-chat-title"></span>
                 <div style="display: flex; gap: 15px; align-items: center;">
                     <svg onclick="retryLastOfflineMessage()" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor: pointer;"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
-                    <svg onclick="openOfflineSettingsModal(false)" class="settings-btn" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="cursor: pointer;"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2zM12 15a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/></svg>
+                    <svg onclick="openOfflineSettingsModal(false)" class="settings-btn" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="cursor: pointer;"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.
                 </div>
             </div>
             <div id="offline-chat-messages"></div>
@@ -5241,6 +5241,15 @@
                             <div id="group-memory-interop-list" style="max-height: 150px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; padding: 5px; display: flex; flex-direction: column; gap: 5px;">
                                 <!-- checklist of group members -->
                             </div>
+                        </div>
+                    </div>
+                    <div class="chat-info-item">
+                        <div class="notification-toggle">
+                            <label style="font-size: 14px; font-weight: 500; color: #333;">在聊天列表中显示</label>
+                            <label class="switch">
+                                <input type="checkbox" id="group-show-in-list-toggle" onchange="toggleGroupShowInList(this.checked)">
+                                <span class="slider"></span>
+                            </label>
                         </div>
                     </div>
                 </div>
@@ -16471,6 +16480,7 @@ ${historyText}`;
                         
                         document.getElementById('group-info-name').value = friend.name;
                         document.getElementById('short-term-memory-input').value = friend.shortTermMemory || '';
+                        document.getElementById('group-show-in-list-toggle').checked = !friend.isHidden;
                         
                         // Render Group Members
                         const membersDisplay = document.getElementById('group-members-display');
@@ -16609,6 +16619,19 @@ ${historyText}`;
             if (container) {
                 container.style.display = isChecked ? 'block' : 'none';
             }
+        }
+
+        function toggleGroupShowInList(isChecked) {
+            if (!currentChatFriendId) return;
+            dbGet('friends', currentChatFriendId, friend => {
+                if (friend) {
+                    friend.isHidden = !isChecked;
+                    dbUpdate('friends', friend, () => {
+                        renderChatList();
+                        renderContactsList();
+                    });
+                }
+            });
         }
 
         function openAddGroupMemberModal() {
