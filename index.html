@@ -3909,32 +3909,48 @@
             font-family: 'Comic Sans MS', cursive, sans-serif;
         }
 
-        /* 浅绿色便利贴弹窗 */
+        /* 思考云朵气泡 */
         .sticky-note-popup {
             position: absolute;
-            background-color: rgba(220, 255, 220, 0.95); /* 浅绿色微微透明 */
-            border: 1px solid #c8e6c9;
-            padding: 15px;
-            border-radius: 8px; /* 轻微圆角，像便利贴 */
-            box-shadow: 2px 4px 10px rgba(0,0,0,0.15);
+            background-color: #fff;
+            border: 2px solid #333;
+            padding: 12px 16px;
+            border-radius: 30px;
+            box-shadow: 2px 4px 12px rgba(0,0,0,0.1);
             font-size: 14px;
             color: #333;
             max-width: 220px;
             z-index: 1000;
-            font-family: "Comic Sans MS", cursive, sans-serif; /* 手写体风格 */
-            pointer-events: none; /* 让点击穿透，或者点击后消失 */
+            font-family: "Comic Sans MS", cursive, sans-serif;
+            pointer-events: none;
             transform-origin: bottom left;
             animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
         
+        /* 大圆圈 */
         .sticky-note-popup::after {
             content: '';
             position: absolute;
-            bottom: -8px;
+            bottom: -10px;
             left: 20px;
-            border-width: 8px 8px 0;
-            border-style: solid;
-            border-color: rgba(220, 255, 220, 0.95) transparent transparent transparent;
+            width: 10px;
+            height: 10px;
+            background-color: #fff;
+            border: 2px solid #333;
+            border-radius: 50%;
+        }
+        
+        /* 小圆圈 */
+        .sticky-note-popup::before {
+            content: '';
+            position: absolute;
+            bottom: -18px;
+            left: 12px;
+            width: 6px;
+            height: 6px;
+            background-color: #fff;
+            border: 2px solid #333;
+            border-radius: 50%;
         }
 
         @keyframes popIn {
@@ -14274,9 +14290,15 @@
                 const minWords = settings.replyWordCountMin || '无';
                 const maxWords = settings.replyWordCountMax || '无';
                 prompt += `    - **字数限制**: 你的总回复字数（包括语言、动作、心理）应在 ${minWords} 到 ${maxWords} 字之间。请务必遵守。\n`;
-                prompt += `3.  **视角**: \n`;
-                prompt += `    - 你的视角是【${settings.characterPerspective === 'first_person' ? '第一人称 (我)' : '第三人称 (他/她)'}】。\n`;
-                prompt += `    - 用户的视角是【${settings.yourPerspective === 'second_person' ? '第二人称 (你)' : '第一人称 (我)'}】。\n`;
+                
+                if (friend.isGroup) {
+                     prompt += `3.  **视角**: \n`;
+                     prompt += `    - **上帝视角**: 必须明确指出动作的主体。**严禁**使用代词（如“他”、“她”、“它”）来指代角色动作，必须直呼**角色名字**，以免混淆（例如：不要写“他打了B”，要写“A打了B”）。\n`;
+                } else {
+                     prompt += `3.  **视角**: \n`;
+                     prompt += `    - 你的视角是【${settings.characterPerspective === 'first_person' ? '第一人称 (我)' : '第三人称 (他/她)'}】。\n`;
+                     prompt += `    - 用户的视角是【${settings.yourPerspective === 'second_person' ? '第二人称 (你)' : '第一人称 (我)'}】。\n`;
+                }
 
             } else {
                 prompt += `\n【系统提示】重要：当前是普通的【微信线上聊天模式】，请你**完全沉浸式地伪装成一个真实人类**在微信上聊天。\n`;
@@ -17338,11 +17360,11 @@ ${historyText}`;
                     style.id = styleId;
                     document.head.appendChild(style);
                 }
-                style.innerHTML = `.sticky-note-popup::after { left: auto; right: 20px; }`;
+                style.innerHTML = `.sticky-note-popup::after { left: auto; right: 20px; } .sticky-note-popup::before { left: auto; right: 12px; }`;
             } else {
                 // Reset arrow to left
                 const style = document.getElementById('sticky-note-dynamic-style');
-                if (style) style.innerHTML = `.sticky-note-popup::after { left: 20px; right: auto; }`;
+                if (style) style.innerHTML = `.sticky-note-popup::after { left: 20px; right: auto; } .sticky-note-popup::before { left: 12px; right: auto; }`;
             }
 
             if (top < 0) {
@@ -18641,6 +18663,17 @@ ${historyText}`;
             });
             
             dbGet('friends', currentChatFriendId, friend => {
+                const yourPerspectiveField = document.getElementById('your-perspective-select').closest('.offline-modal-field');
+                const charPerspectiveField = document.getElementById('character-perspective-select').closest('.offline-modal-field');
+                
+                if (friend && friend.isGroup) {
+                    if(yourPerspectiveField) yourPerspectiveField.style.display = 'none';
+                    if(charPerspectiveField) charPerspectiveField.style.display = 'none';
+                } else {
+                    if(yourPerspectiveField) yourPerspectiveField.style.display = 'flex';
+                    if(charPerspectiveField) charPerspectiveField.style.display = 'flex';
+                }
+
                 if (friend && friend.offlineSettings) {
                     const settings = friend.offlineSettings;
                     document.getElementById('offline-mode-toggle').checked = settings.enabled || false;
