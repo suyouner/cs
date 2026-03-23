@@ -12984,13 +12984,20 @@
                     });
                 }
 
-                document.getElementById('chat-interface-title').textContent = friend.name;
-                showPage('chat-interface-page');
-                renderMessages(friendId, targetMsgId);
-                // Also change status bar color to transparent so header background shows through
-                document.querySelector('.status-bar').style.backgroundColor = 'transparent';
-                
-                applyChatTheme(friend);
+                const isOfflineModeUI = (friend.offlineSettings && friend.offlineSettings.enabled) || friend.separateOfflineUI;
+                if (isOfflineModeUI) {
+                    document.getElementById('offline-chat-title').textContent = friend.name;
+                    showPage('offline-chat-page');
+                    renderOfflineChat(friendId);
+                    document.querySelector('.status-bar').style.backgroundColor = 'transparent';
+                } else {
+                    document.getElementById('chat-interface-title').textContent = friend.name;
+                    showPage('chat-interface-page');
+                    renderMessages(friendId, targetMsgId);
+                    // Also change status bar color to transparent so header background shows through
+                    document.querySelector('.status-bar').style.backgroundColor = 'transparent';
+                    applyChatTheme(friend);
+                }
             });
         }
 
@@ -13278,9 +13285,9 @@
                     let systemPrompt = "";
                     let allFriendsList = await new Promise(res => dbGetAll('friends', res));
                     let groupMembers = [];
+                    const isOfflineMode = (friend.offlineSettings && friend.offlineSettings.enabled) || friend.separateOfflineUI;
                     
                     if (friend.isGroup) {
-                        const isOfflineMode = (friend.offlineSettings && friend.offlineSettings.enabled) || (friend.separateOfflineUI && document.getElementById('offline-chat-page').classList.contains('active'));
                         groupMembers = allFriendsList.filter(f => (friend.members || []).includes(f.id));
                         systemPrompt = `【系统提示】这是一个群聊。群名称：${friend.name}。\n群成员如下：\n`;
                         
@@ -13422,8 +13429,6 @@
                             // Sanitize thought tags immediately to standardize various bracket forms to <thought>
                             aiResponseText = sanitizeThoughtTags(aiResponseText);
 
-                            const isOfflineMode = (friend.offlineSettings && friend.offlineSettings.enabled) || (friend.separateOfflineUI && document.getElementById('offline-chat-page').classList.contains('active'));
-
                             // Parse Thought Feature Tags
                             let mood = null;
                             let innerThought = null;
@@ -13464,7 +13469,7 @@
 
                             if (friend.isGroup) {
                                 hideTypingIndicator(friend.id);
-                                const isSeparateUI = friend.separateOfflineUI && document.getElementById('offline-chat-page').classList.contains('active');
+                                const isSeparateUI = friend.separateOfflineUI;
                                 
                                 const lines = aiResponseText.split('\n').map(s => s.trim()).filter(s => s !== '');
                                 let fallbackMember = groupMembers.length > 0 ? groupMembers[0] : null;
@@ -13541,9 +13546,9 @@
                                                 await new Promise(res => dbAdd('chat_history', msgObj, res));
                                                 
                                                 if (currentChatFriendId === friend.id) {
-                                                    if (isSeparateUI && document.getElementById('offline-chat-page').classList.contains('active')) {
+                                                    if (isSeparateUI) {
                                                         await appendOfflineMessage(msgObj, friend, true, true);
-                                                    } else if (!isSeparateUI && document.getElementById('chat-interface-page').classList.contains('active')) {
+                                                    } else {
                                                         addMessageToUI(msgObj);
                                                     }
                                                 }
@@ -13564,10 +13569,9 @@
                                                 };
                                                 await new Promise(res => dbAdd('chat_history', msgObj, res));
                                                 if (currentChatFriendId === friend.id) {
-                                                    if (isSeparateUI && document.getElementById('offline-chat-page').classList.contains('active')) {
-                                                        // Fallback for stickers in offline mode if needed, currently appendOfflineMessage relies on parseOfflineMessage which ignores stickers, let's just pass it to addMessageToUI in fallback
+                                                    if (isSeparateUI) {
                                                         addMessageToUI(msgObj); 
-                                                    } else if (!isSeparateUI && document.getElementById('chat-interface-page').classList.contains('active')) {
+                                                    } else {
                                                         addMessageToUI(msgObj);
                                                     }
                                                 }
@@ -13589,9 +13593,9 @@
                                                 };
                                                 let bubble;
                                                 if (currentChatFriendId === friend.id) {
-                                                    if (!isSeparateUI && document.getElementById('chat-interface-page').classList.contains('active')) {
+                                                    if (!isSeparateUI) {
                                                         bubble = addMessageToUI(diceMsg);
-                                                    } else if (isSeparateUI && document.getElementById('offline-chat-page').classList.contains('active')) {
+                                                    } else if (isSeparateUI) {
                                                         bubble = addMessageToUI(diceMsg); 
                                                     }
                                                 }
@@ -13637,7 +13641,7 @@
                             } else if (isOfflineMode) {
                                 // Offline mode: handle as a single message
                                 hideTypingIndicator(friend.id);
-                                const isSeparateUI = friend.separateOfflineUI && document.getElementById('offline-chat-page').classList.contains('active');
+                                const isSeparateUI = friend.separateOfflineUI;
                                 const responseMsg = {
                                     friendId: friend.id,
                                     text: aiResponseText,
@@ -14195,7 +14199,7 @@
 
         function buildSystemPrompt(friend, userPersona = null, aiStickers = [], visiblePosts = []) {
             let prompt = `你现在的身份是：${friend.realName || friend.name}。\n`;
-            const isOfflineMode = (friend.offlineSettings && friend.offlineSettings.enabled) || (friend.separateOfflineUI && document.getElementById('offline-chat-page').classList.contains('active'));
+            const isOfflineMode = (friend.offlineSettings && friend.offlineSettings.enabled) || friend.separateOfflineUI;
 
             // --- 核心互动原则 (最高优先级) ---
             prompt += `\n【核心互动原则与禁忌】\n`;
