@@ -3822,6 +3822,19 @@
         #chat-interface-page.in-mini-phone .chat-interface-header {
             padding-top: 10px !important;
         }
+        #chat-interface-page.in-mini-phone .chat-interface-options {
+            visibility: hidden;
+            pointer-events: none;
+        }
+        #chat-interface-page.in-mini-phone .chat-interface-header .back-arrow {
+            display: none !important;
+        }
+        #chat-interface-page.in-mini-phone .action-item.offline-mode-btn {
+            display: none !important;
+        }
+        #chat-interface-page.in-mini-phone .chat-messages-container {
+            zoom: 0.85;
+        }
 
         .thought-popup-overlay {
             position: fixed;
@@ -5025,7 +5038,7 @@
                         </div>
                         <span class="action-name">转账</span>
                     </div>
-                    <div class="action-item" onclick="openOfflineModeModal()">
+                    <div class="action-item offline-mode-btn" onclick="openOfflineModeModal()">
                         <div class="action-icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
                         </div>
