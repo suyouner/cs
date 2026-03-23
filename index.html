@@ -8790,8 +8790,10 @@
         let activeDcPostId = null;
         let activeDcCommentId = null;
         const dcContextMenu = document.getElementById('discover-comment-context-menu');
+        let dcMenuOpenTime = 0;
 
         document.addEventListener('click', (e) => {
+            if (Date.now() - dcMenuOpenTime < 300) return;
             if (dcContextMenu && dcContextMenu.style.display === 'flex' && !e.target.closest('.message-context-menu')) {
                 dcContextMenu.style.display = 'none';
                 activeDcPostId = null;
@@ -8808,6 +8810,7 @@
             document.getElementById('dc-ctx-retry').style.display = isMe ? 'none' : 'block';
 
             dcContextMenu.style.display = 'flex';
+            dcMenuOpenTime = Date.now();
             
             const phoneContainer = document.querySelector('.phone-container');
             const phoneRect = phoneContainer.getBoundingClientRect();
@@ -9952,6 +9955,7 @@
         let currentChatFriendId = null; // To track the currently open chat
         const contextMenu = document.getElementById('chat-context-menu');
         const clearHistoryModal = document.getElementById('clear-history-modal');
+        let chatMenuOpenTime = 0;
 
         function toggleWechatMenu() {
             const menu = document.getElementById('wechat-menu');
@@ -10597,6 +10601,7 @@
             document.getElementById('ctx-unpin-btn').style.display = isPinned ? 'block' : 'none';
 
             contextMenu.style.display = 'flex';
+            chatMenuOpenTime = Date.now();
             
             const phoneContainer = document.querySelector('.phone-container');
             const phoneRect = phoneContainer.getBoundingClientRect();
@@ -10624,6 +10629,7 @@
         }
 
         document.addEventListener('click', (e) => {
+            if (Date.now() - chatMenuOpenTime < 300) return;
             if (!e.target.closest('.chat-context-menu') && !e.target.closest('.chat-item')) {
                 hideContextMenu();
             }
@@ -11206,8 +11212,10 @@
         let activeMessage = null;
         let activeMessageSegment = null;
         const msgContextMenu = document.getElementById('message-context-menu');
+        let msgMenuOpenTime = 0;
 
         document.addEventListener('click', (e) => {
+            if (Date.now() - msgMenuOpenTime < 300) return;
             if (msgContextMenu && msgContextMenu.style.display === 'flex' && !e.target.closest('.message-context-menu')) {
                 msgContextMenu.style.display = 'none';
             }
@@ -11244,6 +11252,7 @@
             let left = (e.clientX || e.touches[0].clientX) - phoneRect.left;
 
             msgContextMenu.style.display = 'flex'; // Need to display first to get dimensions
+            msgMenuOpenTime = Date.now();
             
             if (top + msgContextMenu.offsetHeight > phoneContainer.clientHeight) {
                 top = phoneContainer.clientHeight - msgContextMenu.offsetHeight - 10;
