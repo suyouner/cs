@@ -3807,6 +3807,31 @@
         .offline-send-btn:active {
             background-color: #b3e5fc;
         }
+
+        .thought-popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 9999;
+        }
+
+        .offline-thought-popup {
+            position: absolute;
+            background: rgba(210, 245, 210, 0.95);
+            border-radius: 4px;
+            padding: 12px 16px;
+            font-size: 14px;
+            color: #333;
+            box-shadow: 3px 4px 12px rgba(0,0,0,0.2);
+            z-index: 10000;
+            max-width: 250px;
+            word-wrap: break-word;
+            border-bottom-right-radius: 15px 5px;
+            border-left: 4px solid #82c982;
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+        }
     </style>
 </head>
 <body>
@@ -5017,6 +5042,12 @@
                 </div>
             </div>
             <div id="offline-chat-messages"></div>
+            <div id="offline-mini-phone-btn" style="position: absolute; right: 15px; bottom: 125px; width: 45px; height: 45px; background-color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15); cursor: pointer; z-index: 100;" onclick="openMiniPhoneModal()">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                    <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                </svg>
+            </div>
             <div id="offline-manual-reply-btn" style="position: absolute; right: 15px; bottom: 70px; width: 45px; height: 45px; background-color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15); cursor: pointer; z-index: 100;" onclick="triggerAIResponse(false)">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform: translate(-1px, 1px);"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
             </div>
@@ -5787,6 +5818,33 @@
                 <div style="font-weight: 500; margin-bottom: 8px; color: #555; font-size: 14px;">心声：</div>
                 <div id="thought-text-content" style="color: #666; font-style: normal; font-size: 14px; line-height: 1.5; word-wrap: break-word;"></div>
             </div>
+        </div>
+    </div>
+
+    <!-- Mini Phone Modal -->
+    <div class="modal-overlay" id="mini-phone-modal" style="z-index: 2000;">
+        <div style="width: 280px; height: 500px; background: #fff; border: 8px solid #333; border-radius: 30px; position: relative; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+            <div style="position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 80px; height: 18px; background: #333; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; z-index: 10;"></div>
+            
+            <div id="mini-phone-screen" style="flex: 1; display: flex; flex-direction: column; position: relative; background: #ededed; overflow: hidden; padding-top: 18px;">
+                <div id="mini-phone-list-page" style="display: flex; flex-direction: column; height: 100%;">
+                    <div style="padding: 10px 15px; font-weight: 600; background: #ededed; text-align: center; border-bottom: 1px solid #d7d7d7; font-size: 15px;">微信</div>
+                    <div id="mini-phone-chat-list" style="flex: 1; overflow-y: auto; background: #fff;"></div>
+                </div>
+
+                <div id="mini-phone-chat-page" style="display: none; flex-direction: column; height: 100%; background: #ededed;">
+                    <div style="padding: 10px 15px; display: flex; align-items: center; background: #ededed; border-bottom: 1px solid #d7d7d7;">
+                        <span style="font-weight: bold; font-size: 18px; cursor: pointer; margin-right: 10px; width: 20px;" onclick="closeMiniPhoneChat()"><</span>
+                        <span id="mini-phone-chat-title" style="font-weight: 600; font-size: 15px; flex: 1; text-align: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding-right: 30px;"></span>
+                    </div>
+                    <div id="mini-phone-chat-messages" style="flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 10px;"></div>
+                    <div style="padding: 8px; background: #f7f7f7; border-top: 1px solid #e0e0e0; display: flex; gap: 5px;">
+                        <input type="text" id="mini-phone-input" style="flex: 1; border: none; border-radius: 4px; padding: 6px 10px; font-size: 14px; outline: none;" placeholder="发消息...">
+                        <button style="background: #07c160; color: white; border: none; border-radius: 4px; padding: 0 10px; cursor: pointer; font-size: 13px;" onclick="sendMiniPhoneMessage()">发送</button>
+                    </div>
+                </div>
+            </div>
+            <div style="position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%); width: 80px; height: 4px; background: #999; border-radius: 2px; z-index: 10; cursor: pointer;" onclick="closeMiniPhoneModal()"></div>
         </div>
     </div>
 
@@ -10585,7 +10643,8 @@
                         const items = actionPanel.querySelectorAll('.action-item');
                         if (friend && friend.isGroup) {
                             items.forEach(item => {
-                                if (item.querySelector('.action-name').textContent !== '图片') {
+                                const name = item.querySelector('.action-name').textContent;
+                                if (name !== '图片' && name !== '线下模式') {
                                     item.style.display = 'none';
                                 } else {
                                     item.style.display = 'flex';
@@ -12976,8 +13035,8 @@
             }
         }
 
-        async function triggerAIResponse(isContinue = false) {
-            if (!currentChatFriendId || isAITyping) return;
+        async function triggerAIResponse(isContinue = false, targetFriendId = currentChatFriendId) {
+            if (!targetFriendId || isAITyping) return;
 
             const configStr = localStorage.getItem('globalConfig');
             if (!configStr) {
@@ -12993,10 +13052,10 @@
             isAITyping = true;
             voiceIcon.style.opacity = '0.5';
 
-            showTypingIndicator(currentChatFriendId);
+            showTypingIndicator(targetFriendId);
 
             try {
-                dbGet('friends', currentChatFriendId, async friend => {
+                dbGet('friends', targetFriendId, async friend => {
                     if (!friend) throw new Error("Friend not found");
 
                     let userPersona = null;
@@ -13051,6 +13110,7 @@
                     let groupMembers = [];
                     
                     if (friend.isGroup) {
+                        const isOfflineMode = (friend.offlineSettings && friend.offlineSettings.enabled) || (friend.separateOfflineUI && document.getElementById('offline-chat-page').classList.contains('active'));
                         groupMembers = allFriendsList.filter(f => (friend.members || []).includes(f.id));
                         systemPrompt = `【系统提示】这是一个群聊。群名称：${friend.name}。\n群成员如下：\n`;
                         
@@ -13087,7 +13147,23 @@
                             }
                         }
                         
-                        systemPrompt += `--- \n请根据群聊当前的上下文，决定接下来由哪些群成员发言。为了还原真实的群聊氛围，你可以让多个不同角色互相附和、抢答，也可以让同一个角色连续发送多条消息（断句发送）。
+                        if (isOfflineMode) {
+                            systemPrompt += `--- \n当前为【群聊线下模式】。请根据群聊当前的上下文，决定接下来由哪些群成员发言。为了还原真实的群聊氛围，你可以让多个不同角色互相附和、抢答，也可以让同一个角色连续发送多条消息。
+请严格按照以下格式输出成员的发言内容（每行代表一条独立的气泡，必须以成员名字开头，加英文冒号）：
+角色A的名字: 「他说的话」
+角色A的名字: <thought>他心里的想法</thought>
+角色A的名字: 他的动作描写
+角色B的名字: 「她回复的话」
+角色C的名字: <thought>她默默想着</thought>
+
+1. 每次只允许输出一个类型的段落（对话、动作、或心理描写）。
+2. 【对话】必须使用「」包裹。
+3. 【心理描写】必须使用 <thought></thought> 包裹。
+4. 【动作描写】直接输出，不使用任何符号。
+5. 所有输出的每一行都必须以【角色名字:】开头！即使是动作或心理描写也必须加上名字前缀，以此来指明这个动作或想法属于谁。
+6. 如果你认为此时不需要任何人发言，请直接输出“无”。严禁代替用户发言，严禁输出用户的动作。`;
+                        } else {
+                            systemPrompt += `--- \n请根据群聊当前的上下文，决定接下来由哪些群成员发言。为了还原真实的群聊氛围，你可以让多个不同角色互相附和、抢答，也可以让同一个角色连续发送多条消息（断句发送）。
 请严格按照以下格式输出成员的发言内容（每行代表一条独立的气泡，必须以成员名字开头，加英文冒号）：
 角色A的名字: 他的第一句话
 角色A的名字: 他的第二句话（连续发送）
@@ -13097,6 +13173,7 @@
 如果你需要发送表情包，可以在发言内容中包含对应角色的专属表情包 <sticker>表情包ID</sticker>。
 如果你想让某个角色扔骰子，请在发言内容中包含：<dice></dice>。系统会自动将其转换为一个随机骰子动画。
 如果你认为此时不需要任何人发言，请直接输出“无”。严禁代替用户发言，严禁输出用户的动作。`;
+                        }
                     } else {
                         systemPrompt = buildSystemPrompt(friend, userPersona, aiStickers, visiblePosts);
 
@@ -13132,7 +13209,7 @@
                     const transaction = db.transaction(['chat_history'], 'readonly');
                     const store = transaction.objectStore('chat_history');
                     const index = store.index('friendId');
-                    const request = index.getAll(currentChatFriendId);
+                    const request = index.getAll(targetFriendId);
 
                     request.onsuccess = async () => {
                         let history = request.result;
@@ -13219,6 +13296,8 @@
 
                             if (friend.isGroup) {
                                 hideTypingIndicator(friend.id);
+                                const isSeparateUI = friend.separateOfflineUI && document.getElementById('offline-chat-page').classList.contains('active');
+                                
                                 const lines = aiResponseText.split('\n').map(s => s.trim()).filter(s => s !== '');
                                 for (const line of lines) {
                                     if (line === '无' || line === '') continue;
@@ -13267,11 +13346,18 @@
                                                     senderAvatar: senderMember.avatar,
                                                     text: text,
                                                     type: 'received',
-                                                    timestamp: Date.now()
+                                                    timestamp: Date.now(),
+                                                    isOffline: isOfflineMode,
+                                                    isOfflineSeparate: isSeparateUI
                                                 };
                                                 await new Promise(res => dbAdd('chat_history', msgObj, res));
-                                                if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
-                                                    addMessageToUI(msgObj);
+                                                
+                                                if (currentChatFriendId === friend.id) {
+                                                    if (isSeparateUI && document.getElementById('offline-chat-page').classList.contains('active')) {
+                                                        await appendOfflineMessage(msgObj, friend, true, true);
+                                                    } else if (!isSeparateUI && document.getElementById('chat-interface-page').classList.contains('active')) {
+                                                        addMessageToUI(msgObj);
+                                                    }
                                                 }
                                             }
 
@@ -13284,11 +13370,18 @@
                                                     text: stickerUrl,
                                                     isSticker: true,
                                                     type: 'received',
-                                                    timestamp: Date.now() + 10
+                                                    timestamp: Date.now() + 10,
+                                                    isOffline: isOfflineMode,
+                                                    isOfflineSeparate: isSeparateUI
                                                 };
                                                 await new Promise(res => dbAdd('chat_history', msgObj, res));
-                                                if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
-                                                    addMessageToUI(msgObj);
+                                                if (currentChatFriendId === friend.id) {
+                                                    if (isSeparateUI && document.getElementById('offline-chat-page').classList.contains('active')) {
+                                                        // Fallback for stickers in offline mode if needed, currently appendOfflineMessage relies on parseOfflineMessage which ignores stickers, let's just pass it to addMessageToUI in fallback
+                                                        addMessageToUI(msgObj); 
+                                                    } else if (!isSeparateUI && document.getElementById('chat-interface-page').classList.contains('active')) {
+                                                        addMessageToUI(msgObj);
+                                                    }
                                                 }
                                             }
 
@@ -13302,11 +13395,17 @@
                                                     type: 'received',
                                                     timestamp: Date.now() + 20,
                                                     isSticker: true,
-                                                    isDice: true
+                                                    isDice: true,
+                                                    isOffline: isOfflineMode,
+                                                    isOfflineSeparate: isSeparateUI
                                                 };
                                                 let bubble;
-                                                if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
-                                                    bubble = addMessageToUI(diceMsg);
+                                                if (currentChatFriendId === friend.id) {
+                                                    if (!isSeparateUI && document.getElementById('chat-interface-page').classList.contains('active')) {
+                                                        bubble = addMessageToUI(diceMsg);
+                                                    } else if (isSeparateUI && document.getElementById('offline-chat-page').classList.contains('active')) {
+                                                        bubble = addMessageToUI(diceMsg); 
+                                                    }
                                                 }
                                                 
                                                 await new Promise(res => setTimeout(res, 1200));
@@ -13331,7 +13430,7 @@
                                             friend.lastTime = getCurrentTimeStr();
                                             friend.lastActivityTimestamp = Date.now();
                                             
-                                            const isChatActive = currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active');
+                                            const isChatActive = currentChatFriendId === friend.id && (document.getElementById('chat-interface-page').classList.contains('active') || document.getElementById('offline-chat-page').classList.contains('active'));
                                             if (!isChatActive) {
                                                 friend.unreadCount = (friend.unreadCount || 0) + 1;
                                             }
@@ -17081,6 +17180,252 @@ ${historyText}`;
             return segments;
         }
 
+        // --- Mini Phone Logic ---
+        let currentMiniPhoneFriendId = null;
+        let miniPhonePollTimer = null;
+
+        function openMiniPhoneModal() {
+            document.getElementById('mini-phone-modal').style.display = 'flex';
+            document.getElementById('mini-phone-list-page').style.display = 'flex';
+            document.getElementById('mini-phone-chat-page').style.display = 'none';
+            renderMiniPhoneChatList();
+            
+            if(miniPhonePollTimer) clearInterval(miniPhonePollTimer);
+            miniPhonePollTimer = setInterval(() => {
+                if (document.getElementById('mini-phone-list-page').style.display === 'flex') {
+                    renderMiniPhoneChatList();
+                } else if (document.getElementById('mini-phone-chat-page').style.display === 'flex') {
+                    renderMiniPhoneMessages();
+                }
+            }, 2000);
+        }
+
+        function closeMiniPhoneModal() {
+            document.getElementById('mini-phone-modal').style.display = 'none';
+            currentMiniPhoneFriendId = null;
+            if(miniPhonePollTimer) clearInterval(miniPhonePollTimer);
+        }
+
+        function renderMiniPhoneChatList() {
+            dbGetAll('friends', friends => {
+                const list = document.getElementById('mini-phone-chat-list');
+                list.innerHTML = '';
+                
+                const visibleFriends = friends.filter(f => !f.isHidden);
+
+                visibleFriends.sort((a, b) => {
+                    if (a.isPinned && !b.isPinned) return -1;
+                    if (!a.isPinned && b.isPinned) return 1;
+                    const timeA = a.lastActivityTimestamp || (a.id.includes('_') ? parseInt(a.id.split('_').pop()) : parseInt(a.id)) || 0;
+                    const timeB = b.lastActivityTimestamp || (b.id.includes('_') ? parseInt(b.id.split('_').pop()) : parseInt(b.id)) || 0;
+                    return timeB - timeA;
+                });
+                
+                visibleFriends.forEach(friend => {
+                    const item = document.createElement('div');
+                    item.style.display = 'flex';
+                    item.style.padding = '10px 15px';
+                    item.style.gap = '10px';
+                    item.style.cursor = 'pointer';
+                    item.style.borderBottom = '1px solid #f0f0f0';
+                    if (friend.isPinned) {
+                        item.style.backgroundColor = '#f5f5f5';
+                    }
+
+                    item.innerHTML = `
+                        <div style="position: relative; width: 40px; height: 40px; flex-shrink: 0;">
+                            <img src="${friend.avatar}" style="width: 100%; height: 100%; border-radius: 6px; object-fit: cover; background: #eee;">
+                        </div>
+                        <div style="flex-grow: 1; display: flex; flex-direction: column; justify-content: center; overflow: hidden;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-size: 15px; font-weight: 500; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${friend.name}</span>
+                                <span style="font-size: 11px; color: #b2b2b2;">${friend.lastTime || ''}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
+                                <div style="font-size: 12px; color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-grow: 1;">${friend.lastMsg || ''}</div>
+                            </div>
+                        </div>
+                    `;
+
+                    item.addEventListener('click', () => {
+                        openMiniPhoneChat(friend.id);
+                    });
+
+                    list.appendChild(item);
+                });
+            });
+        }
+
+        function openMiniPhoneChat(friendId) {
+            currentMiniPhoneFriendId = friendId;
+            dbGet('friends', friendId, friend => {
+                if (!friend) return;
+                
+                // Clear unread count when opening
+                if (friend.unreadCount) {
+                    friend.unreadCount = 0;
+                    dbUpdate('friends', friend);
+                }
+                
+                document.getElementById('mini-phone-list-page').style.display = 'none';
+                document.getElementById('mini-phone-chat-page').style.display = 'flex';
+                document.getElementById('mini-phone-chat-title').textContent = friend.name;
+                
+                renderMiniPhoneMessages();
+            });
+        }
+
+        function closeMiniPhoneChat() {
+            document.getElementById('mini-phone-list-page').style.display = 'flex';
+            document.getElementById('mini-phone-chat-page').style.display = 'none';
+            currentMiniPhoneFriendId = null;
+            renderMiniPhoneChatList();
+        }
+
+        function renderMiniPhoneMessages() {
+            if (!currentMiniPhoneFriendId) return;
+            const container = document.getElementById('mini-phone-chat-messages');
+            
+            dbGet('friends', currentMiniPhoneFriendId, friend => {
+                const transaction = db.transaction(['chat_history'], 'readonly');
+                const store = transaction.objectStore('chat_history');
+                const index = store.index('friendId');
+                const request = index.getAll(currentMiniPhoneFriendId);
+
+                request.onsuccess = () => {
+                    let messages = request.result;
+                    messages = messages.filter(msg => !msg.isOfflineSeparate);
+                    
+                    // We only need to completely re-render if count changed drastically,
+                    // but for simplicity and reliability, we can re-render last 30 msgs
+                    // Let's check if the last message is the same to avoid constant re-rendering scroll jumps
+                    if (container.dataset.lastMsgId === (messages.length > 0 ? messages[messages.length-1].id || messages[messages.length-1].timestamp : '')) {
+                        return;
+                    }
+                    
+                    if (messages.length > 0) {
+                        container.dataset.lastMsgId = messages[messages.length-1].id || messages[messages.length-1].timestamp;
+                    } else {
+                        container.dataset.lastMsgId = '';
+                    }
+
+                    container.innerHTML = '';
+                    
+                    const messagesToRender = messages.slice(-30);
+
+                    dbGet('user_profile', 'main_user', profile => {
+                        messagesToRender.forEach(msg => {
+                            if (msg.type === 'system') return;
+
+                            const wrapper = document.createElement('div');
+                            wrapper.style.display = 'flex';
+                            wrapper.style.width = '100%';
+                            wrapper.style.marginBottom = '10px';
+
+                            const bubble = document.createElement('div');
+                            bubble.style.maxWidth = '75%';
+                            bubble.style.padding = '8px 10px';
+                            bubble.style.borderRadius = '8px';
+                            bubble.style.fontSize = '13px';
+                            bubble.style.lineHeight = '1.4';
+                            bubble.style.wordWrap = 'break-word';
+
+                            if (msg.isSticker) {
+                                bubble.style.padding = '0';
+                                bubble.style.backgroundColor = 'transparent';
+                                if (msg.text && msg.text.startsWith('dice:')) {
+                                    bubble.innerHTML = '[骰子]';
+                                } else {
+                                    bubble.innerHTML = `<img src="${msg.text}" style="max-width: 100px; max-height: 100px; object-fit: contain; border-radius: 8px;">`;
+                                }
+                            } else {
+                                bubble.innerHTML = msg.text.replace(/\\n/g, '<br>');
+                            }
+
+                            if (msg.type === 'sent') {
+                                wrapper.style.justifyContent = 'flex-end';
+                                bubble.style.backgroundColor = '#a9e979';
+                                bubble.style.color = '#000';
+                                
+                                wrapper.appendChild(bubble);
+                                
+                                const avatar = document.createElement('img');
+                                avatar.style.width = '30px';
+                                avatar.style.height = '30px';
+                                avatar.style.borderRadius = '4px';
+                                avatar.style.objectFit = 'cover';
+                                avatar.style.marginLeft = '8px';
+                                avatar.style.flexShrink = '0';
+                                avatar.src = (profile && profile.avatar) ? profile.avatar : 'https://via.placeholder.com/150';
+                                wrapper.appendChild(avatar);
+                            } else {
+                                wrapper.style.justifyContent = 'flex-start';
+                                bubble.style.backgroundColor = '#fff';
+                                bubble.style.color = '#000';
+                                
+                                const avatar = document.createElement('img');
+                                avatar.style.width = '30px';
+                                avatar.style.height = '30px';
+                                avatar.style.borderRadius = '4px';
+                                avatar.style.objectFit = 'cover';
+                                avatar.style.marginRight = '8px';
+                                avatar.style.flexShrink = '0';
+                                
+                                if (friend.isGroup && msg.senderAvatar) {
+                                    avatar.src = msg.senderAvatar;
+                                } else {
+                                    avatar.src = friend.avatar;
+                                }
+                                
+                                wrapper.appendChild(avatar);
+                                wrapper.appendChild(bubble);
+                            }
+                            
+                            container.appendChild(wrapper);
+                        });
+                        
+                        container.scrollTop = container.scrollHeight;
+                    });
+                };
+            });
+        }
+
+        function sendMiniPhoneMessage() {
+            const input = document.getElementById('mini-phone-input');
+            const messageText = input.value.trim();
+            if (messageText === '' || !currentMiniPhoneFriendId) return;
+
+            const message = {
+                friendId: currentMiniPhoneFriendId,
+                text: messageText,
+                type: 'sent',
+                timestamp: Date.now()
+            };
+
+            dbAdd('chat_history', message, () => {
+                dbGet('friends', currentMiniPhoneFriendId, friend => {
+                    if (friend) {
+                        friend.lastMsg = messageText;
+                        friend.lastTime = getCurrentTimeStr();
+                        friend.lastActivityTimestamp = Date.now();
+                        dbUpdate('friends', friend, () => {
+                            input.value = '';
+                            renderMiniPhoneMessages();
+                            
+                            // Trigger AI response for the mini phone character
+                            triggerAIResponse(false, currentMiniPhoneFriendId);
+                        });
+                    }
+                });
+            });
+        }
+
+        document.getElementById('mini-phone-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMiniPhoneMessage();
+            }
+        });
+
         function sendOfflineMessage() {
             const input = document.getElementById('offline-chat-input');
             const messageText = input.value.trim();
@@ -18107,12 +18452,13 @@ ${historyText}`;
             }
 
             dbGet('friends', currentChatFriendId, friend => {
-                if (friend && friend.separateOfflineUI) {
+                if (friend && (friend.isGroup || friend.separateOfflineUI)) {
                     if (!friend.offlineSettings) {
                         friend.offlineSettings = { enabled: true };
                     } else {
                         friend.offlineSettings.enabled = true;
                     }
+                    friend.separateOfflineUI = true;
                     dbUpdate('friends', friend, () => {
                         openOfflineChat(friend.id);
                         toggleActionPanel();
