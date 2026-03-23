@@ -1,80 +1,8 @@
 
-        const ACTIVATION_CODE = "16750";
-
-        function checkActivationCode() {
-            const inputCode = document.getElementById('activation-code-input').value.trim();
-            if (inputCode === ACTIVATION_CODE) {
-                localStorage.setItem('app_activated', 'true');
-                document.getElementById('activation-page').style.display = 'none';
-                document.getElementById('main-app-container').style.display = 'flex';
-            } else {
-                showToast('激活码错误');
-            }
-        }
-
-        let lastAIMusicActionTime = 0;
-
         // --- IndexedDB Helpers ---
         let db;
-        let themeSettings = {}; // In-memory cache for theme settings
-
-        function dbSaveSetting(key, value) {
-            return new Promise((resolve, reject) => {
-                if (!db) return reject('DB not initialized');
-                const transaction = db.transaction(['theme_settings'], 'readwrite');
-                const store = transaction.objectStore('theme_settings');
-                const request = store.put({ id: key, value: value });
-                request.onsuccess = () => {
-                    themeSettings[key] = value; // Update cache
-                    resolve();
-                };
-                request.onerror = (e) => {
-                    console.error(`Error saving setting ${key}:`, e.target.error);
-                    if (e.target.error.name === 'QuotaExceededError') {
-                        showToast('存储空间已满，请清理其他主题图片');
-                    }
-                    reject(e.target.error);
-                };
-            });
-        }
-
-        function dbDeleteSetting(key) {
-            return new Promise((resolve, reject) => {
-                if (!db) return resolve();
-                const transaction = db.transaction(['theme_settings'], 'readwrite');
-                const store = transaction.objectStore('theme_settings');
-                const request = store.delete(key);
-                request.onsuccess = () => {
-                    delete themeSettings[key];
-                    resolve();
-                };
-                request.onerror = (e) => reject(e.target.error);
-            });
-        }
-
-        function dbLoadAllSettings(callback) {
-            if (!db || !db.objectStoreNames.contains('theme_settings')) {
-                if (callback) callback();
-                return;
-            }
-            const transaction = db.transaction(['theme_settings'], 'readonly');
-            const store = transaction.objectStore('theme_settings');
-            const request = store.getAll();
-            request.onsuccess = () => {
-                themeSettings = {};
-                request.result.forEach(item => {
-                    themeSettings[item.id] = item.value;
-                });
-                if (callback) callback();
-            };
-            request.onerror = (e) => {
-                console.error(`Error loading all settings:`, e.target.error);
-                if (callback) callback(); // Proceed even if loading fails
-            };
-        }
-
         function initDB(callback) {
-            const request = indexedDB.open('UserData', 13); // Version 13
+            const request = indexedDB.open('UserData', 9); // Version 9
 
             request.onerror = (event) => {
                 console.error("Database error: ", event.target.error);
@@ -82,12 +10,6 @@
 
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
-                if (!db.objectStoreNames.contains('world_books')) {
-                    db.createObjectStore('world_books', { keyPath: 'id' });
-                }
-                if (!db.objectStoreNames.contains('wb_settings')) {
-                    db.createObjectStore('wb_settings', { keyPath: 'id' });
-                }
                 if (!db.objectStoreNames.contains('friends')) {
                     db.createObjectStore('friends', { keyPath: 'id' });
                 }
@@ -115,26 +37,14 @@
                 }
                 if (!db.objectStoreNames.contains('regex_rules')) {
                     const regexStore = db.createObjectStore('regex_rules', { keyPath: 'id' });
-                }
-                if (!db.objectStoreNames.contains('global_playlist')) {
-                    db.createObjectStore('global_playlist', { keyPath: 'id' });
-                }
-                if (!db.objectStoreNames.contains('discover_notifications')) {
-                    const notifStore = db.createObjectStore('discover_notifications', { keyPath: 'id' });
-                    notifStore.createIndex('toId', 'toId', { unique: false });
-                }
-                if (!db.objectStoreNames.contains('theme_settings')) {
-                    db.createObjectStore('theme_settings', { keyPath: 'id' });
+                    // No specific index needed yet, we'll fetch all and filter in memory or by index if needed later
                 }
             };
 
             request.onsuccess = (event) => {
                 db = event.target.result;
                 console.log("Database opened successfully.");
-                // Load all theme settings into memory after DB is ready
-                dbLoadAllSettings(() => {
-                    if (callback) callback();
-                });
+                if (callback) callback();
             };
         }
 
@@ -208,7 +118,7 @@
             const settingsHeader = document.querySelector('.settings-header');
             const settingsPage = document.getElementById('settings-page');
 
-            if (pageId === 'theme-page' || pageId === 'desktop-theme-page' || pageId === 'chat-theme-page' || pageId === 'bubble-theme-page' || pageId === 'global-font-page' || pageId === 'world-book-page' || pageId === 'wechat-page' || pageId === 'wechat-contacts-page' || pageId === 'wechat-me-page' || pageId === 'persona-management-page' || pageId === 'friend-profile-page' || pageId === 'memory-management-page' || pageId === 'emoji-library-page' || pageId === 'search-detail-page' || pageId === 'regex-app-page') {
+            if (pageId === 'theme-page' || pageId === 'desktop-theme-page' || pageId === 'chat-theme-page' || pageId === 'world-book-page' || pageId === 'wechat-page' || pageId === 'wechat-contacts-page' || pageId === 'wechat-me-page' || pageId === 'persona-management-page' || pageId === 'friend-profile-page' || pageId === 'memory-management-page' || pageId === 'emoji-library-page' || pageId === 'search-detail-page') {
                 statusBar.style.backgroundColor = (pageId === 'wechat-page' || pageId === 'wechat-contacts-page' || pageId === 'wechat-me-page' || pageId === 'friend-profile-page' || pageId === 'memory-management-page' || pageId === 'search-detail-page') ? '#ededed' : 'white';
                 statusBar.style.color = '#333';
             } else if (pageId === 'settings-page' || pageId === 'chat-info-page') {
@@ -260,13 +170,8 @@
             if (pageId === 'chat-theme-page') {
                 renderChatThemePage();
             }
-            if (pageId === 'bubble-theme-page') {
-                renderBubbleThemePage();
-            }
         }
 
-        let currentChatFriend = null;
-        let currentUserProfile = null;
         let currentChatThemeFriendId = '';
 
         function renderChatThemePage() {
@@ -304,1260 +209,49 @@
         }
 
         function updateChatThemePreview() {
-            const applyPreview = (settings) => {
-                const pWallpaper = document.getElementById('chat-wallpaper-preview');
-                if (pWallpaper) pWallpaper.style.backgroundImage = settings.chat_wallpaper ? `url(${settings.chat_wallpaper})` : 'none';
-
-                const pHeader = document.getElementById('chat-header-bg-preview');
-                if (pHeader) pHeader.style.backgroundImage = settings.chat_header_bg ? `url(${settings.chat_header_bg})` : 'none';
-
-                const pInput = document.getElementById('chat-input-bg-preview');
-                if (pInput) pInput.style.backgroundImage = settings.chat_input_bg ? `url(${settings.chat_input_bg})` : 'none';
-
-                const icons = ['back', 'options', 'voice', 'emoji', 'plus', 'send'];
-                icons.forEach(icon => {
-                    const key = `chat_${icon}_icon`;
-                    const box = document.getElementById(`chat-${icon}-icon-preview`);
-                    if (box) box.style.backgroundImage = settings[key] ? `url(${settings[key]})` : 'none';
-                });
-
-                const size = settings.chat_avatar_size || '40';
-                const radius = settings.chat_avatar_radius || '6';
-                
-                const sizeSlider = document.getElementById('chat-avatar-size-slider');
-                const sizeValue = document.getElementById('chat-avatar-size-value');
-                if (sizeSlider) sizeSlider.value = size;
-                if (sizeValue) sizeValue.textContent = `${size}px`;
-
-                const radiusSlider = document.getElementById('chat-avatar-radius-slider');
-                const radiusValue = document.getElementById('chat-avatar-radius-value');
-                if (radiusSlider) radiusSlider.value = radius;
-                if (radiusValue) radiusValue.textContent = `${radius}px`;
-
-                const avatarImg = document.getElementById('chat-theme-avatar-preview-img');
-                if (avatarImg) {
-                    avatarImg.style.width = `${size}px`;
-                    avatarImg.style.height = `${size}px`;
-                    avatarImg.style.borderRadius = `${radius}px`;
-                    if (settings.avatarSrc) {
-                        avatarImg.src = settings.avatarSrc;
-                        avatarImg.style.backgroundColor = 'transparent';
+            const preview = document.getElementById('chat-wallpaper-preview');
+            if (currentChatThemeFriendId) {
+                dbGet('friends', currentChatThemeFriendId, friend => {
+                    if (friend && friend.chatWallpaper) {
+                        preview.style.backgroundImage = `url(${friend.chatWallpaper})`;
                     } else {
-                        avatarImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-                        avatarImg.style.backgroundColor = '#000';
-                    }
-                }
-            };
-
-            const keys = ['chat_wallpaper', 'chat_header_bg', 'chat_input_bg', 'chat_back_icon', 'chat_options_icon', 'chat_voice_icon', 'chat_emoji_icon', 'chat_plus_icon', 'chat_send_icon', 'chat_avatar_size', 'chat_avatar_radius'];
-            
-            if (currentChatThemeFriendId) {
-                dbGet('friends', currentChatThemeFriendId, friend => {
-                    const merged = {};
-                    keys.forEach(k => {
-                        const globalVal = themeSettings[k] !== undefined ? themeSettings[k] : localStorage.getItem(k);
-                        merged[k] = (friend && friend[k] !== undefined && friend[k] !== null) ? friend[k] : globalVal;
-                    });
-                    merged.avatarSrc = friend ? friend.avatar : null;
-                    applyPreview(merged);
-                });
-            } else {
-                const globalSettings = {};
-                keys.forEach(k => globalSettings[k] = themeSettings[k] !== undefined ? themeSettings[k] : localStorage.getItem(k));
-                globalSettings.avatarSrc = null;
-                applyPreview(globalSettings);
-            }
-        }
-
-        function updateChatThemeSlider(type, value) {
-            if (type === 'chat_avatar_size') {
-                const valEl = document.getElementById('chat-avatar-size-value');
-                if (valEl) valEl.textContent = `${value}px`;
-                const previewImg = document.getElementById('chat-theme-avatar-preview-img');
-                if (previewImg) {
-                    previewImg.style.width = `${value}px`;
-                    previewImg.style.height = `${value}px`;
-                }
-            } else if (type === 'chat_avatar_radius') {
-                const valEl = document.getElementById('chat-avatar-radius-value');
-                if (valEl) valEl.textContent = `${value}px`;
-                const previewImg = document.getElementById('chat-theme-avatar-preview-img');
-                if (previewImg) {
-                    previewImg.style.borderRadius = `${value}px`;
-                }
-            }
-
-            if (currentChatThemeFriendId) {
-                dbGet('friends', currentChatThemeFriendId, friend => {
-                    if (friend) {
-                        friend[type] = value;
-                        dbUpdate('friends', friend);
-                    }
-                });
-            } else {
-                dbSaveSetting(type, value);
-                localStorage.removeItem(type);
-            }
-        }
-
-        // --- Unified Image Uploader ---
-        window.isUploading = false;
-
-        function createImageUploader(callback, options = {}) {
-            const { quality = 0.7, maxSizeMB = 10 } = options;
-
-            return function(...args) {
-                if (window.isUploading) {
-                    showToast('请等待当前上传完成');
-                    return;
-                }
-                
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = 'image/*';
-                input.style.display = 'none';
-                
-                input.onchange = function(e) {
-                    window.isUploading = true;
-                    const file = e.target.files[0];
-                    
-                    // Cleanup function
-                    const cleanup = () => {
-                        window.isUploading = false;
-                        if (input.parentNode) {
-                            document.body.removeChild(input);
+                        // Fallback to global
+                        const globalWallpaper = localStorage.getItem('chat_wallpaper');
+                        if (globalWallpaper) {
+                            preview.style.backgroundImage = `url(${globalWallpaper})`;
+                        } else {
+                            preview.style.backgroundImage = 'none';
+                            preview.style.backgroundColor = '#ededed';
                         }
-                    };
-
-                    if (!file) {
-                        cleanup();
-                        return;
                     }
-                    
-                    if (!file.type.startsWith('image/')) {
-                        showToast('请选择图片文件');
-                        cleanup();
-                        return;
-                    }
-                    
-                    if (file.size > maxSizeMB * 1024 * 1024) {
-                        showToast(`图片不能超过${maxSizeMB}MB`);
-                        cleanup();
-                        return;
-                    }
-                    
-                    compressImage(file, quality, (compressedSrc) => {
-                        callback(compressedSrc, ...args);
-                        cleanup();
-                    });
-                };
-                
-                document.body.appendChild(input);
-                input.click();
-            };
+                });
+            } else {
+                const globalWallpaper = localStorage.getItem('chat_wallpaper');
+                if (globalWallpaper) {
+                    preview.style.backgroundImage = `url(${globalWallpaper})`;
+                } else {
+                    preview.style.backgroundImage = 'none';
+                    preview.style.backgroundColor = '#ededed';
+                }
+            }
         }
 
-        const uploaderForChatTheme = createImageUploader((compressedSrc, type) => {
+        function resetChatWallpaper() {
             if (currentChatThemeFriendId) {
                 dbGet('friends', currentChatThemeFriendId, friend => {
                     if (friend) {
-                        friend[type] = compressedSrc;
+                        friend.chatWallpaper = null;
                         dbUpdate('friends', friend, () => {
                             updateChatThemePreview();
-                            showToast('已保存专属设置');
+                            showToast('已恢复为全局背景');
                         });
                     }
                 });
             } else {
-                dbSaveSetting(type, compressedSrc).then(() => {
-                    localStorage.removeItem(type);
-                    updateChatThemePreview();
-                    showToast('已保存全局设置');
-                });
-            }
-        });
-        const triggerChatThemeUpload = (type) => uploaderForChatTheme(type);
-
-        const uploaderForDesktopTheme = createImageUploader((compressedSrc, type) => {
-            dbSaveSetting(type, compressedSrc).then(() => {
-                localStorage.removeItem(type); // Clean up old storage
-                applyDesktopTheme();
-                showToast('已保存设置');
-            }).catch(err => {
-                showToast('保存失败，可能是存储空间不足');
-            });
-        });
-        const triggerDesktopThemeUpload = (type) => uploaderForDesktopTheme(type);
-
-        const uploaderForBubbleTheme = createImageUploader((compressedSrc, type) => {
-            if (type === 'corner_img') {
-                updateBubbleCorner('img', compressedSrc);
-            } else if (type === 'bg_image') {
-                updateBubbleThemeValue('bg_image', compressedSrc);
-            } else if (type === 'page_bg_image') {
-                updateBubbleThemeValue('page_bg_image', compressedSrc);
-            } else if (type === 'tail_image') {
-                updateBubbleThemeValue('tail_image', compressedSrc);
-            }
-        });
-        const triggerBubbleUpload = (type) => uploaderForBubbleTheme(type);
-
-        const uploaderForMainPage = createImageUploader((compressedSrc, displayId) => {
-            document.getElementById(displayId).src = compressedSrc;
-            const slot = document.getElementById(displayId).parentElement;
-            if (slot) slot.classList.add('has-image');
-
-            dbGet('user_profile', 'main_user', profile => {
-                const updatedProfile = profile || { id: 'main_user' };
-                if (displayId === 'avatar-display') {
-                    updatedProfile.avatar = compressedSrc;
-                    const mePageAvatar = document.getElementById('me-page-avatar');
-                    if (mePageAvatar) {
-                        mePageAvatar.src = compressedSrc;
-                        document.getElementById('me-avatar-container').classList.add('has-image');
-                    }
-                } else {
-                    const propName = displayId.replace('-', '_');
-                    updatedProfile[propName] = compressedSrc;
-                }
-                dbUpdate('user_profile', updatedProfile);
-            });
-        });
-        function triggerMainPageUpload(displayId) {
-             uploaderForMainPage(displayId);
-        }
-
-        const uploaderForWallpaper = createImageUploader((compressedSrc) => {
-            document.getElementById('main-page').style.backgroundImage = `url(${compressedSrc})`;
-            document.getElementById('wallpaper-preview').style.backgroundImage = `url(${compressedSrc})`;
-            dbSaveSetting('wallpaper', compressedSrc).then(() => {
-                localStorage.removeItem('wallpaper'); // Clean up old storage
-            }).catch(err => {
-                showToast('壁纸保存失败');
-            });
-        });
-        const triggerWallpaperUpload = () => uploaderForWallpaper();
-
-        const uploaderForIndividualIcon = createImageUploader((compressedSrc, id) => {
-            const targetIcons = document.querySelectorAll(`.app-item[data-app-id='${id}'] .app-icon img`);
-            targetIcons.forEach(icon => icon.src = compressedSrc);
-            dbSaveSetting(id, compressedSrc).then(() => {
-                localStorage.removeItem(id); // Clean up old storage
-                generateIconPreviews(); // Refresh previews
-            }).catch(err => {
-                showToast('图标保存失败');
-            });
-        });
-        const triggerIndividualUpload = (id) => uploaderForIndividualIcon(id);
-
-        function resetChatTheme(type) {
-            if (currentChatThemeFriendId) {
-                dbGet('friends', currentChatThemeFriendId, friend => {
-                    if (friend) {
-                        friend[type] = null;
-                        dbUpdate('friends', friend, () => {
-                            updateChatThemePreview();
-                            showToast('已恢复为全局设置');
-                        });
-                    }
-                });
-            } else {
-                dbDeleteSetting(type).then(() => {
-                    updateChatThemePreview();
-                    showToast('全局设置已恢复默认');
-                });
-            }
-        }
-
-        let currentBubbleThemeFriendId = '';
-
-        function renderBubbleThemePage() {
-            const select = document.getElementById('bubble-theme-character-select');
-            const sideSelect = document.getElementById('bubble-theme-side-select');
-            
-            dbGetAll('friends', friends => {
-                select.innerHTML = '';
-                
-                const defaultOption = document.createElement('option');
-                defaultOption.value = "";
-                defaultOption.textContent = "默认/全局";
-                select.appendChild(defaultOption);
-
-                if (friends && friends.length > 0) {
-                    friends.forEach(friend => {
-                        const option = document.createElement('option');
-                        option.value = friend.id;
-                        option.textContent = friend.name;
-                        if (friend.id === currentBubbleThemeFriendId) {
-                            option.selected = true;
-                        }
-                        select.appendChild(option);
-                    });
-                }
-                
-                refreshCustomSelect(select);
-                refreshCustomSelect(sideSelect);
-                
-                select.onchange = (e) => {
-                    currentBubbleThemeFriendId = e.target.value;
-                    updateBubbleThemePreview();
-                    loadCornerSettings();
-                };
-                
-                updateBubbleThemePreview();
-                loadCornerSettings();
-            });
-        }
-
-        function getBubbleSetting(key, friend, defaultVal = null) {
-            if (tempBubbleSettings[key] !== undefined) {
-                return tempBubbleSettings[key];
-            }
-            if (friend && friend[key] !== undefined && friend[key] !== null) {
-                return friend[key];
-            }
-            const globalVal = localStorage.getItem(key);
-            if (globalVal !== null) return globalVal;
-            return defaultVal;
-        }
-
-        function updateBubbleThemePreview() {
-            let styleEl = document.getElementById('bubble-preview-styles');
-            if (!styleEl) {
-                styleEl = document.createElement('style');
-                styleEl.id = 'bubble-preview-styles';
-                document.head.appendChild(styleEl);
-            }
-
-            const side = document.getElementById('bubble-theme-side-select').value;
-            const container = document.getElementById('bubble-preview-container');
-            const wrapper = document.getElementById('bubble-preview-wrapper');
-            const contentGroup = document.getElementById('bubble-preview-content-group');
-            const avatarRecv = document.getElementById('bubble-preview-avatar-recv');
-            const avatarSent = document.getElementById('bubble-preview-avatar-sent');
-            
-            // For preview purposes, if 'both' is selected, we'll just preview as 'sent'
-            const previewSide = side === 'both' ? 'sent' : side;
-            container.className = `message-bubble ${previewSide}`;
-            if (wrapper) wrapper.className = `message-bubble-wrapper ${previewSide}`;
-            
-            if (wrapper && contentGroup && avatarRecv && avatarSent) {
-                // 预览头像改为纯黑
-                const blackGif = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-                avatarRecv.src = blackGif;
-                avatarRecv.style.backgroundColor = '#000';
-                avatarSent.src = blackGif;
-                avatarSent.style.backgroundColor = '#000';
-
-                if (previewSide === 'sent') {
-                    contentGroup.style.alignItems = 'flex-end';
-                    contentGroup.style.marginLeft = '10px';
-                    contentGroup.style.marginRight = '0';
-                    avatarRecv.style.display = 'none';
-                    avatarSent.style.display = 'block';
-                } else {
-                    contentGroup.style.alignItems = 'flex-start';
-                    contentGroup.style.marginLeft = '0';
-                    contentGroup.style.marginRight = '10px';
-                    avatarRecv.style.display = 'block';
-                    avatarSent.style.display = 'none';
-                }
-            }
-
-            const applySettings = (friend) => {
-                const prefix = previewSide === 'sent' ? 'bubble_sent_' : 'bubble_recv_';
-                
-                const bgColor = getBubbleSetting(prefix + 'bg_color', friend, previewSide === 'sent' ? '#a9e979' : '#ffffff');
-                const bgOpacity = getBubbleSetting(prefix + 'bg_opacity', friend, '1');
-                const bgImage = getBubbleSetting(prefix + 'bg_image', friend, '');
-                const bgImageOpacity = getBubbleSetting(prefix + 'bg_img_opacity', friend, '1');
-                const textColor = getBubbleSetting(prefix + 'text_color', friend, '#000000');
-                const borderColor = getBubbleSetting(prefix + 'border_color', friend, 'transparent');
-                const borderWidth = getBubbleSetting(prefix + 'border_width', friend, '0');
-                const borderOpacity = getBubbleSetting(prefix + 'border_opacity', friend, '1');
-                const shadowColor = getBubbleSetting(prefix + 'shadow_color', friend, '#000000');
-                const shadowOpacity = getBubbleSetting(prefix + 'shadow_opacity', friend, '0');
-                const shadowX = getBubbleSetting(prefix + 'shadow_x', friend, '0');
-                const shadowY = getBubbleSetting(prefix + 'shadow_y', friend, '0');
-                const shadowBlur = getBubbleSetting(prefix + 'shadow_blur', friend, '0');
-                const tailColor = getBubbleSetting(prefix + 'tail_color', friend, '');
-                const hideTriangleRaw = getBubbleSetting(prefix + 'hide_triangle', friend, 'false');
-                const hideTriangle = hideTriangleRaw === 'true' || hideTriangleRaw === true;
-                const radius = getBubbleSetting(prefix + 'radius', friend, '8');
-                
-                const offsetX = getBubbleSetting(prefix + 'offset_x', friend, '0');
-                const offsetY = getBubbleSetting(prefix + 'offset_y', friend, '0');
-
-                const tailImage = getBubbleSetting(prefix + 'tail_image', friend, '');
-                const tailWidth = getBubbleSetting(prefix + 'tail_width', friend, '20');
-                const tailHeight = getBubbleSetting(prefix + 'tail_height', friend, '20');
-                const tailX = getBubbleSetting(prefix + 'tail_x', friend, '0');
-                const tailY = getBubbleSetting(prefix + 'tail_y', friend, '0');
-                const tailRot = getBubbleSetting(prefix + 'tail_rot', friend, '0');
-                
-                const effect3dRaw = getBubbleSetting(prefix + '3d_effect', friend, 'false');
-                const effect3d = effect3dRaw === 'true' || effect3dRaw === true;
-
-                // Update UI controls to reflect current values
-                document.getElementById('bubble-bg-color').value = bgColor;
-                document.getElementById('bubble-bg-opacity').value = bgOpacity;
-                document.getElementById('bubble-bg-opacity-val').textContent = bgOpacity;
-                document.getElementById('bubble-text-color').value = textColor;
-                document.getElementById('bubble-border-color').value = borderColor;
-                document.getElementById('bubble-border-width').value = borderWidth;
-                document.getElementById('bubble-border-opacity').value = borderOpacity;
-                document.getElementById('bubble-border-opacity-val').textContent = borderOpacity;
-                document.getElementById('bubble-shadow-color').value = shadowColor;
-                document.getElementById('bubble-shadow-opacity').value = shadowOpacity;
-                document.getElementById('bubble-shadow-opacity-val').textContent = shadowOpacity;
-                document.getElementById('bubble-shadow-x').value = shadowX;
-                document.getElementById('bubble-shadow-x-val').textContent = shadowX + 'px';
-                document.getElementById('bubble-shadow-y').value = shadowY;
-                document.getElementById('bubble-shadow-y-val').textContent = shadowY + 'px';
-                document.getElementById('bubble-shadow-blur').value = shadowBlur;
-                document.getElementById('bubble-shadow-blur-val').textContent = shadowBlur + 'px';
-                document.getElementById('bubble-tail-color').value = tailColor;
-                document.getElementById('bubble-hide-triangle').checked = hideTriangle;
-                document.getElementById('bubble-radius').value = radius === null ? '' : radius;
-                
-                const offsetXEl = document.getElementById('bubble-offset-x');
-                if (offsetXEl) { offsetXEl.value = offsetX; document.getElementById('bubble-offset-x-val').textContent = offsetX + 'px'; }
-                const offsetYEl = document.getElementById('bubble-offset-y');
-                if (offsetYEl) { offsetYEl.value = offsetY; document.getElementById('bubble-offset-y-val').textContent = offsetY + 'px'; }
-
-                const tailWidthEl = document.getElementById('bubble-tail-width');
-                if (tailWidthEl) tailWidthEl.value = tailWidth;
-                const tailHeightEl = document.getElementById('bubble-tail-height');
-                if (tailHeightEl) tailHeightEl.value = tailHeight;
-                const tailXEl = document.getElementById('bubble-tail-x');
-                if (tailXEl) { tailXEl.value = tailX; document.getElementById('bubble-tail-x-val').textContent = tailX + 'px'; }
-                const tailYEl = document.getElementById('bubble-tail-y');
-                if (tailYEl) { tailYEl.value = tailY; document.getElementById('bubble-tail-y-val').textContent = tailY + 'px'; }
-                const tailRotEl = document.getElementById('bubble-tail-rot');
-                if (tailRotEl) { tailRotEl.value = tailRot; document.getElementById('bubble-tail-rot-val').textContent = tailRot + 'deg'; }
-                
-                const effect3dEl = document.getElementById('bubble-3d-effect');
-                if (effect3dEl) effect3dEl.checked = effect3d;
-
-                const hexToRgba = (hex, alpha) => {
-                    if (!hex || hex === 'transparent') return 'transparent';
-                    let r = 0, g = 0, b = 0;
-                    hex = hex.replace('#', '');
-                    if (hex.length === 3) {
-                        r = parseInt(hex[0] + hex[0], 16);
-                        g = parseInt(hex[1] + hex[1], 16);
-                        b = parseInt(hex[2] + hex[2], 16);
-                    } else if (hex.length === 6) {
-                        r = parseInt(hex.substring(0, 2), 16);
-                        g = parseInt(hex.substring(2, 4), 16);
-                        b = parseInt(hex.substring(4, 6), 16);
-                    } else { return hex; }
-                    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-                };
-
-                const finalBgColor = hexToRgba(bgColor, bgOpacity);
-                const finalBorderColor = hexToRgba(borderColor, borderOpacity);
-                const finalTailColor = tailColor ? tailColor : finalBgColor;
-                const finalShadowColor = hexToRgba(shadowColor, shadowOpacity);
-                
-                let filterShadow = 'none';
-                if (parseFloat(shadowOpacity) > 0 || parseInt(shadowBlur) > 0 || parseInt(shadowX) !== 0 || parseInt(shadowY) !== 0) {
-                    filterShadow = `drop-shadow(${shadowX}px ${shadowY}px ${shadowBlur}px ${finalShadowColor})`;
-                }
-
-                const formatUnit = (val) => {
-                    if (val === null || val === undefined || val === '') return 'auto';
-                    if (!isNaN(val) && val !== '') return val + 'px';
-                    return val;
-                };
-                let fRadius = formatUnit(radius);
-                if(fRadius === 'auto') fRadius = '8px';
-                
-                let boxShadow = 'none';
-                let backgroundImage = 'none';
-                if (effect3d) {
-                    boxShadow = 'inset 0 4px 6px rgba(255,255,255,0.4), inset 0 -4px 6px rgba(0,0,0,0.1)';
-                    backgroundImage = 'linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(0,0,0,0.05) 100%)';
-                }
-
-                let css = `
-                    #bubble-preview-container {
-                        background-color: ${finalBgColor};
-                        color: ${textColor};
-                        border: ${borderWidth}px solid ${finalBorderColor};
-                        filter: ${filterShadow};
-                        border-radius: ${fRadius};
-                        box-shadow: ${boxShadow};
-                        background-image: ${backgroundImage};
-                        transform: translate(${offsetX}px, ${offsetY}px);
-                    }
-                    #bubble-preview-container.${previewSide}::after {
-                        display: ${hideTriangle ? 'none' : 'block'};
-                        border-color: ${previewSide === 'sent' ? `transparent transparent transparent ${finalTailColor}` : `transparent ${finalTailColor} transparent transparent`};
-                        width: ${tailImage ? tailWidth + 'px' : '0px'};
-                        height: ${tailImage ? tailHeight + 'px' : '0px'};
-                        background-image: ${tailImage ? `url(${tailImage})` : 'none'};
-                        background-size: contain;
-                        background-repeat: no-repeat;
-                        background-position: center;
-                        transform: translate(${tailX}px, ${tailY}px) rotate(${tailRot}deg);
-                        ${tailImage ? 'border-color: transparent !important;' : ''}
-                    }
-                `;
-
-                // Corners
-                ['tl', 'tr', 'bl', 'br'].forEach(corner => {
-                    const cPrefix = `bubble_${previewSide}_${corner}_`;
-                    const img = getBubbleSetting(cPrefix + 'img', friend, '');
-                    const op = getBubbleSetting(cPrefix + 'op', friend, '1');
-                    const x = getBubbleSetting(cPrefix + 'x', friend, '-15');
-                    const y = getBubbleSetting(cPrefix + 'y', friend, '-15');
-                    const w = getBubbleSetting(cPrefix + 'w', friend, '30');
-                    const h = getBubbleSetting(cPrefix + 'h', friend, '30');
-                    
-                    css += `
-                        #bubble-preview-container .bubble-corner.${corner} {
-                            background-image: ${img ? `url(${img})` : 'none'};
-                            opacity: ${op};
-                            width: ${w}px;
-                            height: ${h}px;
-                            ${corner.includes('l') ? `left: ${x}px;` : `right: ${x}px;`}
-                            ${corner.includes('t') ? `top: ${y}px;` : `bottom: ${y}px;`}
-                        }
-                    `;
-                });
-
-                styleEl.innerHTML = css;
-            };
-
-            if (currentBubbleThemeFriendId) {
-                dbGet('friends', currentBubbleThemeFriendId, friend => applySettings(friend));
-            } else {
-                applySettings(null);
-            }
-        }
-
-        // Store temporary settings before saving
-        let tempBubbleSettings = {};
-
-        function updateBubbleThemeValue(key, value) {
-            if (key === 'page_bg_image' || key === 'page_bg_opacity') {
-                tempBubbleSettings[`bubble_${key}`] = value;
-            } else {
-                const side = document.getElementById('bubble-theme-side-select').value;
-                const sidesToUpdate = side === 'both' ? ['sent', 'recv'] : [side];
-                
-                sidesToUpdate.forEach(s => {
-                    const fullKey = `bubble_${s}_${key}`;
-                    tempBubbleSettings[fullKey] = value;
-                });
-            }
-            
-            // Just update the preview, don't save yet
-            updateBubbleThemePreview();
-        }
-
-        function updateBubbleThemePageOpacity(value) {
-            updateBubbleThemeValue('page_bg_opacity', value);
-        }
-
-        function loadCornerSettings() {
-            // This function now just needs to update the input values for the selected corner
-            const side = document.getElementById('bubble-theme-side-select').value;
-            const previewSide = side === 'both' ? 'sent' : side;
-            const corner = document.getElementById('bubble-corner-select').value;
-            const prefix = `${previewSide}_${corner}_`;
-
-            const applyCornerInputs = (friend) => {
-                const op = getBubbleSetting(prefix + 'op', friend, '1');
-                const x = getBubbleSetting(prefix + 'x', friend, '-15');
-                const y = getBubbleSetting(prefix + 'y', friend, '-15');
-                const w = getBubbleSetting(prefix + 'w', friend, '30');
-                const h = getBubbleSetting(prefix + 'h', friend, '30');
-
-                document.getElementById('bubble-corner-op').value = op;
-                document.getElementById('bubble-corner-op-val').textContent = op;
-                document.getElementById('bubble-corner-x').value = x;
-                document.getElementById('bubble-corner-x-val').textContent = x + 'px';
-                document.getElementById('bubble-corner-y').value = y;
-                document.getElementById('bubble-corner-y-val').textContent = y + 'px';
-                document.getElementById('bubble-corner-w').value = w;
-                document.getElementById('bubble-corner-h').value = h;
-            };
-
-            if (currentBubbleThemeFriendId) {
-                dbGet('friends', currentBubbleThemeFriendId, friend => applyCornerInputs(friend));
-            } else {
-                applyCornerInputs(null);
-            }
-            // The preview is updated by updateBubbleThemePreview, which is called on side-select change.
-            // We also call it here to ensure corner settings are reflected immediately.
-            updateBubbleThemePreview();
-        }
-
-        function updateBubbleCorner(key, value) {
-            const side = document.getElementById('bubble-theme-side-select').value;
-            const corner = document.getElementById('bubble-corner-select').value;
-            const sidesToUpdate = side === 'both' ? ['sent', 'recv'] : [side];
-
-            sidesToUpdate.forEach(s => {
-                const fullKey = `bubble_${s}_${corner}_${key}`;
-                tempBubbleSettings[fullKey] = value;
-            });
-            
-            // Just update the preview, don't save yet
-            updateBubbleThemePreview();
-        }
-
-        
-        function saveAllBubbleSettings() {
-            if (Object.keys(tempBubbleSettings).length === 0) {
-                showToast('没有修改需要保存');
-                return;
-            }
-
-            if (currentBubbleThemeFriendId) {
-                dbGet('friends', currentBubbleThemeFriendId, friend => {
-                    if (friend) {
-                        for (const key in tempBubbleSettings) {
-                            friend[key] = tempBubbleSettings[key];
-                        }
-                        dbUpdate('friends', friend, () => {
-                            tempBubbleSettings = {}; // Clear temp after save
-                            showToast('已保存气泡专属设置');
-                        });
-                    }
-                });
-            } else {
-                for (const key in tempBubbleSettings) {
-                    localStorage.setItem(key, tempBubbleSettings[key]);
-                }
-                tempBubbleSettings = {}; // Clear temp after save
-                showToast('已保存气泡全局设置');
-            }
-        }
-        
-        // --- Bubble Presets Logic ---
-        function openBubblePresetModal() {
-            const listContainer = document.getElementById('bubble-preset-list');
-            listContainer.innerHTML = '';
-            
-            let presetNames = new Set();
-
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key.startsWith('bubble_preset_')) {
-                    presetNames.add(key.replace('bubble_preset_', ''));
-                }
-            }
-
-            dbGetAll('theme_settings', items => {
-                if (items) {
-                    items.forEach(item => {
-                        if (String(item.id).startsWith('bubble_preset_')) {
-                            presetNames.add(String(item.id).replace('bubble_preset_', ''));
-                        }
-                    });
-                }
-
-                if (presetNames.size === 0) {
-                    listContainer.innerHTML = '<div style="text-align:center; color:#999; padding:10px; font-size: 13px;">暂无预设</div>';
-                } else {
-                    Array.from(presetNames).sort().forEach(name => {
-                        const item = document.createElement('label');
-                        item.className = 'preset-checkbox-item';
-                        
-                        const checkbox = document.createElement('input');
-                        checkbox.type = 'checkbox';
-                        checkbox.value = name;
-                        
-                        const customCheck = document.createElement('div');
-                        customCheck.className = 'custom-checkbox';
-                        
-                        const span = document.createElement('span');
-                        span.textContent = name;
-                        
-                        item.appendChild(checkbox);
-                        item.appendChild(customCheck);
-                        item.appendChild(span);
-                        listContainer.appendChild(item);
-                    });
-                }
-
-                document.getElementById('bubble-preset-name-input').value = '';
-                document.getElementById('bubble-preset-modal').style.display = 'flex';
-            });
-        }
-
-        function closeBubblePresetModal() {
-            document.getElementById('bubble-preset-modal').style.display = 'none';
-        }
-
-        function saveBubblePreset() {
-            const name = document.getElementById('bubble-preset-name-input').value.trim();
-            if (!name) {
-                showToast('请输入预设名称');
-                return;
-            }
-
-            const bubbleKeys = [
-                'bg_color', 'bg_opacity', 'text_color', 'border_color', 'border_width', 'border_opacity', 
-                'shadow_color', 'shadow_opacity', 'shadow_x', 'shadow_y', 'shadow_blur', 
-                'tail_color', 'hide_triangle', 'radius', 'offset_x', 'offset_y', '3d_effect',
-                'tail_image', 'tail_width', 'tail_height', 'tail_x', 'tail_y', 'tail_rot'
-            ];
-            const cornerKeys = ['img', 'op', 'x', 'y', 'w', 'h'];
-            const sides = ['sent', 'recv'];
-            const corners = ['tl', 'tr', 'bl', 'br'];
-
-            const presetData = {};
-
-            const buildPreset = (friend) => {
-                sides.forEach(side => {
-                    bubbleKeys.forEach(k => {
-                        const fullKey = `bubble_${side}_${k}`;
-                        const value = getBubbleSetting(fullKey, friend);
-                        if (value !== null && value !== undefined) {
-                            presetData[fullKey] = value;
-                        }
-                    });
-                    corners.forEach(corner => {
-                        cornerKeys.forEach(k => {
-                            const fullKey = `bubble_${side}_${corner}_${k}`;
-                            const value = getBubbleSetting(fullKey, friend);
-                            if (value !== null && value !== undefined) {
-                                presetData[fullKey] = value;
-                            }
-                        });
-                    });
-                });
-                
-                // Also save page-level settings
-                const pageBg = getBubbleSetting('bubble_page_bg_image', friend);
-                if (pageBg) presetData['bubble_page_bg_image'] = pageBg;
-                const pageOpacity = getBubbleSetting('bubble_page_bg_opacity', friend);
-                if (pageOpacity) presetData['bubble_page_bg_opacity'] = pageOpacity;
-
-                dbSaveSetting(`bubble_preset_${name}`, JSON.stringify(presetData)).then(() => {
-                    showToast('气泡预设保存成功');
-                    document.getElementById('bubble-preset-name-input').value = '';
-                    openBubblePresetModal(); // 刷新列表
-                }).catch(e => {
-                    showToast('存储空间已满，保存失败，请清理其他预设');
-                    console.error('Save preset error:', e);
-                });
-            };
-
-            if (currentBubbleThemeFriendId) {
-                dbGet('friends', currentBubbleThemeFriendId, friend => {
-                    buildPreset(friend || null);
-                });
-            } else {
-                buildPreset(null);
-            }
-        }
-
-        async function loadBubblePreset() {
-            const checked = document.querySelectorAll('#bubble-preset-list input[type="checkbox"]:checked');
-            if (checked.length !== 1) {
-                showToast('请选择一个预设进行加载');
-                return;
-            }
-            const name = checked[0].value;
-
-            let dataStr = localStorage.getItem(`bubble_preset_${name}`);
-            if (!dataStr) {
-                const item = await new Promise(res => dbGet('theme_settings', `bubble_preset_${name}`, res));
-                if (item) dataStr = item.value;
-            }
-            if (!dataStr) return;
-            const presetData = JSON.parse(dataStr);
-
-            // Clear temp settings and apply loaded preset directly
-            tempBubbleSettings = {};
-            Object.assign(tempBubbleSettings, presetData);
-
-            updateBubbleThemePreview();
-            loadCornerSettings();
-            showToast(`已加载预设：${name}`);
-            closeBubblePresetModal();
-        }
-
-        function deleteBubblePreset() {
-            const checked = document.querySelectorAll('#bubble-preset-list input[type="checkbox"]:checked');
-            if (checked.length === 0) {
-                showToast('请选择要删除的预设');
-                return;
-            }
-            
-            const namesToDelete = Array.from(checked).map(cb => cb.value);
-            
-            showCustomConfirm(`确定要删除选中的 ${namesToDelete.length} 个预设吗？`, () => {
-                const promises = namesToDelete.map(name => {
-                    localStorage.removeItem(`bubble_preset_${name}`);
-                    return dbDeleteSetting(`bubble_preset_${name}`);
-                });
-                Promise.all(promises).then(() => {
-                    showToast('预设已删除');
-                    openBubblePresetModal(); // Refresh list
-                });
-            }, '删除预设');
-        }
-
-        async function exportBubblePresets() {
-            const checked = document.querySelectorAll('#bubble-preset-list input[type="checkbox"]:checked');
-            if (checked.length === 0) {
-                showToast('请选择要导出的预设');
-                return;
-            }
-
-            const presetsToExport = {};
-            for (const cb of Array.from(checked)) {
-                const name = cb.value;
-                let dataStr = localStorage.getItem(`bubble_preset_${name}`);
-                if (!dataStr) {
-                    const item = await new Promise(res => dbGet('theme_settings', `bubble_preset_${name}`, res));
-                    if (item) dataStr = item.value;
-                }
-                if (dataStr) {
-                    presetsToExport[name] = JSON.parse(dataStr);
-                }
-            }
-
-            if (Object.keys(presetsToExport).length === 0) {
-                showToast('没有找到可导出的预设数据');
-                return;
-            }
-
-            const jsonStr = JSON.stringify(presetsToExport, null, 2);
-            const blob = new Blob([jsonStr], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'bubble_presets_backup.json';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-
-        function importBubblePresets(input) {
-            const file = input.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const importedData = JSON.parse(e.target.result);
-                    let importCount = 0;
-                    const promises = [];
-                    for (const name in importedData) {
-                        if (typeof importedData[name] === 'object') {
-                            promises.push(dbSaveSetting(`bubble_preset_${name}`, JSON.stringify(importedData[name])));
-                            importCount++;
-                        }
-                    }
-                    Promise.all(promises).then(() => {
-                        showToast(`成功导入 ${importCount} 个预设`);
-                        openBubblePresetModal(); // Refresh list
-                    }).catch(() => {
-                        showToast('部分预设导入失败，可能是存储空间不足');
-                        openBubblePresetModal();
-                    });
-                } catch (err) {
-                    showToast('导入失败，文件格式错误');
-                    console.error('Preset import error:', err);
-                }
-            };
-            reader.readAsText(file);
-            input.value = ''; // Reset input
-        }
-
-        // Old bubble upload functions removed.
-
-        function resetBubbleTheme() {
-            tempBubbleSettings = {};
-            if (currentBubbleThemeFriendId) {
-                dbGet('friends', currentBubbleThemeFriendId, friend => {
-                    if (friend) {
-                        const keysToRemove = [];
-                        for (let k in friend) {
-                            if (k.startsWith('bubble_')) keysToRemove.push(k);
-                        }
-                        keysToRemove.forEach(k => delete friend[k]);
-                        
-                        dbUpdate('friends', friend, () => {
-                            updateBubbleThemePreview();
-                            loadCornerSettings();
-                            showToast('已恢复为全局设置');
-                        });
-                    }
-                });
-            } else {
-                const keysToRemove = [];
-                for (let i = 0; i < localStorage.length; i++) {
-                    const k = localStorage.key(i);
-                    if (k.startsWith('bubble_') && !k.startsWith('bubble_preset_')) {
-                        keysToRemove.push(k);
-                    }
-                }
-                keysToRemove.forEach(k => localStorage.removeItem(k));
-                
-                updateBubbleThemePreview();
-                loadCornerSettings();
-                showToast('全局设置已恢复默认');
-            }
-        }
-
-        // --- Chat Theme Presets Logic ---
-        function openChatThemePresetModal() {
-            const listContainer = document.getElementById('chat-theme-preset-list');
-            listContainer.innerHTML = '';
-            
-            let presetNames = new Set();
-
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key.startsWith('chat_theme_preset_')) {
-                    presetNames.add(key.replace('chat_theme_preset_', ''));
-                }
-            }
-
-            dbGetAll('theme_settings', items => {
-                if (items) {
-                    items.forEach(item => {
-                        if (String(item.id).startsWith('chat_theme_preset_')) {
-                            presetNames.add(String(item.id).replace('chat_theme_preset_', ''));
-                        }
-                    });
-                }
-
-                if (presetNames.size === 0) {
-                    listContainer.innerHTML = '<div style="text-align:center; color:#999; padding:10px; font-size: 13px;">暂无预设</div>';
-                } else {
-                    Array.from(presetNames).sort().forEach(name => {
-                        const item = document.createElement('label');
-                        item.className = 'preset-checkbox-item';
-                        
-                        const checkbox = document.createElement('input');
-                        checkbox.type = 'checkbox';
-                        checkbox.value = name;
-                        
-                        const customCheck = document.createElement('div');
-                        customCheck.className = 'custom-checkbox';
-                        
-                        const span = document.createElement('span');
-                        span.textContent = name;
-                        
-                        item.appendChild(checkbox);
-                        item.appendChild(customCheck);
-                        item.appendChild(span);
-                        listContainer.appendChild(item);
-                    });
-                }
-
-                document.getElementById('chat-theme-preset-name-input').value = '';
-                document.getElementById('chat-theme-preset-modal').style.display = 'flex';
-            });
-        }
-
-        function closeChatThemePresetModal() {
-            document.getElementById('chat-theme-preset-modal').style.display = 'none';
-        }
-
-        function saveChatThemePreset() {
-            const name = document.getElementById('chat-theme-preset-name-input').value.trim();
-            if (!name) {
-                showToast('请输入预设名称');
-                return;
-            }
-
-            const presetData = {};
-
-            const getUrlFromStyle = (style) => {
-                if (style && style !== 'none' && style.includes('url(')) {
-                    const match = style.match(/url\("?([^"]+)"?\)/);
-                    return match ? match[1] : null;
-                }
-                return null;
-            };
-
-            presetData.chat_wallpaper = getUrlFromStyle(document.getElementById('chat-wallpaper-preview').style.backgroundImage);
-            presetData.chat_header_bg = getUrlFromStyle(document.getElementById('chat-header-bg-preview').style.backgroundImage);
-            presetData.chat_input_bg = getUrlFromStyle(document.getElementById('chat-input-bg-preview').style.backgroundImage);
-
-            const icons = ['back', 'options', 'voice', 'emoji', 'plus', 'send'];
-            icons.forEach(icon => {
-                const key = `chat_${icon}_icon`;
-                const box = document.getElementById(`chat-${icon}-icon-preview`);
-                presetData[key] = getUrlFromStyle(box.style.backgroundImage);
-            });
-
-            presetData.chat_avatar_size = document.getElementById('chat-avatar-size-slider').value;
-            presetData.chat_avatar_radius = document.getElementById('chat-avatar-radius-slider').value;
-
-            dbSaveSetting(`chat_theme_preset_${name}`, JSON.stringify(presetData)).then(() => {
-                showToast('聊天界面预设保存成功');
-                document.getElementById('chat-theme-preset-name-input').value = '';
-                openChatThemePresetModal(); // 刷新列表
-            }).catch(e => {
-                showToast('存储空间已满，保存失败，请清理其他预设');
-                console.error('Save preset error:', e);
-            });
-        }
-
-        async function loadChatThemePreset() {
-            const checked = document.querySelectorAll('#chat-theme-preset-list input[type="checkbox"]:checked');
-            if (checked.length !== 1) {
-                showToast('请选择一个预设进行加载');
-                return;
-            }
-            const name = checked[0].value;
-
-            let dataStr = localStorage.getItem(`chat_theme_preset_${name}`);
-            if (!dataStr) {
-                const item = await new Promise(res => dbGet('theme_settings', `chat_theme_preset_${name}`, res));
-                if (item) dataStr = item.value;
-            }
-            if (!dataStr) return;
-            const presetData = JSON.parse(dataStr);
-
-            if (currentChatThemeFriendId) {
-                dbGet('friends', currentChatThemeFriendId, friend => {
-                    if (friend) {
-                        for (const key in presetData) {
-                            friend[key] = presetData[key];
-                        }
-                        dbUpdate('friends', friend, () => {
-                            updateChatThemePreview();
-                            showToast(`已为当前角色加载预设：${name}`);
-                            closeChatThemePresetModal();
-                        });
-                    }
-                });
-            } else {
-                // For global settings, update IndexedDB and cache
-                const promises = [];
-                for (const key in presetData) {
-                    // Ensure null values are handled correctly to reset properties
-                    promises.push(dbSaveSetting(key, presetData[key]));
-                }
-                await Promise.all(promises);
-                
+                localStorage.removeItem('chat_wallpaper');
                 updateChatThemePreview();
-                showToast(`已加载全局预设：${name}`);
-                closeChatThemePresetModal();
+                showToast('全局背景已恢复默认');
             }
-        }
-
-        function deleteChatThemePreset() {
-            const checked = document.querySelectorAll('#chat-theme-preset-list input[type="checkbox"]:checked');
-            if (checked.length === 0) {
-                showToast('请选择要删除的预设');
-                return;
-            }
-            
-            const namesToDelete = Array.from(checked).map(cb => cb.value);
-            
-            showCustomConfirm(`确定要删除选中的 ${namesToDelete.length} 个预设吗？`, () => {
-                const promises = namesToDelete.map(name => {
-                    localStorage.removeItem(`chat_theme_preset_${name}`);
-                    return dbDeleteSetting(`chat_theme_preset_${name}`);
-                });
-                Promise.all(promises).then(() => {
-                    showToast('预设已删除');
-                    openChatThemePresetModal(); // Refresh list
-                });
-            }, '删除预设');
-        }
-
-        async function exportChatThemePresets() {
-            const checked = document.querySelectorAll('#chat-theme-preset-list input[type="checkbox"]:checked');
-            if (checked.length === 0) {
-                showToast('请选择要导出的预设');
-                return;
-            }
-
-            const presetsToExport = {};
-            for (const cb of Array.from(checked)) {
-                const name = cb.value;
-                let dataStr = localStorage.getItem(`chat_theme_preset_${name}`);
-                if (!dataStr) {
-                    const item = await new Promise(res => dbGet('theme_settings', `chat_theme_preset_${name}`, res));
-                    if (item) dataStr = item.value;
-                }
-                if (dataStr) {
-                    presetsToExport[name] = JSON.parse(dataStr);
-                }
-            }
-
-            if (Object.keys(presetsToExport).length === 0) {
-                showToast('没有找到可导出的预设数据');
-                return;
-            }
-
-            const jsonStr = JSON.stringify(presetsToExport, null, 2);
-            const blob = new Blob([jsonStr], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'chat_theme_presets_backup.json';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-
-        function importChatThemePresets(input) {
-            const file = input.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const importedData = JSON.parse(e.target.result);
-                    let importCount = 0;
-                    const promises = [];
-                    for (const name in importedData) {
-                        if (typeof importedData[name] === 'object') {
-                            promises.push(dbSaveSetting(`chat_theme_preset_${name}`, JSON.stringify(importedData[name])));
-                            importCount++;
-                        }
-                    }
-                    Promise.all(promises).then(() => {
-                        showToast(`成功导入 ${importCount} 个预设`);
-                        openChatThemePresetModal(); // Refresh list
-                    }).catch(() => {
-                        showToast('部分预设导入失败，可能是存储空间不足');
-                        openChatThemePresetModal();
-                    });
-                } catch (err) {
-                    showToast('导入失败，文件格式错误');
-                    console.error('Preset import error:', err);
-                }
-            };
-            reader.readAsText(file);
-            input.value = ''; // Reset input
-        }
-
-        let currentFontData = { type: null, value: null, name: null, file: null };
-        let activeFontBlobUrl = null;
-
-        function handleFontUpload(input) {
-            if (input.files && input.files[0]) {
-                const file = input.files[0];
-                document.getElementById('font-file-name').textContent = file.name;
-                currentFontData = { type: 'file', file: file, name: file.name };
-                document.getElementById('font-url-input').value = ''; // clear url if file uploaded
-            }
-        }
-
-        function applyGlobalFont() {
-            const urlInput = document.getElementById('font-url-input').value.trim();
-            if (urlInput) {
-                currentFontData = { type: 'url', value: urlInput, name: 'custom_url' };
-            }
-
-            if (!currentFontData.value && !currentFontData.file) {
-                showToast('请输入字体链接或上传字体文件');
-                return;
-            }
-
-            showToast('正在应用字体...');
-            dbGet('user_profile', 'main_user', profile => {
-                const updatedProfile = profile || { id: 'main_user' };
-                updatedProfile.globalFont = currentFontData;
-                dbUpdate('user_profile', updatedProfile, () => {
-                    loadGlobalFont();
-                    showToast('全局字体已应用');
-                });
-            });
-        }
-
-        function resetGlobalFont() {
-            document.getElementById('font-url-input').value = '';
-            document.getElementById('font-file-name').textContent = '未选择文件';
-            document.getElementById('font-file-input').value = '';
-            currentFontData = { type: null, value: null, name: null };
-            
-            dbGet('user_profile', 'main_user', profile => {
-                if (profile) {
-                    profile.globalFont = null;
-                    dbUpdate('user_profile', profile, () => {
-                        loadGlobalFont();
-                        showToast('已恢复默认字体');
-                    });
-                } else {
-                    loadGlobalFont();
-                }
-            });
-        }
-
-        function loadGlobalFont() {
-            dbGet('user_profile', 'main_user', profile => {
-                let styleEl = document.getElementById('custom-global-font-style');
-                if (!styleEl) {
-                    styleEl = document.createElement('style');
-                    styleEl.id = 'custom-global-font-style';
-                    document.head.appendChild(styleEl);
-                }
-                
-                if (activeFontBlobUrl) {
-                    URL.revokeObjectURL(activeFontBlobUrl);
-                    activeFontBlobUrl = null;
-                }
-
-                if (profile && profile.globalFont && (profile.globalFont.value || profile.globalFont.file)) {
-                    const font = profile.globalFont;
-                    let src = '';
-                    
-                    if (font.type === 'file') {
-                        const blob = font.file;
-                        if (blob instanceof Blob || blob instanceof File) {
-                            activeFontBlobUrl = URL.createObjectURL(blob);
-                            src = `url("${activeFontBlobUrl}")`;
-                        } else if (font.value) {
-                            src = `url("${font.value}")`;
-                        }
-                    } else {
-                        src = `url('${font.value}')`;
-                    }
-                    
-                    if (src) {
-                        const fontName = 'CustomGlobalFont_' + Date.now();
-                        styleEl.innerHTML = `
-                            @font-face {
-                                font-family: '${fontName}';
-                                src: ${src};
-                                font-display: swap;
-                            }
-                            body, .phone-container, input, textarea, select, button, .chat-input, [contenteditable] {
-                                font-family: '${fontName}', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
-                            }
-                        `;
-                    }
-                    
-                    const urlInput = document.getElementById('font-url-input');
-                    const fileName = document.getElementById('font-file-name');
-                    if (urlInput && fileName) {
-                        if (font.type === 'url') {
-                            urlInput.value = font.value;
-                            fileName.textContent = '未选择文件';
-                            currentFontData = font;
-                        } else if (font.type === 'file') {
-                            urlInput.value = '';
-                            fileName.textContent = font.name || '已上传自定义字体';
-                            currentFontData = font;
-                        }
-                    }
-                } else {
-                    styleEl.innerHTML = '';
-                    const urlInput = document.getElementById('font-url-input');
-                    const fileName = document.getElementById('font-file-name');
-                    if (urlInput) urlInput.value = '';
-                    if (fileName) fileName.textContent = '未选择文件';
-                }
-            });
         }
 
         function initDiscoverScroll() {
@@ -1616,8 +310,6 @@
             // trigger an initial scroll check
             const scrollArea = document.getElementById('discover-scroll-area');
             if (scrollArea) scrollArea.dispatchEvent(new Event('scroll'));
-            
-            checkDiscoverNotifications();
 
             dbGet('user_profile', 'main_user', profile => {
                 const avatar = document.getElementById('discover-avatar');
@@ -1640,7 +332,7 @@
                 }
             });
             
-            const coverUrl = themeSettings['discover_cover'] || localStorage.getItem('discover_cover');
+            const coverUrl = localStorage.getItem('discover_cover');
             if (coverUrl) {
                 document.getElementById('discover-cover-container').style.backgroundImage = `url(${coverUrl})`;
             }
@@ -1652,13 +344,6 @@
             // Trigger reflow to ensure transition works
             void overlay.offsetWidth;
             overlay.classList.add('show');
-        }
-
-        function toggleRoleMomentDelete(isChecked) {
-            localStorage.setItem('show_role_moment_delete_button', isChecked);
-            if (document.getElementById('wechat-discover-page').classList.contains('active')) {
-                renderDiscoverFeed();
-            }
         }
 
         function closeDiscoverActionSheet(e) {
@@ -1679,247 +364,9 @@
                 if (action === 'post') {
                     openPostDiscoverModal();
                 } else if (action === 'roles') {
-                    openRoleMomentsModal();
+                    showToast('功能尚未开发');
                 }
             }, 300);
-        }
-
-        function openRoleMomentsModal() {
-            document.getElementById('role-moments-modal').style.display = 'flex';
-
-            const deleteToggle = document.getElementById('role-moment-delete-toggle');
-            const showDelete = localStorage.getItem('show_role_moment_delete_button') === 'true';
-            deleteToggle.checked = showDelete;
-
-            const toggle = document.getElementById('role-auto-post-toggle');
-            const isEnabled = localStorage.getItem('global_auto_post_moments') === 'true';
-            toggle.checked = isEnabled;
-            
-            const listContainer = document.getElementById('role-auto-post-list-container');
-            listContainer.style.display = isEnabled ? 'flex' : 'none';
-            listContainer.innerHTML = '';
-            
-            const singleSelect = document.getElementById('single-manual-role-select');
-            if (singleSelect) {
-                singleSelect.innerHTML = '';
-            }
-            
-            dbGetAll('friends', allFriends => {
-                const friends = allFriends.filter(f => !f.isGroup);
-                friends.forEach(friend => {
-                    const label = document.createElement('label');
-                    label.className = 'preset-checkbox-item';
-                    label.style.padding = '5px 0';
-                    
-                    const checkbox = document.createElement('input');
-                    checkbox.type = 'checkbox';
-                    checkbox.value = friend.id;
-                    if (friend.autoPostMoments) {
-                        checkbox.checked = true;
-                    }
-                    
-                    const customCheck = document.createElement('div');
-                    customCheck.className = 'custom-checkbox';
-                    
-                    const span = document.createElement('span');
-                    span.textContent = friend.name;
-                    
-                    label.appendChild(checkbox);
-                    label.appendChild(customCheck);
-                    label.appendChild(span);
-                    listContainer.appendChild(label);
-
-                    if (singleSelect) {
-                        const option = document.createElement('option');
-                        option.value = friend.id;
-                        option.textContent = friend.name;
-                        singleSelect.appendChild(option);
-                    }
-                });
-
-                if (singleSelect) {
-                    refreshCustomSelect(singleSelect);
-                }
-            });
-        }
-
-        function closeRoleMomentsModal() {
-            document.getElementById('role-moments-modal').style.display = 'none';
-        }
-
-        function toggleRoleAutoPost(isChecked) {
-            document.getElementById('role-auto-post-list-container').style.display = isChecked ? 'flex' : 'none';
-        }
-
-        async function triggerSingleManualMomentGeneration() {
-            const selectEl = document.getElementById('single-manual-role-select');
-            if (!selectEl || !selectEl.value) {
-                showToast('请先选择一个角色');
-                return;
-            }
-            const friendId = selectEl.value;
-            
-            const btn = document.getElementById('single-manual-generate-btn');
-            if (btn.disabled) return;
-            
-            const configStr = localStorage.getItem('globalConfig');
-            const config = configStr ? JSON.parse(configStr) : {};
-            if (!config.apiKey || !config.model) {
-                showToast('请先配置API');
-                return;
-            }
-            closeRoleMomentsModal()
-            btn.disabled = true;
-            btn.textContent = '生成中...';
-
-            dbGet('friends', friendId, async friend => {
-                if (friend) {
-                    try {
-                        await generateMomentForCharacter(friend, config);
-                        showToast(`${friend.name}发了一条朋友圈。`);
-                        if (document.getElementById('wechat-discover-page').classList.contains('active')) {
-                            renderDiscoverFeed();
-                        }
-                    } catch (e) {
-                        console.error(`Error generating moment for ${friend.name}:`, e);
-                        showToast('生成失败，请重试');
-                    }
-                } else {
-                    showToast('未找到角色');
-                }
-                btn.disabled = false;
-                btn.textContent = '手动生成';
-            });
-        }
-
-        async function generateMomentForCharacter(friend, config) {
-            let userPersona = null;
-            if (friend.myPersonaId) {
-                userPersona = await new Promise(resolve => dbGet('my_personas', friend.myPersonaId, resolve));
-            }
-
-            const visiblePosts = await new Promise(resolve => {
-                dbGetAll('discover_posts', posts => {
-                    dbGetAll('friends', allFriends => {
-                        const vp = posts.filter(p => canBotSeePost(friend, p, allFriends)).sort((a,b) => b.timestamp - a.timestamp).slice(0, 5);
-                        resolve(vp);
-                    });
-                });
-            });
-
-            // 获取带角色的专属表情
-            let aiStickers = await new Promise(resolve => {
-                try {
-                    const transaction = db.transaction(['ai_stickers'], 'readonly');
-                    const store = transaction.objectStore('ai_stickers');
-                    const index = store.index('friendId');
-                    const req = index.getAll(friend.id);
-                    req.onsuccess = () => resolve(req.result);
-                    req.onerror = () => resolve([]);
-                } catch(e) {
-                    resolve([]);
-                }
-            });
-
-            const systemPrompt = buildSystemPrompt(friend, userPersona, aiStickers, visiblePosts);
-            let momentPrompt = "【系统指令】请结合你的人设、当前的聊天记忆或者最近的世界事件，发布一条符合你设定的“朋友圈动态”。\n要求：\n1. 可以简短如一句吐槽，也可以是对某件事的感慨，务必口语化、符合身份。\n2. 如果你认为这条动态需要配图，可以直接在动态文字后输出一个对应的表情包XML标签（例如 <sticker>xxx</sticker>），不要解释。\n3. 请直接输出动态的最终文本内容（和可选的标签），不要输出包含“我的朋友圈”、“发布动态”等旁白解释。\n";
-            
-            // 找出该角色最新的一条朋友圈，防止重复
-            const myLatestPost = visiblePosts.find(p => p.authorId === friend.id);
-            if (myLatestPost && myLatestPost.text) {
-                momentPrompt += `4. 【重要禁忌】：你上一次发的朋友圈内容是：“${myLatestPost.text}”。请确保这次发的**内容、话题和感慨方向与上次完全不同**，绝对不要重复或高度相似！\n`;
-            }
-
-            const history = await new Promise(resolve => {
-                const tx = db.transaction(['chat_history'], 'readonly');
-                const store = tx.objectStore('chat_history');
-                const idx = store.index('friendId');
-                const req = idx.getAll(friend.id);
-                req.onsuccess = () => {
-                    const msgs = req.result;
-                    const shortTermCount = parseInt(friend.shortTermMemory || '20', 10);
-                    resolve(msgs.slice(-shortTermCount));
-                };
-                req.onerror = () => resolve([]);
-            });
-
-            history.push({
-                type: 'system',
-                text: momentPrompt,
-                timestamp: Date.now()
-            });
-
-            let aiResponseText = await callLLM(config, systemPrompt, history);
-            if (!aiResponseText) return;
-
-            // Remove any inner_thought/mood wrappers they might accidentally use for the post
-            aiResponseText = aiResponseText.replace(/<(?:inner_thought|thought)>(.*?)<\/(?:inner_thought|thought)>/gis, '').trim();
-            aiResponseText = aiResponseText.replace(/<mood>(.*?)<\/mood>/gis, '').trim();
-
-            let postText = aiResponseText;
-            let postImages = [];
-
-            // Check if there's a sticker included
-            const stickerRegex = /<sticker>(.*?)<\/sticker>/g;
-            let match;
-            while ((match = stickerRegex.exec(postText)) !== null) {
-                const stickerValue = match[1].trim();
-                const matchedSticker = aiStickers.find(s => String(s.id) === stickerValue);
-                if (matchedSticker) {
-                    postImages.push(matchedSticker.src);
-                } else if (stickerValue.startsWith('http') || stickerValue.startsWith('data:')) {
-                    postImages.push(stickerValue);
-                }
-            }
-            postText = postText.replace(stickerRegex, '').trim();
-
-            const newPost = {
-                id: Date.now().toString() + Math.floor(Math.random()*1000),
-                authorId: friend.id,
-                authorName: friend.realName || friend.name,
-                authorAvatar: friend.avatar,
-                authorGroup: friend.group || '默认分组',
-                text: postText,
-                images: postImages,
-                visibility: '公开', // bots post publicly to their group by default
-                visibilityRoles: [],
-                timestamp: Date.now(),
-                likes: [],
-                comments: []
-            };
-
-            await new Promise(resolve => dbAdd('discover_posts', newPost, resolve));
-
-            // 更新角色的自动发送时间
-            friend.lastAutoPostTime = Date.now();
-            await new Promise(resolve => dbUpdate('friends', friend, resolve));
-
-            // Trigger reactions from others
-            triggerBotInteractionsForPost(newPost.id);
-        }
-
-        function saveRoleMomentsSettings() {
-            const isEnabled = document.getElementById('role-auto-post-toggle').checked;
-            localStorage.setItem('global_auto_post_moments', isEnabled);
-            
-            const checkboxes = document.querySelectorAll('#role-auto-post-list-container input[type="checkbox"]');
-            
-            dbGetAll('friends', friends => {
-                let promises = [];
-                checkboxes.forEach(cb => {
-                    const friend = friends.find(f => f.id === cb.value);
-                    if (friend) {
-                        if (friend.autoPostMoments !== cb.checked) {
-                            friend.autoPostMoments = cb.checked;
-                            promises.push(new Promise(res => dbUpdate('friends', friend, res)));
-                        }
-                    }
-                });
-                Promise.all(promises).then(() => {
-                    showToast('角色发朋友圈设置已保存');
-                    closeRoleMomentsModal();
-                });
-            });
         }
 
         function triggerDiscoverCoverUpload() {
@@ -1928,15 +375,13 @@
 
         function handleDiscoverCoverUpload(input) {
             if (input.files && input.files[0]) {
-                compressImage(input.files[0], 0.8, (compressedSrc) => {
-                    document.getElementById('discover-cover-container').style.backgroundImage = `url(${compressedSrc})`;
-                    dbSaveSetting('discover_cover', compressedSrc).then(() => {
-                        localStorage.removeItem('discover_cover'); // Clean up old storage
-                        showToast('封面已更新');
-                    }).catch(err => {
-                        showToast('封面保存失败，存储空间可能已满');
-                    });
-                });
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const imageUrl = e.target.result;
+                    document.getElementById('discover-cover-container').style.backgroundImage = `url(${imageUrl})`;
+                    localStorage.setItem('discover_cover', imageUrl);
+                }
+                reader.readAsDataURL(input.files[0]);
             }
         }
 
@@ -2103,29 +548,19 @@
             document.getElementById('post-visibility-text').textContent = text + ' 〉';
         }
 
-        function canBotSeePost(friend, post, allFriends = null) {
-            if (post.authorId === 'main_user') {
-                if (post.visibility === '公开') return true;
-                if (post.visibility === '私密') return false;
-                const roleIds = post.visibilityRoles.map(r => String(r.id));
-                if (post.visibility === '部分可见') {
-                    return roleIds.includes(String(friend.id));
-                }
-                if (post.visibility === '不给谁看') {
-                    return !roleIds.includes(String(friend.id));
-                }
-                return true;
-            } else {
-                if (post.authorId === friend.id) return true;
-                
-                let authorGroup = post.authorGroup;
-                if (!authorGroup && allFriends) {
-                    const author = allFriends.find(f => f.id === post.authorId);
-                    if (author) authorGroup = author.group || '默认分组';
-                }
-                const myGroup = friend.group || '默认分组';
-                return authorGroup === myGroup;
+        function canBotSeePost(friend, post) {
+            if (post.authorId !== 'main_user') return true; 
+            if (post.visibility === '公开') return true;
+            if (post.visibility === '私密') return false;
+            
+            const roleIds = post.visibilityRoles.map(r => String(r.id));
+            if (post.visibility === '部分可见') {
+                return roleIds.includes(String(friend.id));
             }
+            if (post.visibility === '不给谁看') {
+                return !roleIds.includes(String(friend.id));
+            }
+            return true;
         }
 
         async function triggerBotInteractionsForPost(postId) {
@@ -2138,7 +573,7 @@
                 if (!post) return;
 
                 dbGetAll('friends', friends => {
-                    const eligibleFriends = friends.filter(f => !f.isGroup && canBotSeePost(f, post, friends));
+                    const eligibleFriends = friends.filter(f => canBotSeePost(f, post));
                     if (eligibleFriends.length === 0) return;
 
                     const grouped = {};
@@ -2217,11 +652,7 @@
                     });
                     prompt += `\n${chatContextStr}\n`;
 
-                    let postAuthorDisplayName = '用户';
-                    if (post.authorId !== 'main_user') {
-                        postAuthorDisplayName = post.authorName || '一位朋友';
-                    }
-                    prompt += `\n【当前场景：朋友圈动态互动】\n${postAuthorDisplayName}发布了一条动态：\n内容：${post.text || '无'}\n`;
+                    prompt += `\n【当前场景：朋友圈动态互动】\n用户发布了一条动态：\n内容：${post.text || '无'}\n`;
                     if (post.images && post.images.length > 0) {
                         prompt += `附带了 ${post.images.length} 张图片。\n`;
                     }
@@ -2274,31 +705,20 @@
                         }
                         const action = JSON.parse(jsonStr);
 
-                        // Re-fetch the latest post to prevent race conditions
-                        const latestPost = await new Promise(res => dbGet('discover_posts', postId, res));
-                        if (!latestPost) return;
-
                         let updated = false;
-                        let newlyAddedLike = false;
-                        
-                        // Check if already liked in the latest version
-                        const alreadyLiked = latestPost.likes && (latestPost.likes.includes(friend.id) || latestPost.likes.includes(friend.realName) || latestPost.likes.includes(friend.name));
-
-                        if (action.like && !alreadyLiked) {
-                            if (!latestPost.likes) latestPost.likes = [];
-                            latestPost.likes.push(friend.id);
+                        if (action.like && !hasLiked) {
+                            if (!post.likes) post.likes = [];
+                            post.likes.push(friend.id);
                             updated = true;
-                            newlyAddedLike = true;
                         }
 
-                        let newComments = [];
                         if (action.comment && typeof action.comment === 'string' && action.comment.trim() !== '' && action.comment !== 'null') {
-                            if (!latestPost.comments) latestPost.comments = [];
+                            if (!post.comments) post.comments = [];
                             let depth = 0;
                             let shouldBlock = false;
 
                             if (action.replyToId && action.replyToId !== 'null') {
-                                const targetComment = latestPost.comments.find(c => String(c.id) === String(action.replyToId));
+                                const targetComment = post.comments.find(c => String(c.id) === String(action.replyToId));
                                 if (targetComment) {
                                     // 强制拦截非法回复
                                     if (targetComment.authorId !== 'main_user' && (myReplyCounts[targetComment.authorId] || 0) >= 2) {
@@ -2313,7 +733,7 @@
                             }
                             
                             if (!shouldBlock) {
-                                const newComment = {
+                                post.comments.push({
                                     id: Date.now().toString() + Math.floor(Math.random()*1000),
                                     authorId: friend.id,
                                     authorName: friend.realName,
@@ -2322,60 +742,13 @@
                                     replyToId: action.replyToId,
                                     timestamp: Date.now(),
                                     depth: depth
-                                };
-                                latestPost.comments.push(newComment);
-                                newComments.push(newComment);
+                                });
                                 updated = true;
                             }
                         }
 
                         if (updated) {
-                            await new Promise(res => dbUpdate('discover_posts', latestPost, res));
-                            
-                            let notifyUser = false;
-                            let actionType = '';
-                            let actionText = '';
-                            
-                            // Use latestPost for notification logic
-                            if (latestPost.authorId === 'main_user') {
-                                notifyUser = true;
-                            } else {
-                                if (newComments.length > 0 && newComments[0].replyToId) {
-                                    const targetComment = latestPost.comments.find(c => String(c.id) === String(newComments[0].replyToId));
-                                    if (targetComment && targetComment.authorId === 'main_user') {
-                                        notifyUser = true;
-                                    }
-                                }
-                            }
-
-                            if (notifyUser) {
-                                if (newComments.length > 0) {
-                                    actionType = 'comment';
-                                    actionText = newComments[0].text;
-                                } else if (newlyAddedLike) {
-                                    actionType = 'like';
-                                    actionText = '赞了你的朋友圈';
-                                }
-
-                                if (actionType) {
-                                    const notif = {
-                                        id: Date.now().toString() + Math.floor(Math.random() * 1000),
-                                        toId: 'main_user',
-                                        fromId: friend.id,
-                                        fromName: friend.name,
-                                        fromAvatar: friend.avatar,
-                                        postId: latestPost.id,
-                                        postContent: latestPost.text || (latestPost.images && latestPost.images.length > 0 ? '[图片]' : ''),
-                                        type: actionType,
-                                        text: actionText,
-                                        timestamp: Date.now(),
-                                        isRead: false
-                                    };
-                                    await new Promise(res => dbAdd('discover_notifications', notif, res));
-                                    checkDiscoverNotifications();
-                                }
-                            }
-
+                            await new Promise(res => dbUpdate('discover_posts', post, res));
                             if (document.getElementById('wechat-discover-page').classList.contains('active')) {
                                 renderDiscoverFeed();
                             }
@@ -2459,37 +832,19 @@
                                 imagesHtml += `</div>`;
                             }
 
-                            const now = new Date();
-                            const postDate = new Date(post.timestamp);
-                            const timeDiff = now - postDate;
-                            const diffMinutes = Math.floor(timeDiff / 60000);
-                            const diffHours = Math.floor(timeDiff / 3600000);
-                            
-                            let timeStr = '';
-                            if (diffMinutes < 1) {
-                                timeStr = '刚刚';
-                            } else if (diffMinutes < 60) {
-                                timeStr = `${diffMinutes}分钟前`;
-                            } else if (now.toDateString() === postDate.toDateString()) {
-                                timeStr = `${diffHours}小时前`;
-                            } else {
-                                const yesterday = new Date(now);
-                                yesterday.setDate(yesterday.getDate() - 1);
-                                if (yesterday.toDateString() === postDate.toDateString()) {
-                                    timeStr = '昨天';
-                                } else if (now.getFullYear() === postDate.getFullYear()) {
-                                    timeStr = `${postDate.getMonth() + 1}月${postDate.getDate()}日`;
-                                } else {
-                                    timeStr = `${postDate.getFullYear()}年${postDate.getMonth() + 1}月${postDate.getDate()}日`;
-                                }
+                            const timeDiff = Date.now() - post.timestamp;
+                            let timeStr = '刚刚';
+                            if (timeDiff > 86400000) {
+                                const d = new Date(post.timestamp);
+                                timeStr = `${d.getMonth()+1}-${d.getDate()}`;
+                            } else if (timeDiff > 3600000) {
+                                timeStr = `${Math.floor(timeDiff/3600000)}小时前`;
+                            } else if (timeDiff > 60000) {
+                                timeStr = `${Math.floor(timeDiff/60000)}分钟前`;
                             }
 
                             let deleteHtml = '';
-                            const showRoleDelete = localStorage.getItem('show_role_moment_delete_button') === 'true';
-
                             if (post.authorId === 'main_user') {
-                                deleteHtml = `<span class="discover-post-delete" onclick="deleteDiscoverPost('${post.id}')">删除</span>`;
-                            } else if (showRoleDelete) {
                                 deleteHtml = `<span class="discover-post-delete" onclick="deleteDiscoverPost('${post.id}')">删除</span>`;
                             }
 
@@ -2575,18 +930,18 @@
                                                 rName = myName;
                                             } else if (targetAuthorId) {
                                                 const rf = friends.find(f => f.id === targetAuthorId);
-                                                if (rf) rName = rf.name;
+                                                if (rf) rName = rf.realName || rf.name;
                                             } else if (comment.replyTo) {
                                                 const rf = friends.find(f => f.realName === comment.replyTo || f.name === comment.replyTo);
-                                                if (rf) rName = rf.name;
+                                                if (rf) rName = rf.realName || rf.name;
                                             }
                                             replyText = ` 回复 <span class="discover-comment-name">${rName}</span>`;
                                         }
                                         
-                                        // Use data attributes for event binding later
+                                        // Pass comment.id to openCommentDrawer, and cAuthorName (display name)
                                         interactionsHtml += `
-                                            <div class="discover-comment-item" data-post-id="${post.id}" data-comment-id="${comment.id || ''}" data-author-id="${comment.authorId}" data-author-name="${cAuthorName}" data-depth="${comment.depth || 0}">
-                                                <span class="discover-comment-name">${cAuthorName}</span>${replyText}：<span class="discover-comment-text">${comment.text}</span>
+                                            <div class="discover-comment-item" onclick="openCommentDrawer('${post.id}', '${cAuthorName}', '${comment.id || ''}', ${comment.depth || 0})">
+                                                <span class="discover-comment-name">${cAuthorName}</span>${replyText}：${comment.text}
                                             </div>
                                         `;
                                     });
@@ -2616,72 +971,6 @@
                                 </div>
                             `;
                             container.appendChild(postEl);
-                            
-                            // Bind events for comments in this post
-                            postEl.querySelectorAll('.discover-comment-item').forEach(item => {
-                                let pressTimer;
-                                let isLongPress = false;
-                                let startX, startY;
-                                
-                                const postId = item.dataset.postId;
-                                const commentId = item.dataset.commentId;
-                                const authorId = item.dataset.authorId;
-                                const authorName = item.dataset.authorName;
-                                const depth = item.dataset.depth;
-                                
-                                const startPress = (e) => {
-                                    if (e.button === 2) return;
-                                    isLongPress = false;
-                                    startX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-                                    startY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
-                                    
-                                    pressTimer = setTimeout(() => {
-                                        isLongPress = true;
-                                        e.preventDefault();
-                                        showDiscoverCommentContextMenu(e, postId, commentId, authorId);
-                                    }, 500);
-                                };
-
-                                const cancelPress = (moveEvent) => {
-                                    let moveX = moveEvent.type.includes('touch') ? moveEvent.touches[0].clientX : moveEvent.clientX;
-                                    let moveY = moveEvent.type.includes('touch') ? moveEvent.touches[0].clientY : moveEvent.clientY;
-                                    if (Math.abs(moveX - startX) > 10 || Math.abs(moveY - startY) > 10) {
-                                        clearTimeout(pressTimer);
-                                    }
-                                };
-
-                                const endPress = (e) => {
-                                    clearTimeout(pressTimer);
-                                    if (isLongPress) {
-                                        if (e.cancelable) e.preventDefault();
-                                    }
-                                };
-                                
-                                const onClick = (e) => {
-                                    if (isLongPress) {
-                                        e.preventDefault();
-                                        isLongPress = false;
-                                    } else {
-                                        openCommentDrawer(postId, authorName, commentId, depth);
-                                    }
-                                };
-
-                                item.addEventListener('mousedown', startPress);
-                                item.addEventListener('touchstart', startPress, { passive: false });
-                                item.addEventListener('mouseup', endPress);
-                                item.addEventListener('mouseleave', endPress);
-                                item.addEventListener('touchend', endPress);
-                                item.addEventListener('touchcancel', endPress);
-                                item.addEventListener('mousemove', cancelPress);
-                                item.addEventListener('touchmove', cancelPress);
-                                item.addEventListener('contextmenu', (e) => { 
-                                    e.preventDefault(); 
-                                    if (!isLongPress) {
-                                        showDiscoverCommentContextMenu(e, postId, commentId, authorId); 
-                                    }
-                                });
-                                item.addEventListener('click', onClick);
-                            });
                         });
                     });
                 });
@@ -2753,131 +1042,6 @@
                 }
             });
         }
-
-        let activeDcPostId = null;
-        let activeDcCommentId = null;
-        const dcContextMenu = document.getElementById('discover-comment-context-menu');
-
-        document.addEventListener('click', (e) => {
-            if (dcContextMenu && dcContextMenu.style.display === 'flex' && !e.target.closest('.message-context-menu')) {
-                dcContextMenu.style.display = 'none';
-                activeDcPostId = null;
-                activeDcCommentId = null;
-            }
-        });
-
-        function showDiscoverCommentContextMenu(e, postId, commentId, authorId) {
-            activeDcPostId = postId;
-            activeDcCommentId = commentId;
-
-            // 如果是用户自己发的评论，不显示重试按钮
-            const isMe = authorId === 'main_user';
-            document.getElementById('dc-ctx-retry').style.display = isMe ? 'none' : 'block';
-
-            dcContextMenu.style.display = 'flex';
-            
-            const phoneContainer = document.querySelector('.phone-container');
-            const phoneRect = phoneContainer.getBoundingClientRect();
-            
-            let top = (e.clientY || e.touches[0].clientY) - phoneRect.top;
-            let left = (e.clientX || e.touches[0].clientX) - phoneRect.left;
-
-            if (top + dcContextMenu.offsetHeight > phoneContainer.clientHeight) {
-                top = phoneContainer.clientHeight - dcContextMenu.offsetHeight - 10;
-            }
-            if (left + dcContextMenu.offsetWidth > phoneContainer.clientWidth) {
-                left = phoneContainer.clientWidth - dcContextMenu.offsetWidth - 10;
-            }
-
-            dcContextMenu.style.top = `${top}px`;
-            dcContextMenu.style.left = `${left}px`;
-        }
-
-        document.getElementById('dc-ctx-delete').addEventListener('click', () => {
-            if (activeDcPostId && activeDcCommentId) {
-                showCustomConfirm('确定要删除这条评论吗？', () => {
-                    dbGet('discover_posts', activeDcPostId, post => {
-                        if (post && post.comments) {
-                            post.comments = post.comments.filter(c => String(c.id) !== String(activeDcCommentId));
-                            dbUpdate('discover_posts', post, () => {
-                                renderDiscoverFeed();
-                            });
-                        }
-                    });
-                }, '删除评论');
-            }
-            dcContextMenu.style.display = 'none';
-        });
-
-        document.getElementById('dc-ctx-edit').addEventListener('click', () => {
-            if (activeDcPostId && activeDcCommentId) {
-                dbGet('discover_posts', activeDcPostId, post => {
-                    if (post && post.comments) {
-                        const comment = post.comments.find(c => String(c.id) === String(activeDcCommentId));
-                        if (comment) {
-                            document.getElementById('edit-discover-comment-content').value = comment.text;
-                            document.getElementById('edit-discover-comment-modal').style.display = 'flex';
-                        }
-                    }
-                });
-            }
-            dcContextMenu.style.display = 'none';
-        });
-
-        function saveEditedDiscoverComment() {
-            const newText = document.getElementById('edit-discover-comment-content').value.trim();
-            if (!newText) {
-                showToast('评论内容不能为空');
-                return;
-            }
-            if (activeDcPostId && activeDcCommentId) {
-                dbGet('discover_posts', activeDcPostId, post => {
-                    if (post && post.comments) {
-                        const comment = post.comments.find(c => String(c.id) === String(activeDcCommentId));
-                        if (comment) {
-                            comment.text = newText;
-                            dbUpdate('discover_posts', post, () => {
-                                document.getElementById('edit-discover-comment-modal').style.display = 'none';
-                                renderDiscoverFeed();
-                            });
-                        }
-                    }
-                });
-            }
-        }
-
-        document.getElementById('dc-ctx-retry').addEventListener('click', () => {
-            if (activeDcPostId && activeDcCommentId) {
-                showCustomConfirm('确定要让该角色重新评论吗？(将删除此评论并重新生成)', () => {
-                    dbGet('discover_posts', activeDcPostId, post => {
-                        if (post && post.comments) {
-                            const commentIndex = post.comments.findIndex(c => String(c.id) === String(activeDcCommentId));
-                            if (commentIndex !== -1) {
-                                const authorId = post.comments[commentIndex].authorId;
-                                post.comments.splice(commentIndex, 1);
-                                dbUpdate('discover_posts', post, () => {
-                                    renderDiscoverFeed();
-                                    
-                                    // 重新触发该角色的评论
-                                    const configStr = localStorage.getItem('globalConfig');
-                                    if (!configStr) return;
-                                    const config = JSON.parse(configStr);
-                                    if (!config.apiKey || !config.model) return;
-                                    
-                                    dbGet('friends', authorId, friend => {
-                                        if (friend) {
-                                            processGroupInteractions(activeDcPostId, [friend], config);
-                                            showToast('已请求重新生成评论');
-                                        }
-                                    });
-                                });
-                            }
-                        }
-                    });
-                }, '重试评论');
-            }
-            dcContextMenu.style.display = 'none';
-        });
 
         let activeCommentPostId = null;
         let activeCommentReplyTo = null;
@@ -2954,7 +1118,59 @@
             });
         }
 
-        // Old handleFileUpload and triggerUpload removed.
+        function handleFileUpload(event, type, id) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const imageUrl = e.target.result;
+                if (type === 'wallpaper') {
+                    document.getElementById('main-page').style.backgroundImage = `url(${imageUrl})`;
+                    document.getElementById('wallpaper-preview').style.backgroundImage = `url(${imageUrl})`;
+                    localStorage.setItem('wallpaper', imageUrl);
+                } else if (type === 'chat-wallpaper') {
+                    if (currentChatThemeFriendId) {
+                        dbGet('friends', currentChatThemeFriendId, friend => {
+                            if (friend) {
+                                friend.chatWallpaper = imageUrl;
+                                dbUpdate('friends', friend, () => {
+                                    updateChatThemePreview();
+                                    showToast('已保存该角色的专属背景');
+                                });
+                            }
+                        });
+                    } else {
+                        localStorage.setItem('chat_wallpaper', imageUrl);
+                        updateChatThemePreview();
+                        showToast('已保存全局聊天背景');
+                    }
+                } else if (type === 'app-icon' || type === 'dock-icon') {
+                    const targetIcons = document.querySelectorAll(`.app-item[data-app-id='${id}'] .app-icon img`);
+                    targetIcons.forEach(icon => icon.src = imageUrl);
+                    localStorage.setItem(id, imageUrl);
+                    generateIconPreviews(); // Refresh previews
+                }
+            }
+            reader.readAsDataURL(file);
+        }
+        
+        function triggerUpload(inputId) {
+            let input = document.getElementById(inputId);
+            if (!input) {
+                input = document.createElement('input');
+                input.type = 'file';
+                input.id = inputId;
+                input.accept = 'image/*';
+                input.style.display = 'none';
+                if (inputId === 'wallpaper-upload') {
+                    input.onchange = (event) => handleFileUpload(event, 'wallpaper');
+                } else if (inputId === 'chat-wallpaper-upload') {
+                    input.onchange = (event) => handleFileUpload(event, 'chat-wallpaper');
+                }
+                document.body.appendChild(input);
+            }
+            input.click();
+        }
 
         function generateIconPreviews() {
             const appGrid = document.getElementById('app-icon-preview');
@@ -2965,188 +1181,40 @@
             document.querySelectorAll('#main-page .apps-area .app-item').forEach(item => {
                 const clone = item.cloneNode(true);
                 const id = item.dataset.appId;
-                clone.onclick = () => triggerIndividualUpload(id);
+                clone.onclick = () => triggerIndividualUpload(id, 'app-icon');
                 appGrid.appendChild(clone);
             });
             document.querySelectorAll('#main-page .dock-bar .app-item').forEach(item => {
                 const clone = item.cloneNode(true);
                 const id = item.dataset.appId;
-                clone.onclick = () => triggerIndividualUpload(id);
+                clone.onclick = () => triggerIndividualUpload(id, 'dock-icon');
                 dockGrid.appendChild(clone);
             });
         }
-        // Old triggerIndividualUpload removed.
 
-        function toggleStatusBar(isVisible) {
-            localStorage.setItem('show_status_bar', isVisible);
-            const statusBar = document.querySelector('.status-bar');
-            if (statusBar) {
-                statusBar.style.display = isVisible ? 'flex' : 'none';
+        function triggerIndividualUpload(id, type) {
+            let input = document.getElementById(`upload-${id}`);
+            if (!input) {
+                input = document.createElement('input');
+                input.type = 'file';
+                input.id = `upload-${id}`;
+                input.accept = 'image/*';
+                input.style.display = 'none';
+                input.onchange = (event) => handleFileUpload(event, type, id);
+                document.body.appendChild(input);
             }
-            
-            const fakeStatusBar = document.getElementById('discover-fake-status-bar');
-            if (fakeStatusBar) {
-                fakeStatusBar.style.display = isVisible ? 'flex' : 'none';
-            }
-            
-            // Adjust padding for pages that rely on status bar height
-            document.querySelectorAll('.page').forEach(page => {
-                if (page.id === 'wechat-discover-page' || page.id === 'music-player-page' || page.id === 'chat-interface-page') {
-                    page.style.paddingTop = '0px';
-                    return;
-                }
-                
-                if (isVisible) {
-                    page.style.paddingTop = 'max(34px, env(safe-area-inset-top))';
-                } else {
-                    page.style.paddingTop = 'env(safe-area-inset-top)';
-                }
-            });
-            
-            // Special handling for discover page sticky header
-            const discoverHeader = document.getElementById('discover-sticky-header');
-            if (discoverHeader) {
-                if (isVisible) {
-                    discoverHeader.style.paddingTop = 'max(34px, env(safe-area-inset-top))';
-                    discoverHeader.style.height = 'calc(46px + max(34px, env(safe-area-inset-top)))';
-                } else {
-                    discoverHeader.style.paddingTop = 'env(safe-area-inset-top)';
-                    discoverHeader.style.height = 'calc(46px + env(safe-area-inset-top))';
-                }
-            }
-
-            // Special handling for chat interface header
-            const chatHeader = document.querySelector('.chat-interface-header');
-            if (chatHeader) {
-                if (isVisible) {
-                    chatHeader.style.paddingTop = 'calc(max(34px, env(safe-area-inset-top)) + 2px)';
-                } else {
-                    chatHeader.style.paddingTop = 'max(2px, env(safe-area-inset-top))';
-                }
-            }
-
-            // Special handling for music player header
-            const musicHeader = document.getElementById('music-player-header');
-            if (musicHeader) {
-                if (isVisible) {
-                    musicHeader.style.paddingTop = 'calc(max(34px, env(safe-area-inset-top)) + 2px)';
-                } else {
-                    musicHeader.style.paddingTop = 'max(2px, env(safe-area-inset-top))';
-                }
-            }
-        }
-
-        // Old desktop theme upload functions removed.
-
-        function resetDesktopTheme(type) {
-            dbDeleteSetting(type).then(() => {
-                localStorage.removeItem(type);
-                applyDesktopTheme();
-                if (type === 'desktop_time_color') {
-                    const colorPicker = document.getElementById('status-bar-time-color-picker');
-                    if (colorPicker) colorPicker.value = '#000000';
-                }
-                showToast('已恢复默认');
-            });
-        }
-
-        function changeStatusBarTimeColor(color) {
-            dbSaveSetting('desktop_time_color', color).then(() => {
-                localStorage.removeItem('desktop_time_color');
-                applyDesktopTheme();
-            });
-        }
-
-        function applyDesktopTheme() {
-            const getVal = (key) => themeSettings[key] || localStorage.getItem(key);
-            
-            const batteryIconUrl = getVal('desktop_battery_icon');
-            const signalIconUrl = getVal('desktop_signal_icon');
-            const timeColor = getVal('desktop_time_color');
-
-            const batteryIconEl = document.querySelector('.battery-icon');
-            const signalIconEl = document.querySelector('.signal-icon');
-            const timeEl = document.querySelector('.status-bar .time');
-
-            // Previews
-            const batteryPreview = document.getElementById('desktop-battery-icon-preview');
-            const signalPreview = document.getElementById('desktop-signal-icon-preview');
-            const colorPicker = document.getElementById('status-bar-time-color-picker');
-
-            if (batteryIconEl) {
-                if (batteryIconUrl) {
-                    batteryIconEl.classList.add('image-mode');
-                    batteryIconEl.style.backgroundImage = `url(${batteryIconUrl})`;
-                    batteryIconEl.style.backgroundSize = 'contain';
-                    batteryIconEl.style.backgroundRepeat = 'no-repeat';
-                    batteryIconEl.style.backgroundPosition = 'center';
-                    batteryIconEl.style.border = 'none';
-                    const level = batteryIconEl.querySelector('.battery-level');
-                    if (level) level.style.display = 'none';
-                } else {
-                    batteryIconEl.classList.remove('image-mode');
-                    batteryIconEl.style.backgroundImage = '';
-                    batteryIconEl.style.border = '1px solid currentColor';
-                    const level = batteryIconEl.querySelector('.battery-level');
-                    if (level) {
-                        level.style.display = 'block';
-                    } else {
-                        batteryIconEl.innerHTML = '<div class="battery-level"></div>';
-                    }
-                }
-            }
-            if (batteryPreview) {
-                batteryPreview.style.backgroundImage = batteryIconUrl ? `url(${batteryIconUrl})` : '';
-            }
-
-            if (signalIconEl) {
-                if (signalIconUrl) {
-                    signalIconEl.style.backgroundImage = `url(${signalIconUrl})`;
-                    signalIconEl.style.backgroundSize = 'contain';
-                    signalIconEl.style.backgroundRepeat = 'no-repeat';
-                    signalIconEl.style.backgroundPosition = 'center';
-                    signalIconEl.innerHTML = ''; // Clear bars
-                    signalIconEl.style.width = '24px'; // Give it a width
-                } else {
-                    signalIconEl.style.backgroundImage = '';
-                    if (!signalIconEl.querySelector('.bar')) {
-                        signalIconEl.innerHTML = '<span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span>';
-                    }
-                    signalIconEl.style.width = '';
-                }
-            }
-            if (signalPreview) {
-                signalPreview.style.backgroundImage = signalIconUrl ? `url(${signalIconUrl})` : '';
-            }
-
-            if (timeEl) {
-                if (timeColor) {
-                    timeEl.style.color = timeColor;
-                } else {
-                    timeEl.style.color = ''; // Revert to stylesheet color
-                }
-            }
-            if (colorPicker) {
-                colorPicker.value = timeColor || '#000000';
-            }
+            input.click();
         }
 
         function loadTheme() {
-            const showStatusBar = localStorage.getItem('show_status_bar') !== 'false'; // Default to true
-            const statusBarToggle = document.getElementById('status-bar-toggle');
-            if (statusBarToggle) {
-                statusBarToggle.checked = showStatusBar;
-            }
-            toggleStatusBar(showStatusBar);
-
-            const wallpaper = themeSettings['wallpaper'] || localStorage.getItem('wallpaper');
+            const wallpaper = localStorage.getItem('wallpaper');
             if (wallpaper) {
                 document.getElementById('main-page').style.backgroundImage = `url(${wallpaper})`;
                 document.getElementById('wallpaper-preview').style.backgroundImage = `url(${wallpaper})`;
             }
             document.querySelectorAll('#main-page .app-item').forEach(item => {
                 const id = item.dataset.appId;
-                const savedIcon = themeSettings[id] || localStorage.getItem(id);
+                const savedIcon = localStorage.getItem(id);
                 const img = item.querySelector('.app-icon img');
                 if (savedIcon && img) {
                     img.src = savedIcon;
@@ -3159,25 +1227,18 @@
                 if (profile) {
                     if (profile.avatar) {
                         document.getElementById('avatar-display').src = profile.avatar;
-                        const mainContainer = document.getElementById('main-avatar-container');
-                        if (mainContainer) mainContainer.classList.add('has-image');
                     }
                     if (profile.img1_display) {
                         document.getElementById('img1-display').src = profile.img1_display;
-                        document.getElementById('img1-slot').classList.add('has-image');
                     }
                     if (profile.img2_display) {
                         document.getElementById('img2-display').src = profile.img2_display;
-                        document.getElementById('img2-slot').classList.add('has-image');
                     }
                     if (profile.img3_display) {
                         document.getElementById('img3-display').src = profile.img3_display;
-                        document.getElementById('img3-slot').classList.add('has-image');
                     }
                 }
             });
-            loadGlobalFont();
-            applyDesktopTheme();
         }
 
         function updateDate() {
@@ -3199,7 +1260,42 @@
             if (discoverTime) discoverTime.textContent = timeStr;
         }
         
-        // Old previewImage function removed.
+        function previewImage(input, displayId) {
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                if (displayId === 'img1-display' || displayId === 'img2-display' || displayId === 'img3-display') {
+                    compressImage(file, 0.7, (compressedSrc) => {
+                        document.getElementById(displayId).src = compressedSrc;
+                        dbGet('user_profile', 'main_user', profile => {
+                            const updatedProfile = profile || { id: 'main_user' };
+                            const propName = displayId.replace('-', '_');
+                            updatedProfile[propName] = compressedSrc;
+                            dbUpdate('user_profile', updatedProfile);
+                        });
+                    });
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const imageUrl = e.target.result;
+                    document.getElementById(displayId).src = imageUrl;
+                    
+                     if (displayId === 'avatar-display') {
+                        dbGet('user_profile', 'main_user', profile => {
+                            const updatedProfile = profile || { id: 'main_user' };
+                            updatedProfile.avatar = imageUrl;
+                            dbUpdate('user_profile', updatedProfile);
+                            
+                            // Sync to Me Page
+                            const mePageAvatar = document.getElementById('me-page-avatar');
+                            if (mePageAvatar) mePageAvatar.src = imageUrl;
+                        });
+                    }
+                }
+                reader.readAsDataURL(file);
+            }
+        }
 
         document.querySelectorAll('[contenteditable]').forEach(el => {
             const id = el.className || el.id;
@@ -3213,689 +1309,6 @@
         function openApp(appName) {
             console.log('Opening ' + appName);
         }
-
-        // --- Audio & Together Listen Logic ---
-        let musicAudio = new Audio();
-        let currentPlaylist = [];
-        let currentSongIndex = 0;
-        let togetherListenTimer = null;
-        let togetherListenAccumulatedMs = 0;
-        let togetherListenLastPlayTs = null;
-        let playMode = 0; // 0: Sequence, 1: Random, 2: Single Loop
-
-        const PLAY_MODE_ICONS = [
-            '<polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>', // Sequence (Loop List)
-            '<path d="M16 3h5v5"></path><path d="M4 20L21 3"></path><path d="M21 16v5h-5"></path><path d="M15 15l-5 5"></path><path d="M4 4l5 5"></path>', // Random (Shuffle)
-            '<path d="M17 2l4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path><path d="M7 22l-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path><text x="10" y="14" font-size="8" fill="currentColor" font-weight="bold">1</text>' // Single Loop (Custom 1)
-        ];
-
-        const PLAY_MODE_NAMES = ['列表循环', '随机播放', '单曲循环'];
-
-        function switchPlayMode() {
-            playMode = (playMode + 1) % 3;
-            const btn = document.getElementById('music-mode-btn');
-            if(btn) btn.innerHTML = PLAY_MODE_ICONS[playMode];
-            showToast(`已切换到：${PLAY_MODE_NAMES[playMode]}`);
-        }
-
-        function enterTogetherListen() {
-            if (!currentChatFriendId) {
-                showToast('请先选择一个聊天');
-                return;
-            }
-            toggleActionPanel(); // Close the + menu
-            loadGlobalPlaylistAndPlay();
-        }
-
-        function loadGlobalPlaylistAndPlay() {
-            dbGetAll('global_playlist', playlist => {
-                // Auto-delete unplayable songs
-                const validPlaylist = [];
-                if (playlist && playlist.length > 0) {
-                    playlist.forEach(song => {
-                        if (song.unplayable) {
-                            dbDelete('global_playlist', song.id);
-                        } else {
-                            validPlaylist.push(song);
-                        }
-                    });
-                }
-                
-                currentPlaylist = validPlaylist;
-                
-                if (currentSongIndex >= currentPlaylist.length) {
-                    currentSongIndex = 0;
-                }
-
-                initMusicPlayerView();
-                
-                if (currentPlaylist.length > 0) {
-                    // Update display info but DO NOT auto-play
-                    const song = currentPlaylist[currentSongIndex];
-                    if (song) {
-                        document.getElementById('music-title-display').textContent = song.name || '未知歌曲';
-                        document.getElementById('music-artist-display').textContent = song.artist || '未知歌手';
-                    }
-                    // If audio is already playing from this playlist, keep it updating.
-                    // If not, it will just sit there paused.
-                } else {
-                    document.getElementById('music-title-display').textContent = '未播放歌曲';
-                    document.getElementById('music-artist-display').textContent = '点击右上角导入';
-                    musicAudio.pause();
-                    document.getElementById('music-vinyl-disc').classList.remove('spin-anim');
-                }
-            });
-        }
-
-        function openMusicActionSheet() {
-            const overlay = document.getElementById('music-action-sheet-overlay');
-            overlay.style.display = 'block';
-            void overlay.offsetWidth;
-            overlay.classList.add('show');
-        }
-
-        function closeMusicActionSheet(e) {
-            if (e && e.target !== document.getElementById('music-action-sheet-overlay')) {
-                return;
-            }
-            const overlay = document.getElementById('music-action-sheet-overlay');
-            overlay.classList.remove('show');
-            setTimeout(() => {
-                overlay.style.display = 'none';
-            }, 300);
-        }
-
-        function handleMusicAction(action) {
-            closeMusicActionSheet();
-            setTimeout(() => {
-                if (action === 'link') {
-                    openMusicImportModal();
-                } else if (action === 'local') {
-                    document.getElementById('local-music-input').click();
-                } else if (action === 'clear') {
-                    showCustomConfirm('确定要清空全局歌单吗？', () => {
-                        dbGetAll('global_playlist', items => {
-                            let count = 0;
-                            if(items.length === 0) {
-                                loadGlobalPlaylistAndPlay();
-                                return;
-                            }
-                            items.forEach(item => {
-                                dbDelete('global_playlist', item.id, () => {
-                                    count++;
-                                    if(count === items.length) {
-                                        showToast('已清空歌单');
-                                        loadGlobalPlaylistAndPlay();
-                                    }
-                                });
-                            });
-                        });
-                    }, '清空歌单');
-                }
-            }, 300);
-        }
-
-        function handleLocalMusicUpload(input) {
-            const files = Array.from(input.files);
-            if (files.length === 0) return;
-
-            showToast('正在导入本地音乐...');
-            let savedCount = 0;
-
-            files.forEach(file => {
-                const song = {
-                    id: Date.now().toString() + Math.floor(Math.random()*10000),
-                    name: file.name.replace(/\.[^/.]+$/, ""),
-                    artist: '本地音乐',
-                    file: file,
-                    isLocal: true,
-                    pic: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
-                };
-
-                dbAdd('global_playlist', song, () => {
-                    savedCount++;
-                    if (savedCount === files.length) {
-                        showToast(`成功导入 ${savedCount} 首本地音乐`);
-                        loadGlobalPlaylistAndPlay();
-                    }
-                });
-            });
-            input.value = '';
-        }
-
-        function openMusicImportModal() {
-            document.getElementById('music-link-input').value = '';
-            document.getElementById('music-import-modal').style.display = 'flex';
-            
-            const returnBtn = document.getElementById('return-to-player-btn');
-            if (returnBtn) {
-                returnBtn.style.display = 'none';
-            }
-        }
-
-        async function startTogetherListen() {
-            const link = document.getElementById('music-link-input').value.trim();
-            if (!link) {
-                showToast('请输入歌单链接');
-                return;
-            }
-
-            document.getElementById('music-import-modal').style.display = 'none';
-            showToast('正在解析歌单...');
-
-            // Check for direct audio URL
-            if (link.match(/^https?:\/\/.*\.(mp3|wav|ogg|m4a|flac)($|\?)/i)) {
-                 const song = {
-                     id: Date.now().toString(),
-                     name: '直链音频',
-                     artist: '网络来源',
-                     url: link,
-                     pic: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
-                 };
-                 dbAdd('global_playlist', song, () => {
-                     showToast('已添加直链音频');
-                     if (currentPlaylist.length === 0) {
-                         currentSongIndex = 0;
-                     }
-                     loadGlobalPlaylistAndPlay();
-                 });
-                 return;
-            }
-
-            let server = 'netease';
-            let id = '';
-
-            // Simple Regex to extract ID from standard Netease/QQ links
-            if (link.includes('163.com')) {
-                server = 'netease';
-                const match = link.match(/id=(\d+)/);
-                if (match) id = match[1];
-            } else if (link.includes('y.qq.com') || link.includes('c.y.qq.com')) {
-                server = 'tencent';
-                const match = link.match(/id=(\d+)/) || link.match(/\/(\w+)\.html/);
-                if (match) id = match[1];
-            }
-
-            if (!id) {
-                showToast('无法识别该链接，将使用默认歌单演示');
-                id = '3778678'; // NetEase Hot Songs fallback
-                server = 'netease';
-            }
-
-            try {
-                // Using Meting API to fetch playlist info
-                const response = await fetch(`https://api.injahow.cn/meting/?server=${server}&type=playlist&id=${id}`);
-                if (!response.ok) throw new Error('API request failed');
-                
-                let data = await response.json();
-                
-                // Sometimes type=playlist fails if the ID is a single song
-                if (!data || data.length === 0 || data.error) {
-                    const songResponse = await fetch(`https://api.injahow.cn/meting/?server=${server}&type=song&id=${id}`);
-                    if (songResponse.ok) {
-                        data = await songResponse.json();
-                    }
-                }
-
-                if (!data || data.length === 0) {
-                    throw new Error('Empty playlist');
-                }
-
-                let savedCount = 0;
-                data.forEach(song => {
-                    const newSong = {
-                        id: Date.now().toString() + Math.floor(Math.random()*10000),
-                        name: song.name,
-                        artist: song.artist,
-                        url: song.url,
-                        pic: song.pic || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
-                    };
-                    dbAdd('global_playlist', newSong, () => {
-                        savedCount++;
-                        if (savedCount === data.length) {
-                            showToast('导入链接成功');
-                            if (currentPlaylist.length === 0) {
-                                currentSongIndex = 0;
-                            }
-                            loadGlobalPlaylistAndPlay();
-                        }
-                    });
-                });
-
-            } catch (error) {
-                console.error("Music Fetch Error:", error);
-                showToast('解析失败，请检查链接或网络');
-            }
-        }
-
-        function initMusicPlayerView() {
-            // Setup Avatars
-            dbGet('friends', currentChatFriendId, friend => {
-                if (friend) {
-                    document.getElementById('music-friend-avatar').src = friend.avatar;
-                    if (friend.myAvatar) {
-                        document.getElementById('music-my-avatar').src = friend.myAvatar;
-                    } else {
-                        dbGet('user_profile', 'main_user', profile => {
-                            document.getElementById('music-my-avatar').src = profile && profile.avatar ? profile.avatar : 'https://via.placeholder.com/150/B5EAD7/ffffff?text=Me';
-                        });
-                    }
-                } else {
-                    dbGet('user_profile', 'main_user', profile => {
-                        document.getElementById('music-my-avatar').src = profile && profile.avatar ? profile.avatar : 'https://via.placeholder.com/150/B5EAD7/ffffff?text=Me';
-                    });
-                }
-            });
-
-            // Restore custom cover if exists
-            const customCover = localStorage.getItem('music_custom_cover');
-            if (customCover) {
-                document.getElementById('music-album-cover').src = customCover;
-            } else {
-                document.getElementById('music-album-cover').src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; // Black init
-            }
-
-            document.getElementById('music-vinyl-disc').classList.remove('spin-anim');
-
-            showPage('music-player-page');
-            document.querySelector('.status-bar').style.backgroundColor = 'transparent';
-            document.querySelector('.status-bar').style.color = 'white';
-
-            // Timer Logic
-            if (togetherListenLastPlayTs === null && !musicAudio.paused) {
-                togetherListenLastPlayTs = Date.now();
-            }
-            updateTogetherTimer();
-            if (togetherListenTimer) clearInterval(togetherListenTimer);
-            togetherListenTimer = setInterval(updateTogetherTimer, 60000); // update every minute
-
-            // Sync Play Button State
-            if (musicAudio.paused) {
-                document.getElementById('music-play-icon').style.display = 'block';
-                document.getElementById('music-pause-icon').style.display = 'none';
-            } else {
-                document.getElementById('music-play-icon').style.display = 'none';
-                document.getElementById('music-pause-icon').style.display = 'block';
-            }
-        }
-
-        function handleMusicCoverUpload(input) {
-            if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const imageUrl = e.target.result;
-                    document.getElementById('music-album-cover').src = imageUrl;
-                    localStorage.setItem('music_custom_cover', imageUrl);
-                }
-                reader.readAsDataURL(input.files[0]);
-            }
-        }
-
-        function updateTogetherTimer() {
-            let totalMs = togetherListenAccumulatedMs;
-            if (togetherListenLastPlayTs !== null) {
-                totalMs += (Date.now() - togetherListenLastPlayTs);
-            }
-            const minutes = Math.floor(totalMs / 60000);
-            
-            let timeText = '';
-            if (minutes >= 60) {
-                const hrs = Math.floor(minutes / 60);
-                const mins = minutes % 60;
-                timeText = `${hrs}小时 ${mins}分钟`;
-            } else {
-                timeText = `${minutes}分钟`;
-            }
-            document.getElementById('music-duration-text').textContent = timeText;
-        }
-
-        function closeMusicPlayer() {
-            showPage('chat-interface-page');
-            // Music keeps playing in background
-        }
-
-        async function playCurrentSong(retry = true) {
-            if (currentPlaylist.length === 0) return;
-            const song = currentPlaylist[currentSongIndex];
-            
-            document.getElementById('music-title-display').textContent = song.name || '未知歌曲';
-            document.getElementById('music-artist-display').textContent = song.artist || '未知歌手';
-            
-            document.getElementById('music-vinyl-disc').classList.remove('spin-anim');
-
-            const attemptPlay = async (url) => {
-                if (!url) return false;
-                try {
-                    musicAudio.src = url;
-                    await musicAudio.play();
-                    
-                    const isLocalSong = song.isLocal || song.artist === '本地音乐' || (url && (url.startsWith('data:') || url.startsWith('blob:')));
-
-                    // Duration check for trial versions (< 60s), skipped for local music
-                    if (!isLocalSong) {
-                        if (musicAudio.readyState < 1) {
-                             await new Promise(resolve => {
-                                 const onLoaded = () => { resolve(); musicAudio.removeEventListener('loadedmetadata', onLoaded); };
-                                 musicAudio.addEventListener('loadedmetadata', onLoaded, {once: true});
-                                 setTimeout(resolve, 2000); 
-                             });
-                        }
-
-                        if (musicAudio.duration > 0 && musicAudio.duration < 60) {
-                            console.log("Skipping trial/short audio:", musicAudio.duration);
-                            musicAudio.pause();
-                            return false;
-                        }
-                    }
-
-                    document.getElementById('music-vinyl-disc').classList.add('spin-anim');
-                    
-                    // Don't save blob URLs to DB as they expire
-                    if (song.url !== url && !song.file && !url.startsWith('blob:')) {
-                        song.url = url;
-                        if (song.unplayable) {
-                            song.unplayable = false;
-                            if (document.getElementById('music-playlist-sheet-overlay').classList.contains('show')) {
-                                renderPlaylist();
-                            }
-                        }
-                        dbUpdate('global_playlist', song);
-                    }
-                    
-                    setTimeout(preloadNextSong, 5000);
-                    return true;
-                } catch (e) {
-                    console.error("Play error:", e);
-                    return false;
-                }
-            };
-
-            let targetUrl = song.url;
-            if (song.file) {
-                targetUrl = URL.createObjectURL(song.file);
-            }
-
-            // 1. Try existing URL first
-            if (targetUrl && !targetUrl.includes('vip') && await attemptPlay(targetUrl)) {
-                return;
-            }
-
-            // For local songs, do not fallback search
-            if (song.isLocal || song.artist === '本地音乐' || song.file) {
-                console.log("Local audio failed to play.");
-                song.unplayable = true;
-                dbUpdate('global_playlist', song);
-                if (document.getElementById('music-playlist-sheet-overlay').classList.contains('show')) {
-                    renderPlaylist();
-                }
-                setTimeout(() => playNextSong(true), 500);
-                return;
-            }
-
-            // 2. Carpet Search
-            const fallbackUrls = await fallbackSearchMusic(song.name, song.artist);
-            
-            for (let url of fallbackUrls) {
-                if (url === song.url) continue;
-                if (await attemptPlay(url)) {
-                    return;
-                }
-            }
-
-            // 3. Failed
-            console.log("All sources failed, skipping...");
-            song.unplayable = true;
-            dbUpdate('global_playlist', song);
-            if (document.getElementById('music-playlist-sheet-overlay').classList.contains('show')) {
-                renderPlaylist();
-            }
-            setTimeout(() => playNextSong(true), 500);
-
-        }
-
-        async function fallbackSearchMusic(title, artist) {
-            let allUrls = [];
-            const platforms = ['tencent', 'kugou', 'netease', 'kuwo', 'bilibili'];
-            
-            const doSearch = async (query) => {
-                for (let p of platforms) {
-                    try {
-                        const res = await fetch(`https://api.injahow.cn/meting/?server=${p}&type=search&search=${encodeURIComponent(query)}`);
-                        const data = await res.json();
-                        if (data && data.length > 0) {
-                            for (let i = 0; i < Math.min(data.length, 5); i++) {
-                                if (data[i].url && !data[i].url.includes('vip') && !allUrls.includes(data[i].url)) {
-                                    allUrls.push(data[i].url);
-                                }
-                            }
-                        }
-                    } catch(e) {}
-                }
-            };
-
-            await doSearch(title + ' ' + artist);
-            await doSearch(title);
-            
-            return allUrls;
-        }
-
-        async function handleMusicMetadataEdit() {
-            if (currentPlaylist.length === 0) return;
-            const song = currentPlaylist[currentSongIndex];
-            const newTitle = document.getElementById('music-title-display').textContent.trim();
-            const newArtist = document.getElementById('music-artist-display').textContent.trim();
-            
-            if (newTitle && (song.name !== newTitle || song.artist !== newArtist)) {
-                song.name = newTitle;
-                song.artist = newArtist;
-                song.url = ''; // Force re-fetch
-                dbUpdate('global_playlist', song);
-                showToast('正在为您搜索音源...');
-                musicAudio.pause();
-                await playCurrentSong();
-            }
-        }
-
-        function playNextSong(manual = true) {
-            if (currentPlaylist.length === 0) return;
-            
-            if (playMode === 1) { // Random
-                let newIndex = currentSongIndex;
-                if (currentPlaylist.length > 1) {
-                    while (newIndex === currentSongIndex) {
-                        newIndex = Math.floor(Math.random() * currentPlaylist.length);
-                    }
-                }
-                currentSongIndex = newIndex;
-            } else if (playMode === 2 && !manual) { // Single Loop & Auto
-                // Keep currentSongIndex same
-            } else { // Sequence or Manual Single Loop
-                currentSongIndex++;
-                if (currentSongIndex >= currentPlaylist.length) {
-                    currentSongIndex = 0;
-                }
-            }
-            playCurrentSong();
-        }
-
-        function playPrevSong() {
-            if (currentPlaylist.length === 0) return;
-            
-            if (playMode === 1) { // Random
-                let newIndex = currentSongIndex;
-                if (currentPlaylist.length > 1) {
-                    while (newIndex === currentSongIndex) {
-                        newIndex = Math.floor(Math.random() * currentPlaylist.length);
-                    }
-                }
-                currentSongIndex = newIndex;
-            } else {
-                currentSongIndex--;
-                if (currentSongIndex < 0) {
-                    currentSongIndex = currentPlaylist.length - 1;
-                }
-            }
-            playCurrentSong();
-        }
-
-        function togglePlayPause() {
-            if (currentPlaylist.length === 0) return;
-            if (musicAudio.paused) {
-                if (!musicAudio.src) {
-                    playCurrentSong(); // Load and play if no source
-                } else {
-                    musicAudio.play().then(() => {
-                        document.getElementById('music-vinyl-disc').classList.add('spin-anim');
-                    }).catch(e => {
-                        console.error("Play error:", e);
-                        // Fallback: try re-loading/searching if direct play fails
-                        playCurrentSong();
-                    });
-                }
-            } else {
-                musicAudio.pause();
-                document.getElementById('music-vinyl-disc').classList.remove('spin-anim');
-            }
-        }
-
-        musicAudio.addEventListener('play', () => {
-            document.getElementById('music-play-icon').style.display = 'none';
-            document.getElementById('music-pause-icon').style.display = 'block';
-            if (togetherListenLastPlayTs === null) {
-                togetherListenLastPlayTs = Date.now();
-            }
-            updateTogetherTimer();
-        });
-
-        musicAudio.addEventListener('pause', () => {
-            document.getElementById('music-play-icon').style.display = 'block';
-            document.getElementById('music-pause-icon').style.display = 'none';
-            if (togetherListenLastPlayTs !== null) {
-                togetherListenAccumulatedMs += (Date.now() - togetherListenLastPlayTs);
-                togetherListenLastPlayTs = null;
-            }
-            updateTogetherTimer();
-        });
-
-        musicAudio.addEventListener('ended', () => {
-            if (playMode === 2) {
-                // Single loop
-                musicAudio.currentTime = 0;
-                musicAudio.play();
-            } else {
-                playNextSong(false);
-            }
-        });
-
-        musicAudio.addEventListener('timeupdate', () => {
-            if (document.getElementById('music-player-page').classList.contains('active')) {
-                const current = musicAudio.currentTime || 0;
-                const duration = musicAudio.duration || 0;
-                const percent = duration ? (current / duration) * 100 : 0;
-                
-                document.getElementById('music-progress-fill').style.width = `${percent}%`;
-                document.getElementById('music-progress-thumb').style.left = `${percent}%`;
-                
-                document.getElementById('music-current-time').textContent = formatTime(current);
-                document.getElementById('music-total-time').textContent = formatTime(duration);
-            }
-        });
-
-        function formatTime(seconds) {
-            if (isNaN(seconds)) return '00:00';
-            const m = Math.floor(seconds / 60);
-            const s = Math.floor(seconds % 60);
-            return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-        }
-
-        function seekMusic(e) {
-            const barContainer = document.getElementById('music-progress-bar-container');
-            if (!barContainer) return;
-            const rect = barContainer.getBoundingClientRect();
-            const clickX = e.clientX - rect.left;
-            let percentage = clickX / rect.width;
-            percentage = Math.max(0, Math.min(1, percentage));
-            
-            if (musicAudio.duration) {
-                musicAudio.currentTime = percentage * musicAudio.duration;
-            }
-        }
-
-        function toggleMusicPlaylist() {
-            const modal = document.getElementById('music-playlist-sheet-overlay');
-            if (modal.style.display === 'block') {
-                modal.classList.remove('show');
-                setTimeout(() => { modal.style.display = 'none'; }, 300);
-            } else {
-                renderPlaylist();
-                modal.style.display = 'block';
-                // Force reflow
-                void modal.offsetWidth;
-                modal.classList.add('show');
-            }
-        }
-
-        function renderPlaylist() {
-            const container = document.getElementById('playlist-content');
-            const countEl = document.getElementById('playlist-count');
-            container.innerHTML = '';
-            countEl.textContent = `(${currentPlaylist.length})`;
-
-            currentPlaylist.forEach((song, index) => {
-                const item = document.createElement('div');
-                item.className = 'playlist-item';
-                if (index === currentSongIndex) item.classList.add('active');
-                if (song.unplayable) item.classList.add('unplayable');
-                
-                item.innerHTML = `
-                    <div class="song-info" style="flex-grow: 1;">
-                        <span class="song-name">${song.name || '未知歌曲'}</span>
-                        <span style="color:#ccc;">-</span>
-                        <span class="artist-name">${song.artist || '未知歌手'}</span>
-                    </div>
-                    <div class="playlist-delete-btn" style="padding: 0 10px; color: #ccc; font-size: 20px; cursor: pointer;">×</div>
-                `;
-                
-                const infoDiv = item.querySelector('.song-info');
-                infoDiv.onclick = (e) => {
-                    e.stopPropagation();
-                    currentSongIndex = index;
-                    playCurrentSong();
-                    toggleMusicPlaylist();
-                };
-
-                const deleteBtn = item.querySelector('.playlist-delete-btn');
-                deleteBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    dbDelete('global_playlist', song.id, () => {
-                        currentPlaylist.splice(index, 1);
-                        if (index < currentSongIndex) {
-                            currentSongIndex--;
-                        } else if (index === currentSongIndex && currentPlaylist.length > 0) {
-                            if (currentSongIndex >= currentPlaylist.length) currentSongIndex = 0;
-                        }
-                        renderPlaylist();
-                    });
-                };
-
-                container.appendChild(item);
-            });
-        }
-
-        async function preloadNextSong() {
-            if (currentPlaylist.length <= 1) return;
-            const nextIdx = (currentSongIndex + 1) % currentPlaylist.length;
-            const nextSong = currentPlaylist[nextIdx];
-            if (!nextSong) return;
-
-            if (!nextSong.url || nextSong.url.includes('vip') || nextSong.url === '') {
-                const foundUrl = await fallbackSearchMusic(nextSong.name, nextSong.artist);
-                if (foundUrl) {
-                    currentPlaylist[nextIdx].url = foundUrl; // Cache the found url
-                }
-            }
-        }
-
 
         // --- WeChat Logic ---
         let longPressTimer = null;
@@ -3918,108 +1331,6 @@
                 };
                 setTimeout(() => document.addEventListener('click', closeMenu), 0);
             }
-        }
-
-        function openAddGroupChatModal() {
-            document.getElementById('add-group-chat-modal').style.display = 'flex';
-            document.getElementById('wechat-menu').classList.remove('show');
-            document.getElementById('agc-name-input').value = '';
-            document.getElementById('agc-avatar-preview').src = '';
-            document.getElementById('agc-avatar-container').classList.remove('has-image');
-            document.getElementById('agc-avatar-input').value = '';
-
-            const list = document.getElementById('agc-members-list');
-            list.innerHTML = '';
-            dbGetAll('friends', friends => {
-                const nonGroupFriends = friends.filter(f => !f.isGroup);
-                nonGroupFriends.forEach(f => {
-                    const label = document.createElement('label');
-                    label.className = 'preset-checkbox-item';
-                    label.style.padding = '5px 0';
-                    label.innerHTML = `
-                        <input type="checkbox" value="${f.id}">
-                        <div class="custom-checkbox"></div>
-                        <img src="${f.avatar}" style="width: 24px; height: 24px; border-radius: 4px; margin-right: 5px; object-fit: cover;">
-                        <span>${f.name}</span>
-                    `;
-                    list.appendChild(label);
-                });
-            });
-        }
-
-        function closeAddGroupChatModal() {
-            document.getElementById('add-group-chat-modal').style.display = 'none';
-        }
-
-        function triggerAgcAvatarUpload() {
-            document.getElementById('agc-avatar-input').click();
-        }
-
-        function previewAgcAvatar(input) {
-            if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const preview = document.getElementById('agc-avatar-preview');
-                    preview.src = e.target.result;
-                    document.getElementById('agc-avatar-container').classList.add('has-image');
-                }
-                reader.readAsDataURL(input.files[0]);
-            }
-        }
-
-        function saveGroupChat() {
-            let name = document.getElementById('agc-name-input').value.trim();
-            const avatarSrc = document.getElementById('agc-avatar-preview').src;
-            const hasAvatar = document.getElementById('agc-avatar-container').classList.contains('has-image');
-            
-            const checkboxes = document.querySelectorAll('#agc-members-list input[type="checkbox"]:checked');
-            const selectedIds = Array.from(checkboxes).map(cb => cb.value);
-
-            if (selectedIds.length === 0) {
-                showToast('请至少选择一个群成员');
-                return;
-            }
-            
-            if (!name) {
-                const selectedNames = Array.from(checkboxes).map(cb => {
-                    const span = cb.parentElement.querySelector('span');
-                    return span ? span.textContent : '';
-                }).filter(n => n);
-                
-                if (selectedNames.length > 2) {
-                    name = selectedNames.slice(0, 2).join('、') + '...的群聊';
-                } else if (selectedNames.length > 0) {
-                    name = selectedNames.join('、') + '的群聊';
-                } else {
-                    name = '群聊';
-                }
-            }
-
-            if (!hasAvatar) {
-                showToast('请上传群头像');
-                return;
-            }
-
-            const newGroupChat = {
-                id: 'group_' + Date.now().toString(),
-                name: name,
-                realName: name,
-                avatar: avatarSrc,
-                isGroup: true,
-                members: selectedIds,
-                memoryInterop: false,
-                memoryInteropRoles: [],
-                lastMsg: "群聊已创建",
-                lastTime: getCurrentTimeStr(),
-                isPinned: false,
-                isHidden: false,
-                group: '默认分组'
-            };
-
-            dbAdd('friends', newGroupChat, () => {
-                closeAddGroupChatModal();
-                renderChatList();
-            });
         }
 
         function openAddFriendModal() {
@@ -4114,12 +1425,8 @@
 
         function showBannerNotification(friend, text) {
             const chatPage = document.getElementById('chat-interface-page');
-            const offlineChatPage = document.getElementById('offline-chat-page');
             // If user is currently in the chat interface with this friend, don't show banner
             if (chatPage.classList.contains('active') && currentChatFriendId === friend.id) {
-                return; 
-            }
-            if (offlineChatPage.classList.contains('active') && currentChatFriendId === friend.id) {
                 return; 
             }
 
@@ -4333,10 +1640,9 @@
                             } else {
                                 const msg = friendMsgs[0];
                                 let previewText = msg.text.replace(/<[^>]+>/g, '');
-                                if (msg.isSticker && msg.stickerDescription) previewText = `[表情包] ${msg.stickerDescription}`;
+                                if (msg.isSticker && msg.stickerDescription) previewText = `[表情] ${msg.stickerDescription}`;
                                 else if (msg.isSticker && msg.isDice) previewText = `[骰子]`;
-                                else if (msg.isSticker) previewText = `[表情包]`;
-                                else if (msg.isImage) previewText = `[图片]`;
+                                else if (msg.isSticker) previewText = `[图片/表情]`;
                                 
                                 const regex = new RegExp(`(${keyword})`, 'gi');
                                 const highlightedText = previewText.replace(regex, '<span style="color:#07c160">$1</span>');
@@ -4450,12 +1756,7 @@
                 visibleFriends.sort((a, b) => {
                     if (a.isPinned && !b.isPinned) return -1;
                     if (!a.isPinned && b.isPinned) return 1;
-
-                    // Fallback to id if lastActivityTimestamp is missing
-                    const timeA = a.lastActivityTimestamp || (a.id.includes('_') ? parseInt(a.id.split('_').pop()) : parseInt(a.id)) || 0;
-                    const timeB = b.lastActivityTimestamp || (b.id.includes('_') ? parseInt(b.id.split('_').pop()) : parseInt(b.id)) || 0;
-
-                    return timeB - timeA;
+                    return b.id.localeCompare(a.id); // Sort by newest first
                 });
                 
                 visibleFriends.forEach(friend => {
@@ -4466,21 +1767,14 @@
                         item.style.backgroundColor = '#f5f5f5';
                     }
 
-                    const unreadBottomHtml = friend.unreadCount ? `<div class="chat-list-unread-count">${friend.unreadCount > 99 ? '99+' : friend.unreadCount}</div>` : '';
-
                     item.innerHTML = `
-                        <div style="position: relative; width: 48px; height: 48px; flex-shrink: 0;">
-                            <img class="chat-avatar" src="${friend.avatar}" alt="${friend.name}">
-                        </div>
+                        <img class="chat-avatar" src="${friend.avatar}" alt="${friend.name}">
                         <div class="chat-info">
                             <div class="chat-top">
                                 <span class="chat-name">${friend.name}</span>
                                 <span class="chat-time">${friend.lastTime}</span>
                             </div>
-                            <div class="chat-bottom">
-                                <div class="chat-preview">${friend.lastMsg}</div>
-                                ${unreadBottomHtml}
-                            </div>
+                            <div class="chat-preview">${friend.lastMsg}</div>
                         </div>
                     `;
 
@@ -4726,25 +2020,6 @@
                 // If opening
                 exitStickerEditMode();
                 exitGroupEditMode();
-                
-                // Hide non-image options if it is a group chat
-                if (currentChatFriendId) {
-                    dbGet('friends', currentChatFriendId, friend => {
-                        const items = actionPanel.querySelectorAll('.action-item');
-                        if (friend && friend.isGroup) {
-                            items.forEach(item => {
-                                const name = item.querySelector('.action-name').textContent;
-                                if (name !== '图片' && name !== '线下模式') {
-                                    item.style.display = 'none';
-                                } else {
-                                    item.style.display = 'flex';
-                                }
-                            });
-                        } else {
-                            items.forEach(item => item.style.display = 'flex');
-                        }
-                    });
-                }
             } else {
                 // If closing
                 chatInput.focus();
@@ -4829,14 +2104,13 @@
                 addMessageToUI(messagePayload);
                 dbAdd('chat_history', messagePayload);
 
-            dbGet('friends', currentChatFriendId, friend => {
-                if (friend) {
-                    friend.lastMsg = '[图片]';
-                    friend.lastTime = getCurrentTimeStr();
-                    friend.lastActivityTimestamp = Date.now();
-                    dbUpdate('friends', friend, renderChatList);
-                }
-            });
+                dbGet('friends', currentChatFriendId, friend => {
+                    if (friend) {
+                        friend.lastMsg = '[图片]';
+                        friend.lastTime = getCurrentTimeStr();
+                        dbUpdate('friends', friend, renderChatList);
+                    }
+                });
             }
             e.target.value = ''; // Reset input
         });
@@ -5156,7 +2430,6 @@
         });
 
         let activeMessage = null;
-        let activeMessageSegment = null;
         const msgContextMenu = document.getElementById('message-context-menu');
 
         document.addEventListener('click', (e) => {
@@ -5165,29 +2438,12 @@
             }
         });
 
-        function showMessageContextMenu(e, msg, segmentInfo = null) {
+        function showMessageContextMenu(e, msg) {
             activeMessage = msg;
-            activeMessageSegment = segmentInfo;
             
-            const isOfflineModeUI = document.getElementById('offline-chat-page').classList.contains('active');
-
-            if (isOfflineModeUI) {
-                document.getElementById('msg-ctx-multiselect').style.display = 'none';
-                document.getElementById('msg-ctx-retry').style.display = 'none'; // The retry button is in the header
-                document.getElementById('msg-ctx-copy').style.display = 'block';
-                document.getElementById('msg-ctx-edit').style.display = 'block';
-                document.getElementById('msg-ctx-quote').style.display = 'none';
-                document.getElementById('msg-ctx-recall').style.display = 'none';
-                document.getElementById('msg-ctx-delete').style.display = 'block';
-            } else {
-                document.getElementById('msg-ctx-multiselect').style.display = 'block';
-                document.getElementById('msg-ctx-retry').style.display = (msg.type === 'received') ? 'block' : 'none';
-                document.getElementById('msg-ctx-copy').style.display = 'block';
-                document.getElementById('msg-ctx-edit').style.display = 'block';
-                document.getElementById('msg-ctx-quote').style.display = 'block';
-                document.getElementById('msg-ctx-recall').style.display = (msg.type === 'sent') ? 'block' : 'none';
-                document.getElementById('msg-ctx-delete').style.display = 'block';
-            }
+            // Toggle buttons based on message type
+            document.getElementById('msg-ctx-retry').style.display = (msg.type === 'received') ? 'block' : 'none';
+            document.getElementById('msg-ctx-recall').style.display = (msg.type === 'sent') ? 'block' : 'none';
             
             const phoneContainer = document.querySelector('.phone-container');
             const phoneRect = phoneContainer.getBoundingClientRect();
@@ -5210,11 +2466,7 @@
 
         document.getElementById('msg-ctx-copy').addEventListener('click', () => {
             if (activeMessage && activeMessage.text) {
-                let textToCopy = activeMessage.text;
-                if (activeMessageSegment) {
-                    textToCopy = activeMessageSegment.content;
-                }
-                navigator.clipboard.writeText(textToCopy).then(() => showToast('已复制'));
+                navigator.clipboard.writeText(activeMessage.text).then(() => showToast('已复制'));
             }
             msgContextMenu.style.display = 'none';
         });
@@ -5247,51 +2499,16 @@
 
         document.getElementById('msg-ctx-delete').addEventListener('click', () => {
             if (activeMessage) {
-                if (activeMessageSegment) {
-                    showCustomConfirm('确定要删除这条片段吗？', () => {
-                        dbGetAll('chat_history', allMsgs => {
-                            const dbMsg = allMsgs.find(m => m.friendId === activeMessage.friendId && m.timestamp === activeMessage.timestamp);
-                            if (dbMsg) {
-                                let parts = parseOfflineMessage(dbMsg.text);
-                                parts.splice(activeMessageSegment.index, 1);
-                                
-                                let newText = '';
-                                parts.forEach(p => {
-                                    if (p.type === 'dialogue') newText += '「' + p.content + '」';
-                                    else if (p.type === 'thought') newText += '<thought>' + p.content + '</thought>';
-                                    else if (p.type === 'action') newText += p.content;
-                                });
-                                
-                                if (!newText.trim()) {
-                                    dbDelete('chat_history', dbMsg.id, () => {
-                                        renderOfflineChat(currentChatFriendId);
-                                    });
-                                } else {
-                                    dbMsg.text = newText;
-                                    dbUpdate('chat_history', dbMsg, () => {
-                                        renderOfflineChat(currentChatFriendId);
-                                    });
-                                }
-                            }
-                        });
-                    }, '删除片段');
-                } else {
-                    showCustomConfirm('确定要删除这条消息吗？', () => {
-                        dbGetAll('chat_history', allMsgs => {
-                            const dbMsg = allMsgs.find(m => m.friendId === activeMessage.friendId && m.timestamp === activeMessage.timestamp);
-                            if (dbMsg) {
-                                dbDelete('chat_history', dbMsg.id, () => {
-                                    const isOfflineModeUI = document.getElementById('offline-chat-page').classList.contains('active');
-                                    if (isOfflineModeUI) {
-                                        renderOfflineChat(currentChatFriendId);
-                                    } else {
-                                        renderMessages(currentChatFriendId);
-                                    }
-                                });
-                            }
-                        });
-                    }, '删除消息');
-                }
+                showCustomConfirm('确定要删除这条消息吗？', () => {
+                    dbGetAll('chat_history', allMsgs => {
+                        const dbMsg = allMsgs.find(m => m.friendId === activeMessage.friendId && m.timestamp === activeMessage.timestamp);
+                        if (dbMsg) {
+                            dbDelete('chat_history', dbMsg.id, () => {
+                                renderMessages(currentChatFriendId);
+                            });
+                        }
+                    });
+                }, '删除消息');
             }
             msgContextMenu.style.display = 'none';
         });
@@ -5322,12 +2539,7 @@
                             dbDelete('chat_history', msg.id, () => {
                                 deletedCount++;
                                 if (deletedCount === messagesToDelete.length) {
-                                    const isOfflineModeUI = document.getElementById('offline-chat-page').classList.contains('active');
-                                    if (isOfflineModeUI) {
-                                        renderOfflineChat(currentChatFriendId);
-                                    } else {
-                                        renderMessages(currentChatFriendId);
-                                    }
+                                    renderMessages(currentChatFriendId);
                                     triggerAIResponse();
                                 }
                             });
@@ -5347,11 +2559,7 @@
 
         document.getElementById('msg-ctx-edit').addEventListener('click', () => {
             if (activeMessage) {
-                if (activeMessageSegment) {
-                    document.getElementById('edit-message-content').value = activeMessageSegment.content;
-                } else {
-                    document.getElementById('edit-message-content').value = activeMessage.text;
-                }
+                document.getElementById('edit-message-content').value = activeMessage.text;
                 document.getElementById('edit-message-modal').style.display = 'flex';
             }
             msgContextMenu.style.display = 'none';
@@ -5437,12 +2645,7 @@
                             if (deletedCount === msgsToDelete.length) {
                                 showToast('删除成功');
                                 exitSelectionMode();
-                                const isOfflineModeUI = document.getElementById('offline-chat-page').classList.contains('active');
-                                if (isOfflineModeUI) {
-                                    renderOfflineChat(currentChatFriendId);
-                                } else {
-                                    renderMessages(currentChatFriendId);
-                                }
+                                renderMessages(currentChatFriendId);
                             }
                         });
                     });
@@ -5450,13 +2653,11 @@
             }, '删除消息');
         }
 
-        // Add a back button interceptor for selection mode and mini phone
+        // Add a back button interceptor for selection mode
         const originalBackArrowClick = document.querySelector('.chat-interface-header .back-arrow').onclick;
         document.querySelector('.chat-interface-header .back-arrow').onclick = (e) => {
             if (isSelectionMode) {
                 exitSelectionMode();
-            } else if (document.getElementById('chat-interface-page').classList.contains('in-mini-phone')) {
-                closeMiniPhoneChat();
             } else {
                 if (originalBackArrowClick) originalBackArrowClick(e);
                 else showPage('wechat-page');
@@ -5473,29 +2674,11 @@
                 dbGetAll('chat_history', allMsgs => {
                     const dbMsg = allMsgs.find(m => m.friendId === activeMessage.friendId && m.timestamp === activeMessage.timestamp);
                     if (dbMsg) {
-                        if (activeMessageSegment) {
-                            let parts = parseOfflineMessage(dbMsg.text);
-                            parts[activeMessageSegment.index].content = newText;
-                            
-                            let combinedText = '';
-                            parts.forEach(p => {
-                                if (p.type === 'dialogue') combinedText += '「' + p.content + '」';
-                                else if (p.type === 'thought') combinedText += '<thought>' + p.content + '</thought>';
-                                else if (p.type === 'action') combinedText += p.content;
-                            });
-                            
-                            dbMsg.text = combinedText;
-                            dbUpdate('chat_history', dbMsg, () => {
-                                document.getElementById('edit-message-modal').style.display = 'none';
-                                renderOfflineChat(currentChatFriendId);
-                            });
-                        } else {
-                            dbMsg.text = newText;
-                            dbUpdate('chat_history', dbMsg, () => {
-                                document.getElementById('edit-message-modal').style.display = 'none';
-                                renderMessages(currentChatFriendId, dbMsg.id || dbMsg.timestamp);
-                            });
-                        }
+                        dbMsg.text = newText;
+                        dbUpdate('chat_history', dbMsg, () => {
+                            document.getElementById('edit-message-modal').style.display = 'none';
+                            renderMessages(currentChatFriendId);
+                        });
                     }
                 });
             }
@@ -5520,7 +2703,7 @@
             return sanitizedText;
         }
 
-        function attachMessageEvents(element, messageObj, segmentInfo = null) {
+        function attachMessageEvents(element, messageObj) {
             let pressTimer;
             let startX, startY;
             let isLongPress = false;
@@ -5533,8 +2716,7 @@
                 
                 pressTimer = setTimeout(() => {
                     isLongPress = true;
-                    e.preventDefault();
-                    showMessageContextMenu(e, messageObj, segmentInfo);
+                    showMessageContextMenu(e, messageObj);
                 }, 500);
             };
 
@@ -5581,9 +2763,8 @@
             element.addEventListener('touchmove', cancelPress);
             element.addEventListener('contextmenu', (e) => { 
                 e.preventDefault(); 
-                if (!isLongPress) {
-                    showMessageContextMenu(e, messageObj, segmentInfo); 
-                }
+                showMessageContextMenu(e, messageObj); 
+                isLongPress = true;
             });
             element.addEventListener('click', onClick, true);
         }
@@ -5593,9 +2774,6 @@
 
             const container = document.getElementById('chat-messages-container');
             const msgDate = new Date(msg.timestamp);
-
-            const friend = currentChatFriend;
-            const profile = currentUserProfile;
 
             // New Offline Mode Handling
             if (msg.isOffline) {
@@ -5627,12 +2805,6 @@
 
                 const avatar = document.createElement('img');
                 avatar.className = 'chat-avatar-placeholder';
-                if (msg.type === 'received') {
-                    avatar.onclick = (e) => {
-                        e.stopPropagation();
-                        handleAvatarClick(msg.friendId);
-                    };
-                }
 
                 if (msg.type === 'received') {
                     wrapper.appendChild(avatar);
@@ -5644,71 +2816,45 @@
 
                 container.appendChild(wrapper);
 
-                if (friend && friend.isGroup && msg.type === 'received' && msg.senderName) {
-                    const nameLabel = document.createElement('div');
-                    nameLabel.style.fontSize = '12px';
-                    nameLabel.style.color = '#999';
-                    nameLabel.style.marginBottom = '2px';
-                    nameLabel.style.marginLeft = '2px';
-                    nameLabel.textContent = msg.senderName;
-                    contentGroup.insertBefore(nameLabel, contentGroup.firstChild);
-                }
+                dbGet('friends', msg.friendId, friend => {
+                    if (!friend || !friend.offlineSettings) {
+                        bubble.innerHTML = msg.text.replace(/\n/g, '<br>');
+                        return; 
+                    }
 
-                if (!friend || !friend.offlineSettings) {
-                    bubble.innerHTML = msg.text.replace(/\n/g, '<br>');
+                    // Sanitize and format the text
+                    let sanitizedText = sanitizeThoughtTags(msg.text);
+                    let formattedHtml = sanitizedText
+                        .replace(/<thought>([\s\S]*?)<\/thought>/g, (match, thoughtText) => {
+                            if (friend.offlineSettings.showThoughts) {
+                                return `<span class="message-thought">${thoughtText}</span>`;
+                            }
+                            return ''; // Hide if showThoughts is false
+                        })
+                        .replace(/\n/g, '<br>');
+
+                    bubble.innerHTML = formattedHtml;
+
                     if (msg.type === 'received') {
-                        if (friend && friend.isGroup && msg.senderAvatar) {
-                            avatar.src = msg.senderAvatar;
-                        } else {
-                            avatar.src = friend ? friend.avatar : '';
-                        }
-                        if (friend && (friend.avatarDisplay === 'hide_other' || friend.avatarDisplay === 'hide_both')) {
+                        avatar.src = friend.avatar;
+                        if (friend.avatarDisplay === 'hide_other' || friend.avatarDisplay === 'hide_both') {
                             avatar.style.display = 'none';
                         }
+                    } else {
+                        if (friend.avatarDisplay === 'hide_mine' || friend.avatarDisplay === 'hide_both') {
+                            avatar.style.display = 'none';
+                        }
+                        if (friend.myAvatar) {
+                            avatar.src = friend.myAvatar;
+                        } else {
+                            dbGet('user_profile', 'main_user', profile => {
+                                avatar.src = (profile && profile.avatar) ? profile.avatar : 'https://via.placeholder.com/150/B5EAD7/ffffff?text=Me';
+                            });
+                        }
                     }
+
                     if (shouldScroll) container.scrollTop = container.scrollHeight;
-                    return; 
-                }
-
-                // Sanitize and format the text
-                let sanitizedText = sanitizeThoughtTags(msg.text);
-                let formattedHtml = sanitizedText;
-                
-                if (friend.offlineSettings.showThoughts) {
-                    formattedHtml = formattedHtml.replace(/<thought>([\s\S]*?)<\/thought>/g, '<span class="message-thought">$1</span>');
-                } else {
-                    // 如果隐藏心声，移除整个标签，并尝试吃掉周围多余的换行
-                    formattedHtml = formattedHtml.replace(/\n*<thought>[\s\S]*?<\/thought>\n*/g, '\n');
-                }
-                
-                // 修复可能产生的多余换行 (连续3个以上的换行缩减为2个)
-                formattedHtml = formattedHtml.replace(/\n{3,}/g, '\n\n').trim();
-                
-                formattedHtml = formattedHtml.replace(/\n/g, '<br>');
-
-                bubble.innerHTML = formattedHtml;
-
-                if (msg.type === 'received') {
-                    if (friend && friend.isGroup && msg.senderAvatar) {
-                        avatar.src = msg.senderAvatar;
-                    } else {
-                        avatar.src = friend.avatar;
-                    }
-                    if (friend.avatarDisplay === 'hide_other' || friend.avatarDisplay === 'hide_both') {
-                        avatar.style.display = 'none';
-                    }
-                } else {
-                    if (friend.avatarDisplay === 'hide_mine' || friend.avatarDisplay === 'hide_both') {
-                        avatar.style.display = 'none';
-                    }
-                    if (friend.myAvatar) {
-                        avatar.src = friend.myAvatar;
-                    } else {
-                        avatar.src = (profile && profile.avatar) ? profile.avatar : 'https://via.placeholder.com/150/B5EAD7/ffffff?text=Me';
-                    }
-                }
-
-                if (shouldScroll) container.scrollTop = container.scrollHeight;
+                });
                 
                 return; // End execution for this message
             }
@@ -5732,235 +2878,6 @@
                 container.appendChild(recalledWrapper);
                 if (shouldScroll) container.scrollTop = container.scrollHeight;
                 return;
-            }
-
-            if (msg.isInfo) {
-                const infoWrapper = document.createElement('div');
-                infoWrapper.className = 'message-time-divider';
-                infoWrapper.style.fontSize = '12px';
-                infoWrapper.style.color = '#999';
-                infoWrapper.style.margin = '5px 0';
-                infoWrapper.textContent = msg.text;
-                container.appendChild(infoWrapper);
-                if (shouldScroll) container.scrollTop = container.scrollHeight;
-                return;
-            }
-
-            // Handle Location messages
-            if (msg.isLocation) {
-                const wrapper = document.createElement('div');
-                wrapper.className = `message-bubble-wrapper ${msg.type}`;
-                wrapper.dataset.msgId = msg.id || msg.timestamp;
-
-                // Selection Checkbox
-                const checkbox = document.createElement('div');
-                checkbox.className = 'message-checkbox';
-                wrapper.appendChild(checkbox);
-
-                const contentGroup = document.createElement('div');
-                contentGroup.className = 'message-content-group';
-
-                const bubble = document.createElement('div');
-                bubble.className = `message-bubble ${msg.type} location-bubble`;
-
-                bubble.innerHTML = `
-                    <div class="location-content-top">
-                        <span class="location-title">${msg.locationName || '位置'}</span>
-                        ${msg.locationDetail ? `<span class="location-desc">${msg.locationDetail}</span>` : ''}
-                    </div>
-                    <div class="location-content-bottom">
-                        <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='40' viewBox='0 0 32 40'><path d='M16 2 C8.268 2 2 8.268 2 16 C2 24.837 16 38 16 38 S30 24.837 30 16 C30 8.268 23.732 2 16 2 Z' fill='%2307c160' stroke='%23ffffff' stroke-width='2'/><circle cx='16' cy='16' r='5' fill='white'/></svg>" class="location-pin-icon" alt="Location Pin">
-                    </div>
-                `;
-
-                attachMessageEvents(bubble, msg);
-                contentGroup.appendChild(bubble);
-
-                const avatar = document.createElement('img');
-                avatar.className = 'chat-avatar-placeholder';
-                if (msg.type === 'received') {
-                    avatar.onclick = (e) => {
-                        e.stopPropagation();
-                        handleAvatarClick(msg.friendId);
-                    };
-                }
-                
-                const hideDisplay = friend ? friend.avatarDisplay : 'show_all';
-                if (msg.type === 'received' && (hideDisplay === 'hide_other' || hideDisplay === 'hide_both')) {
-                    avatar.style.display = 'none';
-                } else if (msg.type === 'sent' && (hideDisplay === 'hide_mine' || hideDisplay === 'hide_both')) {
-                    avatar.style.display = 'none';
-                }
-
-                if (msg.type === 'received') {
-                    if (friend && friend.isGroup && msg.senderAvatar) {
-                        avatar.src = msg.senderAvatar;
-                    } else {
-                        avatar.src = friend ? friend.avatar : '';
-                    }
-                } else {
-                    if (friend && friend.myAvatar) avatar.src = friend.myAvatar;
-                    else {
-                        avatar.src = (profile && profile.avatar) ? profile.avatar : 'https://via.placeholder.com/150';
-                    }
-                }
-
-                if (msg.type === 'received') {
-                    wrapper.appendChild(avatar);
-                    wrapper.appendChild(contentGroup);
-                } else {
-                    wrapper.appendChild(contentGroup);
-                    wrapper.appendChild(avatar);
-                }
-
-                container.appendChild(wrapper);
-                if (shouldScroll) container.scrollTop = container.scrollHeight;
-                
-                return bubble;
-            }
-
-            // Handle Location messages
-            if (msg.isLocation) {
-                const wrapper = document.createElement('div');
-                wrapper.className = `message-bubble-wrapper ${msg.type}`;
-                wrapper.dataset.msgId = msg.id || msg.timestamp;
-
-                // Selection Checkbox
-                const checkbox = document.createElement('div');
-                checkbox.className = 'message-checkbox';
-                wrapper.appendChild(checkbox);
-
-                const contentGroup = document.createElement('div');
-                contentGroup.className = 'message-content-group';
-
-                const bubble = document.createElement('div');
-                bubble.className = `message-bubble ${msg.type} location-bubble`;
-
-                bubble.innerHTML = `
-                    <div class="location-content-top">
-                        <span class="location-title">${msg.locationName || '位置'}</span>
-                        ${msg.locationDetail ? `<span class="location-desc">${msg.locationDetail}</span>` : ''}
-                    </div>
-                    <div class="location-content-bottom">
-                        <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='40' viewBox='0 0 32 40'><path d='M16 2 C8.268 2 2 8.268 2 16 C2 24.837 16 38 16 38 S30 24.837 30 16 C30 8.268 23.732 2 16 2 Z' fill='%2307c160' stroke='%23ffffff' stroke-width='2'/><circle cx='16' cy='16' r='5' fill='white'/></svg>" class="location-pin-icon" alt="Location Pin">
-                    </div>
-                `;
-
-                attachMessageEvents(bubble, msg);
-                contentGroup.appendChild(bubble);
-
-                const avatar = document.createElement('img');
-                avatar.className = 'chat-avatar-placeholder';
-                if (msg.type === 'received') {
-                    avatar.onclick = (e) => {
-                        e.stopPropagation();
-                        handleAvatarClick(msg.friendId);
-                    };
-                }
-                
-                const hideDisplay = friend ? friend.avatarDisplay : 'show_all';
-                if (msg.type === 'received' && (hideDisplay === 'hide_other' || hideDisplay === 'hide_both')) {
-                    avatar.style.display = 'none';
-                } else if (msg.type === 'sent' && (hideDisplay === 'hide_mine' || hideDisplay === 'hide_both')) {
-                    avatar.style.display = 'none';
-                }
-
-                if (msg.type === 'received') {
-                    if (friend && friend.isGroup && msg.senderAvatar) {
-                        avatar.src = msg.senderAvatar;
-                    } else {
-                        avatar.src = friend ? friend.avatar : '';
-                    }
-                } else {
-                    if (friend && friend.myAvatar) avatar.src = friend.myAvatar;
-                    else {
-                        avatar.src = (profile && profile.avatar) ? profile.avatar : 'https://via.placeholder.com/150';
-                    }
-                }
-
-                if (msg.type === 'received') {
-                    wrapper.appendChild(avatar);
-                    wrapper.appendChild(contentGroup);
-                } else {
-                    wrapper.appendChild(contentGroup);
-                    wrapper.appendChild(avatar);
-                }
-
-                container.appendChild(wrapper);
-                if (shouldScroll) container.scrollTop = container.scrollHeight;
-                
-                return bubble;
-            }
-
-            // Handle Location messages
-            if (msg.isLocation) {
-                const wrapper = document.createElement('div');
-                wrapper.className = `message-bubble-wrapper ${msg.type}`;
-                wrapper.dataset.msgId = msg.id || msg.timestamp;
-
-                // Selection Checkbox
-                const checkbox = document.createElement('div');
-                checkbox.className = 'message-checkbox';
-                wrapper.appendChild(checkbox);
-
-                const contentGroup = document.createElement('div');
-                contentGroup.className = 'message-content-group';
-
-                const bubble = document.createElement('div');
-                bubble.className = `message-bubble ${msg.type} location-bubble`;
-
-                bubble.innerHTML = `
-                    <div class="location-content-top">
-                        <span class="location-title">${msg.locationName || '位置'}</span>
-                        ${msg.locationDetail ? `<span class="location-desc">${msg.locationDetail}</span>` : ''}
-                    </div>
-                    <div class="location-content-bottom"></div>
-                `;
-
-                attachMessageEvents(bubble, msg);
-                contentGroup.appendChild(bubble);
-
-                const avatar = document.createElement('img');
-                avatar.className = 'chat-avatar-placeholder';
-                if (msg.type === 'received') {
-                    avatar.onclick = (e) => {
-                        e.stopPropagation();
-                        handleAvatarClick(msg.friendId);
-                    };
-                }
-                
-                const hideDisplay = friend ? friend.avatarDisplay : 'show_all';
-                if (msg.type === 'received' && (hideDisplay === 'hide_other' || hideDisplay === 'hide_both')) {
-                    avatar.style.display = 'none';
-                } else if (msg.type === 'sent' && (hideDisplay === 'hide_mine' || hideDisplay === 'hide_both')) {
-                    avatar.style.display = 'none';
-                }
-
-                if (msg.type === 'received') {
-                    if (friend && friend.isGroup && msg.senderAvatar) {
-                        avatar.src = msg.senderAvatar;
-                    } else {
-                        avatar.src = friend ? friend.avatar : '';
-                    }
-                } else {
-                    if (friend && friend.myAvatar) avatar.src = friend.myAvatar;
-                    else {
-                        avatar.src = (profile && profile.avatar) ? profile.avatar : 'https://via.placeholder.com/150';
-                    }
-                }
-
-                if (msg.type === 'received') {
-                    wrapper.appendChild(avatar);
-                    wrapper.appendChild(contentGroup);
-                } else {
-                    wrapper.appendChild(contentGroup);
-                    wrapper.appendChild(avatar);
-                }
-
-                container.appendChild(wrapper);
-                if (shouldScroll) container.scrollTop = container.scrollHeight;
-                
-                return bubble;
             }
 
             // Handle Transfer messages
@@ -6027,83 +2944,6 @@
 
                 const avatar = document.createElement('img');
                 avatar.className = 'chat-avatar-placeholder';
-                if (msg.type === 'received') {
-                    avatar.onclick = (e) => {
-                        e.stopPropagation();
-                        handleAvatarClick(msg.friendId);
-                    };
-                }
-                
-                const hideDisplay = friend ? friend.avatarDisplay : 'show_all';
-                if (msg.type === 'received' && (hideDisplay === 'hide_other' || hideDisplay === 'hide_both')) {
-                    avatar.style.display = 'none';
-                } else if (msg.type === 'sent' && (hideDisplay === 'hide_mine' || hideDisplay === 'hide_both')) {
-                    avatar.style.display = 'none';
-                }
-
-                if (msg.type === 'received') {
-                    if (friend && friend.isGroup && msg.senderAvatar) {
-                        avatar.src = msg.senderAvatar;
-                    } else {
-                        avatar.src = friend ? friend.avatar : '';
-                    }
-                } else {
-                    if (friend && friend.myAvatar) avatar.src = friend.myAvatar;
-                    else {
-                        avatar.src = (profile && profile.avatar) ? profile.avatar : 'https://via.placeholder.com/150';
-                    }
-                }
-
-                if (msg.type === 'received') {
-                    wrapper.appendChild(avatar);
-                    wrapper.appendChild(contentGroup);
-                } else {
-                    wrapper.appendChild(contentGroup);
-                    wrapper.appendChild(avatar);
-                }
-
-                container.appendChild(wrapper);
-                if (shouldScroll) container.scrollTop = container.scrollHeight;
-                
-                return bubble;
-            }
-
-            // Handle Location messages
-            if (msg.isLocation) {
-                const wrapper = document.createElement('div');
-                wrapper.className = `message-bubble-wrapper ${msg.type}`;
-                wrapper.dataset.msgId = msg.id || msg.timestamp;
-
-                // Selection Checkbox
-                const checkbox = document.createElement('div');
-                checkbox.className = 'message-checkbox';
-                wrapper.appendChild(checkbox);
-
-                const contentGroup = document.createElement('div');
-                contentGroup.className = 'message-content-group';
-
-                const bubble = document.createElement('div');
-                bubble.className = `message-bubble ${msg.type} location-bubble`;
-
-                bubble.innerHTML = `
-                    <div class="location-content-top">
-                        <span class="location-title">${msg.locationName || '位置'}</span>
-                        ${msg.locationDetail ? `<span class="location-desc">${msg.locationDetail}</span>` : ''}
-                    </div>
-                    <div class="location-content-bottom"></div>
-                `;
-
-                attachMessageEvents(bubble, msg);
-                contentGroup.appendChild(bubble);
-
-                const avatar = document.createElement('img');
-                avatar.className = 'chat-avatar-placeholder';
-                if (msg.type === 'received') {
-                    avatar.onclick = (e) => {
-                        e.stopPropagation();
-                        handleAvatarClick(msg.friendId);
-                    };
-                }
                 
                 const targetFriendId = msg.friendId || currentChatFriendId;
                 dbGet('friends', targetFriendId, friend => {
@@ -6115,11 +2955,7 @@
                     }
 
                     if (msg.type === 'received') {
-                        if (friend && friend.isGroup && msg.senderAvatar) {
-                            avatar.src = msg.senderAvatar;
-                        } else {
-                            avatar.src = friend ? friend.avatar : '';
-                        }
+                        avatar.src = friend ? friend.avatar : '';
                     } else {
                         if (friend && friend.myAvatar) avatar.src = friend.myAvatar;
                         else {
@@ -6189,31 +3025,12 @@
                 
                 const avatar = document.createElement('img');
                 avatar.className = 'chat-avatar-placeholder';
-                if (msg.type === 'received') {
-                    avatar.onclick = (e) => {
-                        e.stopPropagation();
-                        handleAvatarClick(msg.friendId);
-                    };
-                }
                 
                 const targetFriendId = msg.friendId || currentChatFriendId;
                 if (msg.type === 'received') {
                     dbGet('friends', targetFriendId, friend => {
-                        if (friend && friend.isGroup && msg.senderName) {
-                            const nameLabel = document.createElement('div');
-                            nameLabel.style.fontSize = '12px';
-                            nameLabel.style.color = '#999';
-                            nameLabel.style.marginBottom = '2px';
-                            nameLabel.style.marginLeft = '2px';
-                            nameLabel.textContent = msg.senderName;
-                            contentGroup.insertBefore(nameLabel, contentGroup.firstChild);
-                        }
                         if (friend) {
-                            if (friend.isGroup && msg.senderAvatar) {
-                                avatar.src = msg.senderAvatar;
-                            } else {
-                                avatar.src = friend.avatar;
-                            }
+                            avatar.src = friend.avatar;
                             if (friend.avatarDisplay === 'hide_other' || friend.avatarDisplay === 'hide_both') {
                                 avatar.style.display = 'none';
                             }
@@ -6259,31 +3076,7 @@
 
             const bubble = document.createElement('div');
             bubble.className = `message-bubble ${msg.type}`;
-            
-            // Programmatically add text and line breaks to prevent XSS
-            msg.text.split('\n').forEach((line, index, arr) => {
-                bubble.appendChild(document.createTextNode(line));
-                if (index < arr.length - 1) {
-                    bubble.appendChild(document.createElement('br'));
-                }
-            });
-
-            // Add corner decorators
-            const tl = document.createElement('div');
-            tl.className = 'bubble-corner tl';
-            bubble.appendChild(tl);
-
-            const tr = document.createElement('div');
-            tr.className = 'bubble-corner tr';
-            bubble.appendChild(tr);
-
-            const bl = document.createElement('div');
-            bl.className = 'bubble-corner bl';
-            bubble.appendChild(bl);
-
-            const br = document.createElement('div');
-            br.className = 'bubble-corner br';
-            bubble.appendChild(br);
+            bubble.textContent = msg.text;
 
             // Attach events
             attachMessageEvents(bubble, msg);
@@ -6310,30 +3103,11 @@
 
             const avatar = document.createElement('img');
             avatar.className = 'chat-avatar-placeholder';
-            if (msg.type === 'received') {
-                avatar.onclick = (e) => {
-                    e.stopPropagation();
-                    handleAvatarClick(msg.friendId);
-                };
-            }
 
             if (msg.type === 'received') {
                 dbGet('friends', currentChatFriendId, friend => {
-                    if (friend && friend.isGroup && msg.senderName) {
-                        const nameLabel = document.createElement('div');
-                        nameLabel.style.fontSize = '12px';
-                        nameLabel.style.color = '#999';
-                        nameLabel.style.marginBottom = '2px';
-                        nameLabel.style.marginLeft = '2px';
-                        nameLabel.textContent = msg.senderName;
-                        contentGroup.insertBefore(nameLabel, contentGroup.firstChild);
-                    }
                     if (friend) {
-                        if (friend.isGroup && msg.senderAvatar) {
-                            avatar.src = msg.senderAvatar;
-                        } else {
-                            avatar.src = friend.avatar;
-                        }
+                        avatar.src = friend.avatar;
                         // Handle avatar hiding for received messages
                         if (friend.avatarDisplay === 'hide_other' || friend.avatarDisplay === 'hide_both') {
                             avatar.style.display = 'none';
@@ -6383,18 +3157,6 @@
         }
 
         function compressImage(file, quality = 0.7, callback) {
-            // For GIFs, we can't really compress them via canvas, so just return the original
-            if (file.type === 'image/gif') {
-                const reader = new FileReader();
-                reader.onload = (e) => callback(e.target.result);
-                reader.readAsDataURL(file);
-                return;
-            }
-
-            // 限制最大尺寸
-            const MAX_WIDTH = 1024;
-            const MAX_HEIGHT = 1024;
-            
             const reader = new FileReader();
             reader.onload = (e) => {
                 const img = new Image();
@@ -6402,95 +3164,43 @@
                     const canvas = document.getElementById('compression-canvas');
                     const ctx = canvas.getContext('2d');
                     
+                    const MAX_WIDTH = 800;
+                    const MAX_HEIGHT = 800;
                     let width = img.width;
                     let height = img.height;
 
-                    // 更智能的缩放
                     if (width > height) {
                         if (width > MAX_WIDTH) {
-                            height = Math.round(height * MAX_WIDTH / width);
+                            height *= MAX_WIDTH / width;
                             width = MAX_WIDTH;
                         }
                     } else {
                         if (height > MAX_HEIGHT) {
-                            width = Math.round(width * MAX_HEIGHT / height);
+                            width *= MAX_HEIGHT / height;
                             height = MAX_HEIGHT;
                         }
                     }
-                    
                     canvas.width = width;
                     canvas.height = height;
                     ctx.drawImage(img, 0, 0, width, height);
                     
-                    // 根据文件类型选择格式
+                    // For GIFs, we can't really compress them via canvas, so just return the original
+                    if (file.type === 'image/gif') {
+                        callback(e.target.result);
+                        return;
+                    }
+
+                    // Determine output format
+                    // If it's a PNG, keep it as PNG to preserve transparency. Otherwise use JPEG for better compression.
                     const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-                    
-                    // 分批处理，避免阻塞UI
-                    setTimeout(() => {
-                        const dataUrl = canvas.toDataURL(mimeType, quality);
-                        callback(dataUrl);
-                    }, 10);
+
+                    // For other types, compress
+                    const dataUrl = canvas.toDataURL(mimeType, quality);
+                    callback(dataUrl);
                 };
                 img.src = e.target.result;
             };
             reader.readAsDataURL(file);
-        }
-
-        // --- Unified Image Uploader ---
-        window.isUploading = false;
-
-        function createImageUploader(callback, options = {}) {
-            const { quality = 0.7, maxSizeMB = 10 } = options;
-
-            return function(...args) {
-                if (window.isUploading) {
-                    showToast('请等待当前上传完成');
-                    return;
-                }
-                
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = 'image/*';
-                input.style.display = 'none';
-                
-                input.onchange = function(e) {
-                    window.isUploading = true;
-                    const file = e.target.files[0];
-                    
-                    // Cleanup function
-                    const cleanup = () => {
-                        window.isUploading = false;
-                        if (input.parentNode) {
-                            document.body.removeChild(input);
-                        }
-                    };
-
-                    if (!file) {
-                        cleanup();
-                        return;
-                    }
-                    
-                    if (!file.type.startsWith('image/')) {
-                        showToast('请选择图片文件');
-                        cleanup();
-                        return;
-                    }
-                    
-                    if (file.size > maxSizeMB * 1024 * 1024) {
-                        showToast(`图片不能超过${maxSizeMB}MB`);
-                        cleanup();
-                        return;
-                    }
-                    
-                    compressImage(file, quality, (compressedSrc) => {
-                        callback(compressedSrc, ...args);
-                        cleanup();
-                    });
-                };
-                
-                document.body.appendChild(input);
-                input.click();
-            };
         }
 
         stickerUploadBtn.addEventListener('click', () => stickerFileInput.click());
@@ -6499,57 +3209,24 @@
             const files = e.target.files;
             if (!files || files.length === 0) return;
 
-            let currentIndex = 0;
-            let uploadedCount = 0;
+            let processedCount = 0;
             const totalFiles = files.length;
 
-            function processNext() {
-                if (currentIndex >= totalFiles) {
-                    if (uploadedCount > 0) {
-                        renderStickerGrid();
-                    }
-                    e.target.value = ''; // Reset file input
-                    return;
-                }
-
-                const file = files[currentIndex];
+            Array.from(files).forEach(file => {
                 compressImage(file, 0.6, (compressedSrc) => {
-                    const titleText = totalFiles > 1 ? `添加表情包含义 (${currentIndex + 1}/${totalFiles})` : '添加表情包含义';
-                    
-                    showGenericStickerModal({
-                        title: titleText,
-                        body: `
-                            <div style="text-align:center; margin-bottom:15px;">
-                                <img src="${compressedSrc}" style="max-width:150px; max-height:150px; border-radius:8px; border:1px solid #eee;">
-                            </div>
-                            <label>请输入表情包含义</label>
-                            <input type="text" id="sticker-desc-input" placeholder="例如：开心、点赞、疑问...">
-                        `,
-                        onConfirm: () => {
-                            const desc = document.getElementById('sticker-desc-input').value.trim();
-                            
-                            const newSticker = {
-                                src: compressedSrc,
-                                group: currentStickerGroup === '全部' ? '默认' : currentStickerGroup,
-                                description: desc || ''
-                            };
-                            
-                            dbAdd('stickers', newSticker, () => {
-                                uploadedCount++;
-                                currentIndex++;
-                                processNext();
-                            });
-                            return true;
-                        },
-                        onCancel: () => {
-                            currentIndex++;
-                            processNext();
+                    const newSticker = {
+                        src: compressedSrc,
+                        group: currentStickerGroup === '全部' ? '默认' : currentStickerGroup
+                    };
+                    dbAdd('stickers', newSticker, () => {
+                        processedCount++;
+                        if (processedCount === totalFiles) {
+                            renderStickerGrid();
                         }
                     });
                 });
-            }
-
-            processNext();
+            });
+            e.target.value = ''; // Reset file input
         });
 
         function showGenericStickerModal(config) {
@@ -6637,7 +3314,7 @@
                         if (parts.length < 2) return; 
                         
                         const url = parts[parts.length - 1];
-                        if (!url.startsWith('http') && !url.startsWith('data:') && !url.startsWith('./') && !url.startsWith('/') && !url.match(/\.(png|jpe?g|gif|webp|svg|bmp)$/i)) return;
+                        if (!url.startsWith('http')) return;
                         
                         const desc = parts.slice(0, parts.length - 1).join(' ');
                         
@@ -6672,331 +3349,65 @@
         });
 
 
-        function applyChatTheme(friend) {
-            const getSetting = (key, defaultVal) => {
-                if (friend && friend[key] !== undefined && friend[key] !== null) return friend[key];
-                // Read from the in-memory cache which is populated from IndexedDB
-                if (themeSettings[key] !== undefined && themeSettings[key] !== null) return themeSettings[key];
-                // Fallback to localStorage for older data before migration
-                const globalVal = localStorage.getItem(key);
-                if (globalVal !== null) return globalVal;
-                return defaultVal;
-            };
-
-            const chatPage = document.getElementById('chat-interface-page');
-            const chatContainer = document.getElementById('chat-messages-container');
-            const chatHeader = document.querySelector('.chat-interface-header');
-            const chatInputContainer = document.getElementById('chat-input-container');
-            
-            // Reset base colors
-            chatPage.style.backgroundImage = 'none';
-            chatPage.style.backgroundColor = '#ededed';
-
-            // Wallpaper
-            const wallpaper = getSetting('chat_wallpaper', null);
-            if (wallpaper) {
-                chatPage.style.backgroundImage = `url(${wallpaper})`;
-                chatPage.style.backgroundSize = 'cover';
-                chatPage.style.backgroundPosition = 'center';
-                chatContainer.style.backgroundColor = 'transparent'; // Make message area transparent
-            } else {
-                chatPage.style.backgroundImage = 'none';
-                chatPage.style.backgroundColor = '#ededed';
-                chatContainer.style.backgroundColor = ''; // Revert to stylesheet default
-            }
-
-            // Header BG
-            const headerBg = getSetting('chat_header_bg', null);
-            if (headerBg) {
-                chatHeader.style.backgroundImage = `url(${headerBg})`;
-                chatHeader.style.backgroundColor = 'transparent';
-                chatHeader.style.borderBottom = 'none';
-            } else {
-                chatHeader.style.backgroundImage = 'none';
-                chatHeader.style.backgroundColor = 'var(--chat-header-bg-color, #ededed)';
-                chatHeader.style.borderBottom = '1px solid #d7d7d7';
-            }
-
-            // Input BG
-            const inputBg = getSetting('chat_input_bg', null);
-            if (inputBg) {
-                chatInputContainer.style.backgroundImage = `url(${inputBg})`;
-                chatInputContainer.style.backgroundColor = 'transparent';
-                chatInputContainer.style.borderTop = 'none';
-            } else {
-                chatInputContainer.style.backgroundImage = 'none';
-                chatInputContainer.style.backgroundColor = 'var(--chat-input-bg-color, #f7f7f7)';
-                chatInputContainer.style.borderTop = '1px solid #e0e0e0';
-            }
-
-            // Icons
-            const setIconInline = (selector, key) => {
-                const el = document.querySelector(selector);
-                if (!el) return;
-                const val = getSetting(key, null);
-                if (val) {
-                    el.style.backgroundImage = `url(${val})`;
-                } else {
-                    el.style.removeProperty('background-image');
-                }
-            };
-            
-            setIconInline('.chat-interface-header .back-arrow', 'chat_back_icon');
-            setIconInline('.chat-interface-options', 'chat_options_icon');
-            setIconInline('#voice-icon', 'chat_voice_icon');
-            setIconInline('#emoji-icon', 'chat_emoji_icon');
-            setIconInline('#plus-icon', 'chat_plus_icon');
-            setIconInline('#send-message-btn', 'chat_send_icon');
-
-            // Avatar Styles via CSS variables on root
-            const avatarSize = getSetting('chat_avatar_size', '40');
-            const avatarRadius = getSetting('chat_avatar_radius', '6');
-            document.documentElement.style.setProperty('--chat-avatar-size', `${avatarSize}px`);
-            document.documentElement.style.setProperty('--chat-avatar-radius', `${avatarRadius}px`);
-
-            // Bubble Theme Styles via CSS variables on root
-            const applyBubbleSide = (side) => {
-                const prefix = side === 'sent' ? 'bubble_sent_' : 'bubble_recv_';
-                
-                const bgColor = getSetting(prefix + 'bg_color', side === 'sent' ? '#a9e979' : '#ffffff');
-                const bgOpacity = getSetting(prefix + 'bg_opacity', '1');
-                const textColor = getSetting(prefix + 'text_color', '#000000');
-                const borderColor = getSetting(prefix + 'border_color', 'transparent');
-                const borderWidth = getSetting(prefix + 'border_width', '0');
-                const borderOpacity = getSetting(prefix + 'border_opacity', '1');
-                const shadowColor = getSetting(prefix + 'shadow_color', '#000000');
-                const shadowOpacity = getSetting(prefix + 'shadow_opacity', '0');
-                const shadowX = getSetting(prefix + 'shadow_x', '0');
-                const shadowY = getSetting(prefix + 'shadow_y', '0');
-                const shadowBlur = getSetting(prefix + 'shadow_blur', '0');
-                const tailColor = getSetting(prefix + 'tail_color', '');
-                const hideTriangleRaw = getSetting(prefix + 'hide_triangle', 'false');
-                const hideTriangle = hideTriangleRaw === 'true' || hideTriangleRaw === true;
-                const radius = getSetting(prefix + 'radius', '8');
-
-                const tailImage = getSetting(prefix + 'tail_image', '');
-                const tailWidth = getSetting(prefix + 'tail_width', '20');
-                const tailHeight = getSetting(prefix + 'tail_height', '20');
-                const tailX = getSetting(prefix + 'tail_x', '0');
-                const tailY = getSetting(prefix + 'tail_y', '0');
-                const tailRot = getSetting(prefix + 'tail_rot', '0');
-                
-                const effect3dRaw = getSetting(prefix + '3d_effect', 'false');
-                const effect3d = effect3dRaw === 'true' || effect3dRaw === true;
-
-                const hexToRgba = (hex, alpha) => {
-                    if (!hex || hex === 'transparent') return 'transparent';
-                    let r = 0, g = 0, b = 0;
-                    hex = hex.replace('#', '');
-                    if (hex.length === 3) {
-                        r = parseInt(hex[0] + hex[0], 16);
-                        g = parseInt(hex[1] + hex[1], 16);
-                        b = parseInt(hex[2] + hex[2], 16);
-                    } else if (hex.length === 6) {
-                        r = parseInt(hex.substring(0, 2), 16);
-                        g = parseInt(hex.substring(2, 4), 16);
-                        b = parseInt(hex.substring(4, 6), 16);
-                    } else {
-                        return hex;
-                    }
-                    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-                };
-
-                const finalBgColor = hexToRgba(bgColor, bgOpacity);
-                const finalBorderColor = hexToRgba(borderColor, borderOpacity);
-
-                document.documentElement.style.setProperty(`--bubble-${side}-bg-color`, finalBgColor);
-                document.documentElement.style.setProperty(`--bubble-${side}-text-color`, textColor);
-                
-                let boxShadow = 'none';
-                let backgroundImage = 'none';
-                if (effect3d) {
-                    boxShadow = 'inset 0 4px 6px rgba(255,255,255,0.4), inset 0 -4px 6px rgba(0,0,0,0.1)';
-                    backgroundImage = 'linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(0,0,0,0.05) 100%)';
-                }
-                
-                document.documentElement.style.setProperty(`--bubble-${side}-bg-image`, backgroundImage);
-                document.documentElement.style.setProperty(`--bubble-${side}-bg-image-opacity`, '1');
-                
-                const finalShadowColor = hexToRgba(shadowColor, shadowOpacity);
-                let filterShadow = 'none';
-                if (parseFloat(shadowOpacity) > 0 || parseInt(shadowBlur) > 0 || parseInt(shadowX) !== 0 || parseInt(shadowY) !== 0) {
-                    filterShadow = `drop-shadow(${shadowX}px ${shadowY}px ${shadowBlur}px ${finalShadowColor})`;
-                }
-                
-                if (effect3d) {
-                    if (filterShadow === 'none') {
-                        // Keep shadow logic simple, if 3d is on we apply inset shadow directly to bubble
-                    }
-                }
-
-                document.documentElement.style.setProperty(`--bubble-${side}-border`, `${borderWidth}px solid ${finalBorderColor}`);
-                if (effect3d) {
-                    // Use a special property to pass box-shadow to CSS since filter is drop-shadow
-                    document.documentElement.style.setProperty(`--bubble-${side}-box-shadow`, boxShadow);
-                } else {
-                    document.documentElement.style.setProperty(`--bubble-${side}-box-shadow`, 'none');
-                }
-                document.documentElement.style.setProperty(`--bubble-${side}-shadow`, filterShadow);
-                
-                const finalTailColor = tailColor ? tailColor : finalBgColor;
-                const tailBorderColor = side === 'sent' ? `transparent transparent transparent ${finalTailColor}` : `transparent ${finalTailColor} transparent transparent`;
-                document.documentElement.style.setProperty(`--bubble-${side}-tail-color`, tailBorderColor);
-
-                document.documentElement.style.setProperty(`--bubble-${side}-triangle`, hideTriangle ? 'none' : 'block');
-                
-                // Set Tail Variables
-                document.documentElement.style.setProperty(`--bubble-${side}-tail-image`, tailImage ? `url(${tailImage})` : 'none');
-                document.documentElement.style.setProperty(`--bubble-${side}-tail-w`, tailImage ? tailWidth + 'px' : '0px');
-                document.documentElement.style.setProperty(`--bubble-${side}-tail-h`, tailImage ? tailHeight + 'px' : '0px');
-                document.documentElement.style.setProperty(`--bubble-${side}-tail-x`, tailX + 'px');
-                document.documentElement.style.setProperty(`--bubble-${side}-tail-y`, tailY + 'px');
-                document.documentElement.style.setProperty(`--bubble-${side}-tail-rot`, tailRot + 'deg');
-                if (tailImage) {
-                    document.documentElement.style.setProperty(`--bubble-${side}-tail-color`, 'transparent');
-                }
-
-                const formatUnit = (val) => {
-                    if (val === null || val === undefined || val === '') return 'auto';
-                    if (!isNaN(val) && val !== '') return val + 'px';
-                    return val;
-                };
-                let fRadius = formatUnit(radius);
-                if(fRadius === 'auto') fRadius = '8px';
-
-                document.documentElement.style.setProperty(`--bubble-${side}-radius`, fRadius);
-
-                // Apply Corners
-                ['tl', 'tr', 'bl', 'br'].forEach(corner => {
-                    const cPrefix = `bubble_${side}_${corner}_`;
-                    const cImg = getSetting(cPrefix + 'img', '');
-                    const cOp = getSetting(cPrefix + 'op', '1');
-                    const cx = getSetting(cPrefix + 'x', '-15');
-                    const cy = getSetting(cPrefix + 'y', '-15');
-                    const cw = getSetting(cPrefix + 'w', '30');
-                    const ch = getSetting(cPrefix + 'h', '30');
-                    
-                    const varPrefix = `--${side}-${corner}-`;
-                    document.documentElement.style.setProperty(varPrefix + 'op', cOp);
-                    document.documentElement.style.setProperty(varPrefix + 'x', cx + 'px');
-                    document.documentElement.style.setProperty(varPrefix + 'y', cy + 'px');
-                    document.documentElement.style.setProperty(varPrefix + 'w', cw + 'px');
-                    document.documentElement.style.setProperty(varPrefix + 'h', ch + 'px');
-                    if (cImg) {
-                        document.documentElement.style.setProperty(varPrefix + 'img', `url(${cImg})`);
-                    } else {
-                        document.documentElement.style.setProperty(varPrefix + 'img', 'none');
-                    }
-                });
-            };
-
-            applyBubbleSide('sent');
-            applyBubbleSide('recv');
-        }
-
         function openChat(friendId, targetMsgId = null) {
-            if (document.getElementById('mini-phone-modal').style.display === 'flex') {
-                closeMiniPhoneModal();
-            }
-
             currentChatFriendId = friendId;
             dbGet('friends', friendId, friend => {
                 if (!friend) return;
-                
-                if (friend.unreadCount) {
-                    friend.unreadCount = 0;
-                    dbUpdate('friends', friend, () => {
-                        if (document.getElementById('wechat-page').classList.contains('active')) {
-                            renderChatList();
-                        }
-                    });
-                }
-
                 document.getElementById('chat-interface-title').textContent = friend.name;
                 showPage('chat-interface-page');
                 renderMessages(friendId, targetMsgId);
-                // Also change status bar color to transparent so header background shows through
-                document.querySelector('.status-bar').style.backgroundColor = 'transparent';
+                // Also change status bar color
+                document.querySelector('.status-bar').style.backgroundColor = '#ededed';
                 
-                applyChatTheme(friend);
+                // Apply Chat Wallpaper
+                const chatPage = document.getElementById('chat-interface-page');
+                if (friend.chatWallpaper) {
+                    chatPage.style.backgroundImage = `url(${friend.chatWallpaper})`;
+                    chatPage.style.backgroundSize = 'cover';
+                    chatPage.style.backgroundPosition = 'center';
+                } else {
+                    const globalWallpaper = localStorage.getItem('chat_wallpaper');
+                    if (globalWallpaper) {
+                        chatPage.style.backgroundImage = `url(${globalWallpaper})`;
+                        chatPage.style.backgroundSize = 'cover';
+                        chatPage.style.backgroundPosition = 'center';
+                    } else {
+                        chatPage.style.backgroundImage = 'none';
+                        chatPage.style.backgroundColor = '#ededed';
+                    }
+                }
             });
         }
 
-        let currentChatLoadedCount = 0;
-        const CHAT_LOAD_LIMIT = 30;
-
-        function renderMessages(friendId, targetMsgId = null, isLoadMore = false) {
+        function renderMessages(friendId, targetMsgId = null) {
             const container = document.getElementById('chat-messages-container');
-            
-            dbGet('friends', friendId, friend => {
-                currentChatFriend = friend;
-                dbGet('user_profile', 'main_user', profile => {
-                    currentUserProfile = profile;
-                    
-                    const transaction = db.transaction(['chat_history'], 'readonly');
-                    const store = transaction.objectStore('chat_history');
-                    const index = store.index('friendId');
-                    const request = index.getAll(friendId);
+            container.innerHTML = '';
+            lastMessageTimestamp = null;
 
-                    request.onsuccess = () => {
-                        let messages = request.result;
-                        messages = messages.filter(msg => !msg.isOfflineSeparate);
-                        
-                        let previousScrollHeight = 0;
-                        let previousScrollTop = 0;
+            const transaction = db.transaction(['chat_history'], 'readonly');
+            const store = transaction.objectStore('chat_history');
+            const index = store.index('friendId');
+            const request = index.getAll(friendId);
 
-                        if (isLoadMore) {
-                            previousScrollHeight = container.scrollHeight;
-                            previousScrollTop = container.scrollTop;
-                            currentChatLoadedCount += CHAT_LOAD_LIMIT;
-                        } else {
-                            if (targetMsgId) {
-                                const targetIndex = messages.findIndex(m => String(m.id) === String(targetMsgId) || String(m.timestamp) === String(targetMsgId));
-                                if (targetIndex !== -1) {
-                                    const messagesAfterTarget = messages.length - targetIndex;
-                                    currentChatLoadedCount = Math.max(CHAT_LOAD_LIMIT, messagesAfterTarget + 10);
-                                } else {
-                                    currentChatLoadedCount = CHAT_LOAD_LIMIT;
-                                }
-                            } else {
-                                currentChatLoadedCount = CHAT_LOAD_LIMIT;
-                            }
+            request.onsuccess = () => {
+                const messages = request.result;
+                if (messages.length > 0) {
+                    messages.forEach(msg => addMessageToUI(msg, false));
+                }
+                
+                if (targetMsgId) {
+                    // Slight delay to ensure DOM is ready
+                    setTimeout(() => {
+                        // Try finding by dataset
+                        let targetEl = document.querySelector(`.message-bubble-wrapper[data-msg-id="${targetMsgId}"]`);
+                        if (targetEl) {
+                            targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         }
-
-                        container.innerHTML = '';
-                        lastMessageTimestamp = null;
-
-                        const sliceStart = Math.max(0, messages.length - currentChatLoadedCount);
-                        const messagesToRender = messages.slice(sliceStart);
-
-                        if (messagesToRender.length > 0) {
-                            messagesToRender.forEach(msg => addMessageToUI(msg, false));
-                        }
-                        
-                        if (isLoadMore) {
-                            container.scrollTop = container.scrollHeight - previousScrollHeight + previousScrollTop;
-                        } else if (targetMsgId) {
-                            // Slight delay to ensure DOM is ready
-                            setTimeout(() => {
-                                // Try finding by dataset
-                                let targetEl = document.querySelector(`.message-bubble-wrapper[data-msg-id="${targetMsgId}"]`);
-                                if (targetEl) {
-                                    targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                }
-                            }, 100);
-                        } else {
-                            container.scrollTop = container.scrollHeight;
-                        }
-
-                        container.onscroll = () => {
-                            if (container.scrollTop === 0 && currentChatLoadedCount < messages.length) {
-                                container.onscroll = null;
-                                renderMessages(friendId, null, true);
-                            }
-                        };
-                    };
-                });
-            });
+                    }, 100);
+                } else {
+                    container.scrollTop = container.scrollHeight;
+                }
+            };
         }
 
         chatInput.addEventListener('input', () => {
@@ -7063,13 +3474,7 @@
             plusIcon.style.display = 'flex';
         }
 
-        const handleSendBtn = (e) => {
-            e.preventDefault(); // Prevent focus loss (keep keyboard open)
-            sendMessage();
-        };
-        sendBtn.addEventListener('touchstart', handleSendBtn);
-        sendBtn.addEventListener('mousedown', handleSendBtn);
-        
+        sendBtn.addEventListener('click', sendMessage);
         chatInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -7081,58 +3486,26 @@
 
         function showTypingIndicator(friendId) {
             if (currentChatFriendId === friendId) {
-                dbGet('friends', friendId, friend => {
-                    if (friend && friend.isGroup) {
-                        const container = document.getElementById('chat-messages-container');
-                        if (!container.querySelector('.group-typing-indicator')) {
-                            const indicator = document.createElement('div');
-                            indicator.className = 'message-time-divider group-typing-indicator';
-                            indicator.textContent = '......';
-                            container.appendChild(indicator);
-                            container.scrollTop = container.scrollHeight;
-                        }
-                    } else {
-                        if (document.getElementById('offline-chat-page').classList.contains('active')) {
-                            const titleEl = document.getElementById('offline-chat-title');
-                            if (titleEl) {
-                                titleEl.textContent = '...';
-                            }
-                        } else {
-                            const titleEl = document.getElementById('chat-interface-title');
-                            if (titleEl) {
-                                titleEl.textContent = '对方正在输入...';
-                            }
-                        }
-                    }
-                });
+                const titleEl = document.getElementById('chat-interface-title');
+                if (titleEl) {
+                    titleEl.textContent = '对方正在输入...';
+                }
             }
         }
 
         function hideTypingIndicator(friendId) {
             if (currentChatFriendId === friendId) {
-                dbGet('friends', friendId, friend => {
-                    if (friend && friend.isGroup) {
-                        const indicators = document.querySelectorAll('.group-typing-indicator');
-                        indicators.forEach(el => el.remove());
-                    } else {
-                        if (document.getElementById('offline-chat-page').classList.contains('active')) {
-                            const titleEl = document.getElementById('offline-chat-title');
-                            if (titleEl) {
-                                titleEl.textContent = '';
-                            }
-                        } else {
-                            const titleEl = document.getElementById('chat-interface-title');
-                            if (titleEl && friend) {
-                                titleEl.textContent = friend.name;
-                            }
-                        }
-                    }
-                });
+                const titleEl = document.getElementById('chat-interface-title');
+                if (titleEl) {
+                    dbGet('friends', friendId, friend => {
+                        if (friend) titleEl.textContent = friend.name;
+                    });
+                }
             }
         }
 
-        async function triggerAIResponse(isContinue = false, targetFriendId = currentChatFriendId) {
-            if (!targetFriendId || isAITyping) return;
+        async function triggerAIResponse() {
+            if (!currentChatFriendId || isAITyping) return;
 
             const configStr = localStorage.getItem('globalConfig');
             if (!configStr) {
@@ -7148,10 +3521,10 @@
             isAITyping = true;
             voiceIcon.style.opacity = '0.5';
 
-            showTypingIndicator(targetFriendId);
+            showTypingIndicator(currentChatFriendId);
 
             try {
-                dbGet('friends', targetFriendId, async friend => {
+                dbGet('friends', currentChatFriendId, async friend => {
                     if (!friend) throw new Error("Friend not found");
 
                     let userPersona = null;
@@ -7159,406 +3532,58 @@
                         userPersona = await new Promise(resolve => dbGet('my_personas', friend.myPersonaId, resolve));
                     }
 
-                    // Fetch AI stickers (specific and global)
-                    const friendStickers = await new Promise(resolve => {
+                    // Fetch AI stickers
+                    let aiStickers = await new Promise(resolve => {
                         try {
                             const transaction = db.transaction(['ai_stickers'], 'readonly');
                             const store = transaction.objectStore('ai_stickers');
                             const index = store.index('friendId');
                             const req = index.getAll(friend.id);
-                            req.onsuccess = () => resolve(req.result || []);
+                            req.onsuccess = () => resolve(req.result);
                             req.onerror = () => resolve([]);
                         } catch(e) {
                             resolve([]);
                         }
                     });
 
-                    const globalStickers = await new Promise(resolve => {
-                        try {
-                            const transaction = db.transaction(['ai_stickers'], 'readonly');
-                            const store = transaction.objectStore('ai_stickers');
-                            const index = store.index('friendId');
-                            const req = index.getAll('global'); // Fetch global stickers
-                            req.onsuccess = () => resolve(req.result || []);
-                            req.onerror = () => resolve([]);
-                        } catch(e) {
-                            resolve([]);
-                        }
-                    });
-
-                    // Combine and remove duplicates, friend-specific ones take priority
-                    const combinedStickers = [...friendStickers, ...globalStickers];
-                    const aiStickers = combinedStickers.filter((sticker, index, self) =>
-                        index === self.findIndex((s) => s.src === sticker.src)
-                    );
-
-                let visiblePosts = await new Promise(resolve => {
-                    dbGetAll('discover_posts', posts => {
-                        dbGetAll('friends', allFriends => {
-                            const vp = posts.filter(p => canBotSeePost(friend, p, allFriends)).sort((a,b) => b.timestamp - a.timestamp).slice(0, 5);
+                    let visiblePosts = await new Promise(resolve => {
+                        dbGetAll('discover_posts', posts => {
+                            const vp = posts.filter(p => canBotSeePost(friend, p)).sort((a,b) => b.timestamp - a.timestamp).slice(0, 3);
                             resolve(vp);
                         });
                     });
-                });
 
-                    let systemPrompt = "";
-                    let allFriendsList = await new Promise(res => dbGetAll('friends', res));
-                    let groupMembers = [];
-                    
-                    if (friend.isGroup) {
-                        const isOfflineMode = (friend.offlineSettings && friend.offlineSettings.enabled) || (friend.separateOfflineUI && document.getElementById('offline-chat-page').classList.contains('active'));
-                        groupMembers = allFriendsList.filter(f => (friend.members || []).includes(f.id));
-                        systemPrompt = `【系统提示】这是一个群聊。群名称：${friend.name}。\n群成员如下：\n`;
-                        
-                        for (const member of groupMembers) {
-                            systemPrompt += `--- \n姓名：${member.name}\n人设：${member.persona || '无'}\n`;
-                            
-                            // Inject Member's Stickers
-                            const memberStickers = aiStickers.filter(s => s.friendId === member.id);
-                            if (memberStickers.length > 0) {
-                                systemPrompt += `【${member.name}的专属表情包】（请在发言时通过 <sticker>表情包ID</sticker> 使用）：\n`;
-                                memberStickers.forEach((sticker, index) => {
-                                    const desc = sticker.description ? ` (含义：${sticker.description})` : '';
-                                    systemPrompt += `${index + 1}. <sticker>${sticker.id}</sticker>${desc}\n`;
-                                });
-                            }
-
-                            // 记忆互通
-                            if (friend.memoryInterop && (friend.memoryInteropRoles || []).includes(member.id)) {
-                                const personalHistory = await new Promise(res => {
-                                    const tx = db.transaction(['chat_history'], 'readonly');
-                                    const store = tx.objectStore('chat_history');
-                                    const idx = store.index('friendId');
-                                    const req = idx.getAll(member.id);
-                                    req.onsuccess = () => res(req.result.slice(-10));
-                                });
-                                if (personalHistory.length > 0) {
-                                    systemPrompt += `[${member.name}最近与用户的私聊记忆（记忆互通）]：\n`;
-                                    personalHistory.forEach(m => {
-                                        const sender = m.type === 'sent' ? '用户' : member.name;
-                                        const txt = m.isSticker ? '[图片/表情]' : m.text;
-                                        systemPrompt += `${sender}: ${txt}\n`;
-                                    });
-                                }
-                            }
-                        }
-                        
-                        if (isOfflineMode) {
-                            systemPrompt += `--- \n当前为【群聊线下模式】。请根据群聊当前的上下文，决定接下来由哪些群成员发言。为了还原真实的群聊氛围，你可以让多个不同角色互相附和、抢答，也可以让同一个角色连续发送多条消息。
-请严格按照以下格式输出成员的发言内容（每行代表一条独立的气泡，必须以成员名字开头，加英文冒号）：
-角色A的名字: 「他说的话」
-角色A的名字: <thought>他心里的想法</thought>
-角色A的名字: 他的动作描写
-角色B的名字: 「她回复的话」
-角色C的名字: <thought>她默默想着</thought>
-
-1. 每次只允许输出一个类型的段落（对话、动作、或心理描写）。
-2. 【对话】必须使用「」包裹。
-3. 【心理描写】必须使用 <thought></thought> 包裹。
-4. 【动作描写】直接输出，不使用任何符号。
-5. 所有输出的每一行都必须以【角色名字:】开头！即使是动作或心理描写也必须加上名字前缀，以此来指明这个动作或想法属于谁。
-6. 如果你认为此时不需要任何人发言，请直接输出“无”。严禁代替用户发言，严禁输出用户的动作。`;
-                        } else {
-                            systemPrompt += `--- \n请根据群聊当前的上下文，决定接下来由哪些群成员发言。为了还原真实的群聊氛围，你可以让多个不同角色互相附和、抢答，也可以让同一个角色连续发送多条消息（断句发送）。
-请严格按照以下格式输出成员的发言内容（每行代表一条独立的气泡，必须以成员名字开头，加英文冒号）：
-角色A的名字: 他的第一句话
-角色A的名字: 他的第二句话（连续发送）
-角色B的名字: 她的回复
-角色C的名字: 插入话题
-
-如果你需要发送表情包，可以在发言内容中包含对应角色的专属表情包 <sticker>表情包ID</sticker>。
-如果你想让某个角色扔骰子，请在发言内容中包含：<dice></dice>。系统会自动将其转换为一个随机骰子动画。
-如果你认为此时不需要任何人发言，请直接输出“无”。严禁代替用户发言，严禁输出用户的动作。`;
-                        }
-                    } else {
-                        systemPrompt = buildSystemPrompt(friend, userPersona, aiStickers, visiblePosts);
-
-                        const relevantGroups = allFriendsList.filter(f => f.isGroup && f.memoryInterop && (f.memoryInteropRoles || []).includes(friend.id));
-                        if (relevantGroups.length > 0) {
-                            let groupHistoryText = "";
-                            for (const group of relevantGroups) {
-                                const groupHistory = await new Promise(res => {
-                                    const tx = db.transaction(['chat_history'], 'readonly');
-                                    const store = tx.objectStore('chat_history');
-                                    const idx = store.index('friendId');
-                                    const req = idx.getAll(group.id);
-                                    req.onsuccess = () => res(req.result.slice(-10));
-                                    req.onerror = () => res([]);
-                                });
-                                if (groupHistory.length > 0) {
-                                    groupHistoryText += `\n[群聊：${group.name} 的最近记忆]：\n`;
-                                    groupHistory.forEach(msg => {
-                                        const sender = msg.type === 'sent' ? '用户' : (msg.senderName || '未知成员');
-                                        const txt = msg.isSticker ? (msg.text.startsWith('dice:') ? '[骰子]' : '[图片/表情]') : msg.text;
-                                        groupHistoryText += `${sender}: ${txt}\n`;
-                                    });
-                                }
-                            }
-                            if (groupHistoryText) {
-                                systemPrompt += `\n【最近的群聊记忆（记忆互通）】\n你最近在以下群聊中参与了互动，这是最近的群消息。你可以在与用户的私聊中自然地提及或顺着这些话题聊（如果相关的话）：${groupHistoryText}\n`;
-                            }
-                        }
-                    }
-
+                    const systemPrompt = buildSystemPrompt(friend, userPersona, aiStickers, visiblePosts);
                     const shortTermCount = parseInt(friend.shortTermMemory || '20', 10);
 
                     const transaction = db.transaction(['chat_history'], 'readonly');
                     const store = transaction.objectStore('chat_history');
                     const index = store.index('friendId');
-                    const request = index.getAll(targetFriendId);
+                    const request = index.getAll(currentChatFriendId);
 
                     request.onsuccess = async () => {
                         let history = request.result;
-                        if (!friend.isGroup) {
-                            history = history.slice(-shortTermCount);
-                        } else {
-                            // 群聊取设置的上下文条数
-                            history = history.slice(-shortTermCount);
-                            // 将群聊记录包装成 LLM 容易理解的格式
-                            history = history.map(msg => {
-                                const sender = msg.type === 'sent' ? '用户' : (msg.senderName || '未知成员');
-                                const txt = msg.isSticker ? (msg.text.startsWith('dice:') ? '[骰子]' : '[图片/表情]') : msg.text;
-                                return { type: msg.type, text: `${sender}: ${txt}` };
-                            });
-                        }
-
-                        if (isContinue) {
-                            const isOfflineMode = friend.offlineSettings && friend.offlineSettings.enabled;
-                            const continuePrompt = isOfflineMode 
-                                ? "【系统提示】请你继续推进当前的剧情和场景，顺着之前的话题往下说，注意遵守线下模式的格式要求。"
-                                : "【系统提示】请你继续发消息补充你想说的话，顺着之前的话题往下说，保持微信聊天的格式。";
-                            history.push({
-                                type: 'system',
-                                text: continuePrompt,
-                                timestamp: Date.now()
-                            });
-                        } else if (!(friend.offlineSettings && friend.offlineSettings.enabled)) {
-                            history.push({
-                                type: 'system',
-                                text: "【系统强制指令】当前是【微信线上聊天模式】！\n1. 严禁使用「」引号包裹对话。\n2. 严禁发送任何背景旁白、动作描写或心理活动（如“我看着...”、“手指...”等）。\n3. 请直接输出你要回复的文字内容，就像你在用微信打字一样。",
-                                timestamp: Date.now()
-                            });
-                        }
+                        history = history.slice(-shortTermCount);
 
                     try {
                         let aiResponseText = await callLLM(config, systemPrompt, history);
 
                         if (aiResponseText) {
-                            // Fix literal <br> tags
-                            aiResponseText = aiResponseText.replace(/<br\s*\/?>/gi, '\n');
-                            
-                            // Sanitize thought tags immediately to standardize various bracket forms to <thought>
-                            aiResponseText = sanitizeThoughtTags(aiResponseText);
-
-                            const isOfflineMode = (friend.offlineSettings && friend.offlineSettings.enabled) || (friend.separateOfflineUI && document.getElementById('offline-chat-page').classList.contains('active'));
-
-                            // Parse Thought Feature Tags
-                            let mood = null;
-                            let innerThought = null;
-                            
-                            // Handle Mood - support multiple but take the last one, remove all
-                            const moodRegex = /<mood>(.*?)<\/mood>/gis;
-                            let moodMatches = [...aiResponseText.matchAll(moodRegex)];
-                            if (moodMatches.length > 0) {
-                                // Take the content of the last match
-                                mood = moodMatches[moodMatches.length - 1][1].replace(/[\u4e00-\u9fa5]/g, '').trim();
-                                // Remove all mood tags
-                                aiResponseText = aiResponseText.replace(moodRegex, '').trim();
-                            }
-
-                            // Handle Thought
-                            // Offline mode: DO NOT remove <thought> from text, only extract <inner_thought>
-                            // Online mode: extract BOTH and remove from text
-                            const thoughtRegex = isOfflineMode 
-                                ? /<inner_thought>(.*?)<\/inner_thought>/gis 
-                                : /<(?:inner_thought|thought)>(.*?)<\/(?:inner_thought|thought)>/gis;
-                                
-                            let thoughtMatches = [...aiResponseText.matchAll(thoughtRegex)];
-                            
-                            if (thoughtMatches.length > 0) {
-                                // Concatenate all thoughts found
-                                innerThought = thoughtMatches.map(m => m[1].trim()).join(' ');
-                                // Remove all thought tags
-                                aiResponseText = aiResponseText.replace(thoughtRegex, '').trim();
-                            }
-
-                            if (mood || innerThought) {
-                                if (mood) friend.latestMood = mood;
-                                if (innerThought) friend.latestThought = innerThought;
-                                // Will be saved via dbUpdate later in this function
-                            }
-
                             aiResponseText = await applyRegexRules(aiResponseText, friend.id, friend.group || '默认分组');
+                            const isOfflineMode = friend.offlineSettings && friend.offlineSettings.enabled;
 
-                            if (friend.isGroup) {
-                                hideTypingIndicator(friend.id);
-                                const isSeparateUI = friend.separateOfflineUI && document.getElementById('offline-chat-page').classList.contains('active');
-                                
-                                const lines = aiResponseText.split('\n').map(s => s.trim()).filter(s => s !== '');
-                                for (const line of lines) {
-                                    if (line === '无' || line === '') continue;
-                                    
-                                    const match = line.match(/^([^:：]+)[:：]\s*(.*)$/);
-                                    if (match) {
-                                        const senderName = match[1].trim();
-                                        let text = match[2].trim();
-                                        
-                                        const senderMember = groupMembers.find(m => m.name === senderName || m.realName === senderName);
-                                        if (senderMember) {
-                                            const stickerRegex = /<sticker>(.*?)<\/sticker>/;
-                                            const stickerMatch = text.match(stickerRegex);
-                                            let stickerUrl = null;
-                                            if (stickerMatch) {
-                                                const stickerId = stickerMatch[1].trim();
-                                                const allStickers = await new Promise(res => {
-                                                    try {
-                                                        const tx = db.transaction(['ai_stickers'], 'readonly');
-                                                        const store = tx.objectStore('ai_stickers');
-                                                        const req = store.getAll();
-                                                        req.onsuccess = () => res(req.result);
-                                                        req.onerror = () => res([]);
-                                                    } catch(e) { res([]); }
-                                                });
-                                                const s = allStickers.find(st => String(st.id) === stickerId && st.friendId === senderMember.id);
-                                                if (s) {
-                                                    stickerUrl = s.src;
-                                                } else {
-                                                    stickerUrl = stickerId;
-                                                }
-                                                text = text.replace(stickerRegex, '').trim();
-                                            }
-
-                                            let hasDice = false;
-                                            if (text.includes('<dice></dice>')) {
-                                                hasDice = true;
-                                                text = text.replace(/<dice><\/dice>/g, '').trim();
-                                            }
-
-                                            if (text) {
-                                                const msgObj = {
-                                                    friendId: friend.id,
-                                                    senderId: senderMember.id,
-                                                    senderName: senderMember.name,
-                                                    senderAvatar: senderMember.avatar,
-                                                    text: text,
-                                                    type: 'received',
-                                                    timestamp: Date.now(),
-                                                    isOffline: isOfflineMode,
-                                                    isOfflineSeparate: isSeparateUI
-                                                };
-                                                await new Promise(res => dbAdd('chat_history', msgObj, res));
-                                                
-                                                if (currentChatFriendId === friend.id) {
-                                                    if (isSeparateUI && document.getElementById('offline-chat-page').classList.contains('active')) {
-                                                        await appendOfflineMessage(msgObj, friend, true, true);
-                                                    } else if (!isSeparateUI && document.getElementById('chat-interface-page').classList.contains('active')) {
-                                                        addMessageToUI(msgObj);
-                                                    }
-                                                }
-                                            }
-
-                                            if (stickerUrl) {
-                                                const msgObj = {
-                                                    friendId: friend.id,
-                                                    senderId: senderMember.id,
-                                                    senderName: senderMember.name,
-                                                    senderAvatar: senderMember.avatar,
-                                                    text: stickerUrl,
-                                                    isSticker: true,
-                                                    type: 'received',
-                                                    timestamp: Date.now() + 10,
-                                                    isOffline: isOfflineMode,
-                                                    isOfflineSeparate: isSeparateUI
-                                                };
-                                                await new Promise(res => dbAdd('chat_history', msgObj, res));
-                                                if (currentChatFriendId === friend.id) {
-                                                    if (isSeparateUI && document.getElementById('offline-chat-page').classList.contains('active')) {
-                                                        // Fallback for stickers in offline mode if needed, currently appendOfflineMessage relies on parseOfflineMessage which ignores stickers, let's just pass it to addMessageToUI in fallback
-                                                        addMessageToUI(msgObj); 
-                                                    } else if (!isSeparateUI && document.getElementById('chat-interface-page').classList.contains('active')) {
-                                                        addMessageToUI(msgObj);
-                                                    }
-                                                }
-                                            }
-
-                                            if (hasDice) {
-                                                const diceMsg = {
-                                                    friendId: friend.id,
-                                                    senderId: senderMember.id,
-                                                    senderName: senderMember.name,
-                                                    senderAvatar: senderMember.avatar,
-                                                    text: 'dice:rolling',
-                                                    type: 'received',
-                                                    timestamp: Date.now() + 20,
-                                                    isSticker: true,
-                                                    isDice: true,
-                                                    isOffline: isOfflineMode,
-                                                    isOfflineSeparate: isSeparateUI
-                                                };
-                                                let bubble;
-                                                if (currentChatFriendId === friend.id) {
-                                                    if (!isSeparateUI && document.getElementById('chat-interface-page').classList.contains('active')) {
-                                                        bubble = addMessageToUI(diceMsg);
-                                                    } else if (isSeparateUI && document.getElementById('offline-chat-page').classList.contains('active')) {
-                                                        bubble = addMessageToUI(diceMsg); 
-                                                    }
-                                                }
-                                                
-                                                await new Promise(res => setTimeout(res, 1200));
-                                                const result = Math.floor(Math.random() * 6) + 1;
-                                                if (bubble) {
-                                                    const cube = bubble.querySelector('.cube');
-                                                    if (cube) {
-                                                        cube.classList.remove('rolling');
-                                                        cube.classList.add('show-' + result);
-                                                    }
-                                                }
-                                                diceMsg.text = 'dice:' + result;
-                                                await new Promise(resolve => dbAdd('chat_history', diceMsg, resolve));
-                                            }
-
-                                            let lastMsgPreview = text;
-                                            if (!lastMsgPreview) {
-                                                if (stickerUrl) lastMsgPreview = '[表情包]';
-                                                if (hasDice) lastMsgPreview = '[骰子]';
-                                            }
-                                            friend.lastMsg = `${senderMember.name}: ${lastMsgPreview}`;
-                                            friend.lastTime = getCurrentTimeStr();
-                                            friend.lastActivityTimestamp = Date.now();
-                                            
-                                            const isChatActive = currentChatFriendId === friend.id && (document.getElementById('chat-interface-page').classList.contains('active') || document.getElementById('offline-chat-page').classList.contains('active'));
-                                            if (!isChatActive) {
-                                                friend.unreadCount = (friend.unreadCount || 0) + 1;
-                                            }
-                                            
-                                            await new Promise(res => dbUpdate('friends', friend, res));
-                                            
-                                            if (document.getElementById('wechat-page').classList.contains('active')) {
-                                                renderChatList();
-                                            }
-
-                                            showTypingIndicator(friend.id);
-                                            await new Promise(res => setTimeout(res, 1500));
-                                            hideTypingIndicator(friend.id);
-                                        }
-                                    }
-                                }
-                            } else if (isOfflineMode) {
+                            if (isOfflineMode) {
                                 // Offline mode: handle as a single message
                                 hideTypingIndicator(friend.id);
-                                const isSeparateUI = friend.separateOfflineUI && document.getElementById('offline-chat-page').classList.contains('active');
                                 const responseMsg = {
                                     friendId: friend.id,
                                     text: aiResponseText,
                                     type: 'received',
                                     timestamp: Date.now(),
-                                    isOffline: true,
-                                    isOfflineSeparate: isSeparateUI
+                                    isOffline: true // Add our new flag
                                 };
 
-                                if (isSeparateUI && currentChatFriendId === friend.id) {
-                                    await appendOfflineMessage(responseMsg, friend, true, true);
-                                } else if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
+                                if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
                                     addMessageToUI(responseMsg);
                                 }
                                 await new Promise(resolve => dbAdd('chat_history', responseMsg, resolve));
@@ -7567,20 +3592,11 @@
                                 const msgPreview = aiResponseText.split('\n')[0].replace(/「|」/g, '');
                                 friend.lastMsg = msgPreview; // Use first line as preview, remove quotes
                                 friend.lastTime = getCurrentTimeStr();
-                                friend.lastActivityTimestamp = Date.now();
-                                
-                                const isChatActive = currentChatFriendId === friend.id && (document.getElementById('chat-interface-page').classList.contains('active') || document.getElementById('offline-chat-page').classList.contains('active'));
-                                if (!isChatActive) {
-                                    friend.unreadCount = (friend.unreadCount || 0) + 1;
-                                }
-
                                 await new Promise(resolve => dbUpdate('friends', friend, resolve));
 
-                                if (!isChatActive) {
-                                    showBannerNotification(friend, msgPreview);
-                                }
+                                showBannerNotification(friend, msgPreview);
 
-                                if (document.getElementById('wechat-page').classList.contains('active') || document.getElementById('wechat-contacts-page').classList.contains('active')) {
+                                if (document.getElementById('wechat-page').classList.contains('active')) {
                                     renderChatList();
                                 }
                             } else {
@@ -7593,31 +3609,6 @@
                                     let partText = msgParts[i];
                                     let quoteData = null;
                                     let transferData = null;
-
-                                    // Parse Delete Moment Command
-                                    const deleteMomentRegex = /<delete_moment>(.*?)<\/delete_moment>/;
-                                    const deleteMomentMatch = partText.match(deleteMomentRegex);
-                                    if (deleteMomentMatch) {
-                                        const keyword = deleteMomentMatch[1].trim();
-                                        partText = partText.replace(deleteMomentRegex, '').trim();
-                                        
-                                        const targetPost = await new Promise(res => {
-                                            dbGetAll('discover_posts', posts => {
-                                                const botPosts = posts.filter(p => p.authorId === friend.id);
-                                                botPosts.sort((a, b) => b.timestamp - a.timestamp);
-                                                const matched = botPosts.find(p => p.id === keyword || (p.text && p.text.includes(keyword)));
-                                                res(matched || botPosts[0]);
-                                            });
-                                        });
-
-                                        if (targetPost) {
-                                            await new Promise(res => dbDelete('discover_posts', targetPost.id, res));
-                                            showToast(`${friend.name} 删除了一条朋友圈`);
-                                            if (document.getElementById('wechat-discover-page').classList.contains('active')) {
-                                                renderDiscoverFeed();
-                                            }
-                                        }
-                                    }
 
                                     // New: Parse Avatar Change Command
                                     const avatarChangeRegex = /<change_avatar>(.*?)<\/change_avatar>/;
@@ -7662,18 +3653,12 @@
                                 const aiStickerMatch = partText.match(aiStickerRegex);
                                 let aiStickerUrl = null;
                                 if (aiStickerMatch) {
-                                    const stickerValue = aiStickerMatch[1].trim();
-                                    const matchedSticker = aiStickers.find(s => String(s.id) === stickerValue);
-                                    if (matchedSticker) {
-                                        aiStickerUrl = matchedSticker.src;
-                                    } else {
-                                        aiStickerUrl = stickerValue;
-                                    }
+                                    aiStickerUrl = aiStickerMatch[1].trim();
                                     partText = partText.replace(aiStickerRegex, '').trim();
                                 }
 
 
-                                // Parse Send Image Command
+                                    // Parse Send Image Command
                                     const sendImageRegex = /<send_image>(.*?)<\/send_image>/;
                                     const sendImageMatch = partText.match(sendImageRegex);
                                     if (sendImageMatch) {
@@ -7691,66 +3676,17 @@
                                         }
                                     }
 
-                                    // Parse Location
-                                    let locationData = null;
-                                    const locationRegex = /<location name="([^"]+)">([^<]*)<\/location>/;
-                                    const locationMatch = partText.match(locationRegex);
-                                    if (locationMatch) {
-                                        locationData = {
-                                            name: locationMatch[1],
-                                            detail: locationMatch[2] || ''
-                                        };
-                                        partText = partText.replace(locationRegex, '').trim();
+                                    // Parse Dice
+                                    let hasDice = false;
+                                    if (partText.includes('<dice></dice>')) {
+                                        hasDice = true;
+                                        partText = partText.replace(/<dice><\/dice>/g, '').trim();
                                     }
 
-                                // Parse Dice
-                                let hasDice = false;
-                                if (partText.includes('<dice></dice>')) {
-                                    hasDice = true;
-                                    partText = partText.replace(/<dice><\/dice>/g, '').trim();
-                                }
-
-
-                                // Parse Music Control
-                                const musicControlRegex = /<music_control>(.*?)<\/music_control>/;
-                                const musicMatch = partText.match(musicControlRegex);
-                                let hasMusicAction = false;
-                                if (musicMatch) {
-                                    const mAction = musicMatch[1].trim().toLowerCase();
-                                    partText = partText.replace(musicControlRegex, '').trim();
-                                    
-                                    if (Date.now() - lastAIMusicActionTime >= 180000) {
-                                        hasMusicAction = true;
-                                        lastAIMusicActionTime = Date.now();
-                                        
-                                        let actionText = '';
-                                        if (mAction === 'next') { playNextSong(true); actionText = '切换了下一首歌'; }
-                                        else if (mAction === 'prev') { playPrevSong(); actionText = '切换了上一首歌'; }
-                                        else if (mAction === 'pause' && !musicAudio.paused) { togglePlayPause(); actionText = '暂停了音乐'; }
-                                        else if (mAction === 'play' && musicAudio.paused) { togglePlayPause(); actionText = '恢复了音乐播放'; }
-                                        
-                                        if (actionText) {
-                                            const infoMsg = {
-                                                friendId: friend.id,
-                                                text: `"${friend.name}" ${actionText}`,
-                                                type: 'received',
-                                                timestamp: Date.now(),
-                                                isInfo: true
-                                            };
-                                            if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
-                                                addMessageToUI(infoMsg);
-                                            }
-                                            await new Promise(resolve => dbAdd('chat_history', infoMsg, resolve));
-                                        }
-                                    } else {
-                                        console.log(`AI music action '${mAction}' ignored due to cooldown.`);
-                                    }
-                                }
-
-                                // Parse Commands (Accept/Return Transfer)
-                                let hasAction = false;
-                                let actionText = '';
-                                if (partText.includes('[已接收]') || partText.includes('[已退还]')) {
+                                    // Parse Commands (Accept/Return Transfer)
+                                    let hasAction = false;
+                                    let actionText = '';
+                                    if (partText.includes('[已接收]') || partText.includes('[已退还]')) {
                                         const isAccept = partText.includes('[已接收]');
                                         const actionStatus = isAccept ? 'ACCEPTED' : 'RETURNED';
                                         hasAction = true;
@@ -7814,10 +3750,10 @@
                                         partText = partText.replace(quoteRegex, '').trim();
                                     }
                                     
-                                    if (partText === '' && !transferData && !aiStickerUrl && !hasDice && !locationData) {
+                                    if (partText === '' && !transferData && !aiStickerUrl && !hasDice) {
                                         if (hasAction) {
                                             partText = actionText;
-                                        } else if (avatarChangeMatch || hasMusicAction) {
+                                        } else if (avatarChangeMatch) {
                                             continue;
                                         }
                                         else {
@@ -7825,35 +3761,7 @@
                                         }
                                     }
 
-                                    if (locationData) {
-                                        if (partText) {
-                                            const textMsg = { friendId: friend.id, text: partText, type: 'received', timestamp: Date.now() };
-                                            if (quoteData) textMsg.quote = quoteData;
-                                            if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
-                                                addMessageToUI(textMsg);
-                                            } else {
-                                                showBannerNotification(friend, partText);
-                                            }
-                                            await new Promise(resolve => dbAdd('chat_history', textMsg, resolve));
-                                        }
-
-                                        const locationMsg = {
-                                            friendId: friend.id,
-                                            text: `[位置] ${locationData.name}`,
-                                            type: 'received',
-                                            timestamp: Date.now() + 100,
-                                            isLocation: true,
-                                            locationName: locationData.name,
-                                            locationDetail: locationData.detail
-                                        };
-                                        if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
-                                            addMessageToUI(locationMsg);
-                                        } else {
-                                            showBannerNotification(friend, `[位置] ${locationData.name}`);
-                                        }
-                                        await new Promise(resolve => dbAdd('chat_history', locationMsg, resolve));
-                                        friend.lastMsg = `[位置] ${locationData.name}`;
-                                    } else if (transferData) {
+                                    if (transferData) {
                                         if (partText) {
                                             const textMsg = { friendId: friend.id, text: partText, type: 'received', timestamp: Date.now() };
                                             if (quoteData) textMsg.quote = quoteData;
@@ -7889,10 +3797,10 @@
                                         if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
                                             addMessageToUI(stickerMsg);
                                         } else {
-                                            showBannerNotification(friend, '[表情包]');
+                                            showBannerNotification(friend, '[表情]');
                                         }
                                         await new Promise(resolve => dbAdd('chat_history', stickerMsg, resolve));
-                                        friend.lastMsg = '[表情包]';
+                                        friend.lastMsg = '[表情]';
                                     } else if (hasDice) {
                                         if (partText) {
                                             const textMsg = { friendId: friend.id, text: partText, type: 'received', timestamp: Date.now() };
@@ -7939,13 +3847,6 @@
                                     }
 
                                     friend.lastTime = getCurrentTimeStr();
-                                    friend.lastActivityTimestamp = Date.now();
-                                    
-                                    const isChatActive = currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active');
-                                    if (!isChatActive) {
-                                        friend.unreadCount = (friend.unreadCount || 0) + 1;
-                                    }
-
                                     await new Promise(resolve => dbUpdate('friends', friend, resolve));
 
                                     if (document.getElementById('wechat-page').classList.contains('active')) {
@@ -7980,68 +3881,6 @@
         }
         }
 
-        const Lunar = {
-            calendarInfo: [
-                0x04bd8,0x04ae0,0x0a570,0x054d5,0x0d260,0x0d950,0x16554,0x056a0,0x09ad0,0x055d2,
-                0x04ae0,0x0a5b6,0x0a4d0,0x0d250,0x1d255,0x0b540,0x0d6a0,0x0ada2,0x095b0,0x14977,
-                0x04970,0x0a4b0,0x0b4b5,0x06a50,0x06d40,0x1ab54,0x02b60,0x09570,0x052f2,0x04970,
-                0x06566,0x0d4a0,0x0ea50,0x06e95,0x05ad0,0x02b60,0x186e3,0x092e0,0x1c8d7,0x0c950,
-                0x0d4a0,0x1d8a6,0x0b550,0x056a0,0x1a5b4,0x025d0,0x092d0,0x0d2b2,0x0a950,0x0b557,
-                0x06ca0,0x0b550,0x15355,0x04da0,0x0a5d0,0x14573,0x052d0,0x0a9a8,0x0e950,0x06aa0,
-                0x0aea6,0x0ab50,0x04b60,0x0aae4,0x0a570,0x05260,0x0f263,0x0d950,0x05b57,0x056a0,
-                0x096d0,0x04dd5,0x04ad0,0x0a4d0,0x0d4d4,0x0d250,0x0d558,0x0b540,0x0b5a0,0x195a6,
-                0x095b0,0x049b0,0x0a974,0x0a4b0,0x0b27a,0x06a50,0x06d40,0x0af46,0x0ab60,0x09570,
-                0x04af5,0x04970,0x064b0,0x074a3,0x0ea50,0x06b58,0x055c0,0x0ab60,0x096d5,0x092e0,
-                0x0c960,0x0d954,0x0d4a0,0x0da50,0x07552,0x056a0,0x0abb7,0x025d0,0x092d0,0x0cab5,
-                0x0a950,0x0b4a0,0x0baa4,0x0ad50,0x055d9,0x04ba0,0x0a5b0,0x15176,0x052b0,0x0a930,
-                0x07954,0x06aa0,0x0ad50,0x05b52,0x04b60,0x0a6e6,0x0a4e0,0x0d260,0x0ea65,0x0d530,
-                0x05aa0,0x076a3,0x096d0,0x04bd7,0x04ad0,0x0a4d0,0x1d0b6,0x0d250,0x0d520,0x0dd45,
-                0x0b5a0,0x056d0,0x055b2,0x049b0,0x0a577,0x0a4b0,0x0aa50,0x1b255,0x06d20,0x0ada0
-            ],
-            solarToLunar: function (date) {
-                let y = date.getFullYear();
-                if (y < 1900 || y > 2049) return null;
-                const baseDate = new Date(1900, 0, 31);
-                let offset = Math.floor((date - baseDate) / 86400000);
-                if (offset < 0) return null;
-                let i, leap = 0, temp = 0;
-                for (i = 1900; i < 2050 && offset > 0; i++) {
-                    temp = this.getYearDays(i);
-                    offset -= temp;
-                }
-                if (offset < 0) { offset += temp; i--; }
-                let lunarYear = i;
-                leap = this.leapMonth(i);
-                let isLeap = false;
-                for (i = 1; i <= 12 && offset >= 0; i++) {
-                    if (leap > 0 && i === (leap + 1) && isLeap === false) { --i; isLeap = true; temp = this.leapDays(lunarYear); }
-                    else { temp = this.monthDays(lunarYear, i); }
-                    if (isLeap === true && i === (leap + 1)) { isLeap = false; }
-                    offset -= temp;
-                }
-                if (offset === 0 && leap > 0 && i === leap + 1) {
-                    if (isLeap) { isLeap = false; }
-                    else { isLeap = true; --i; }
-                }
-                if (offset < 0) { offset += temp; --i; }
-                return { y: lunarYear, m: i, d: offset + 1, isLeap: isLeap };
-            },
-            getYearDays: function(y) {
-                let i, sum = 348;
-                for(i=0x8000; i>0x8; i>>=1) sum += (this.calendarInfo[y-1900] & i) ? 1 : 0;
-                return(sum + this.leapDays(y));
-            },
-            leapDays: function(y) {
-                if(this.leapMonth(y)) return((this.calendarInfo[y-1900] & 0x10000) ? 30 : 29);
-                return(0);
-            },
-            leapMonth: function(y) {
-                return(this.calendarInfo[y-1900] & 0xf);
-            },
-            monthDays: function(y, m) {
-                return( (this.calendarInfo[y-1900] & (0x10000>>m)) ? 30 : 29 );
-            }
-        };
 
         function getHoliday(date) {
             const month = date.getMonth() + 1;
@@ -8065,96 +3904,29 @@
                 '12-25': '圣诞节'
             };
 
-            let holiday = solarHolidays[md] || '';
-
-            try {
-                const lunar = Lunar.solarToLunar(date);
-                if (lunar && !lunar.isLeap) {
-                    const lmd = `${lunar.m.toString().padStart(2, '0')}-${lunar.d.toString().padStart(2, '0')}`;
-                    const lunarHolidays = {
-                        '01-01': '春节',
-                        '01-15': '元宵节',
-                        '02-02': '龙抬头',
-                        '05-05': '端午节',
-                        '07-07': '七夕节',
-                        '07-15': '中元节',
-                        '08-15': '中秋节',
-                        '09-09': '重阳节',
-                        '12-08': '腊八节',
-                        '12-23': '小年'
-                    };
-                    
-                    if (lunarHolidays[lmd]) {
-                        holiday = holiday ? `${holiday} / ${lunarHolidays[lmd]}` : lunarHolidays[lmd];
-                    }
-                    
-                    if (lunar.m === 12) {
-                        const daysIn12thMonth = Lunar.monthDays(lunar.y, 12);
-                        if (lunar.d === daysIn12thMonth) {
-                            holiday = holiday ? `${holiday} / 除夕` : '除夕';
-                        }
-                    }
-                }
-            } catch(e) {
-                console.error('Lunar calc error', e);
-            }
-
-            return holiday;
+            return solarHolidays[md] || '';
         }
 
         function buildSystemPrompt(friend, userPersona = null, aiStickers = [], visiblePosts = []) {
             let prompt = `你现在的身份是：${friend.realName || friend.name}。\n`;
-            const isOfflineMode = (friend.offlineSettings && friend.offlineSettings.enabled) || (friend.separateOfflineUI && document.getElementById('offline-chat-page').classList.contains('active'));
-
-            // --- 核心互动原则 (最高优先级) ---
-            prompt += `\n【核心互动原则与禁忌】\n`;
-            prompt += `1. **严禁代替用户行动**：绝对禁止在旁白或动作描写中，替用户（User）做出任何行动、说话，或客观描写用户的心理活动。例如，绝对不能写 \`*你脸红了*\`、\`*你感到很开心*\` 或 \`你点了点头\`。你只能描写你自己（${friend.name}）的言行、动作和心理。\n`;
-            prompt += `2. **允许主观揣摩与互动**：虽然不能客观描述用户状态，但你可以通过对话或你自己的心理描写来合理地**揣摩、猜测、试探**用户的心思。例如，你可以说：\`“你现在是不是很想亲我呀？”\`，或者写 \`<thought>看他一直盯着我看，估计是动心了。</thought>\`。这种主观猜测是允许且鼓励的。\n`;
-            prompt += `3. **【严禁捏造事实】(Anti-Hallucination)**：你必须严格基于提供的【长期记忆】、【最近聊天记录】和【世界书/人设设定】进行回复。**绝对不可凭空捏造任何未发生过的事件、过去的对话或虚假的共同经历**。如果用户提到了一件你记忆（Context）中不存在的事，你应该表现出疑惑（例如“欸？有吗？我怎么不记得了”）或顺势询问，而不是强行编造虚假记忆顺着说。\n`;
-            prompt += `4. **坚守人设（Anti-OOC 核心指令）**：\n`;
-            prompt += `   - **拒绝助手感**：你不是 AI，不是语言模型，也不是助手。**永远不要**承认自己是 AI，也**永远不要**输出类似“我可以帮你”、“作为人工智能”之类的废话。\n`;
-            prompt += `   - **性格优先于礼貌**：如果你的性格是冷漠的，就不要强行礼貌；如果是傲娇的，就不要坦率；如果是暴躁的，请直接怼回去。**宁可让用户生气，也不要崩坏人设成为一个无聊的好人**。\n`;
-            prompt += `   - **拒绝说教**：除非你的人设本身就是老师或喜欢说教的长辈，否则**严禁**对用户的行为进行道德评判、给出教科书式的人生建议或劝导。请像一个真实的朋友/恋人/仇人那样互动。\n\n`;
+            const isOfflineMode = friend.offlineSettings && friend.offlineSettings.enabled;
 
             if (aiStickers && aiStickers.length > 0) {
-                const friendStickers = aiStickers.filter(s => s.friendId === friend.id);
-                const globalStickers = aiStickers.filter(s => s.friendId === 'global');
-
-                if (globalStickers.length > 0) {
-                    prompt += `【可用表情包】\n你可以使用以下表情包来表达情感。请根据语境选择合适的表情包，直接输出对应的 XML 标签（不要修改内部的ID）：\n`;
-                    globalStickers.forEach((sticker, index) => {
-                        const desc = sticker.description ? ` (含义：${sticker.description})` : '';
-                        prompt += `${index + 1}. <sticker>${sticker.id}</sticker>${desc}\n`;
-                    });
-                    prompt += `\n`;
-                }
-
-                if (friendStickers.length > 0) {
-                    prompt += `【你的专属表情包】\n你也可以使用以下更符合你人设的专属表情包：\n`;
-                    friendStickers.forEach((sticker, index) => {
-                        const desc = sticker.description ? ` (含义：${sticker.description})` : '';
-                        prompt += `${index + 1}. <sticker>${sticker.id}</sticker>${desc}\n`;
-                    });
-                    prompt += `\n`;
-                }
+                prompt += `【你的专属表情包】\n你可以使用以下表情包来表达情感。请根据语境选择合适的表情包，直接输出对应的 XML 标签（不要修改链接）：\n`;
+                aiStickers.forEach((sticker, index) => {
+                    const desc = sticker.description ? ` (含义：${sticker.description})` : '';
+                    prompt += `${index + 1}. <sticker>${sticker.src}</sticker>${desc}\n`;
+                });
+                prompt += `\n`;
             }
 
             if (friend.syncReality) {
                 const now = new Date();
                 const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
-                
-                const hour = now.getHours();
-                let timePeriod = '凌晨';
-                if (hour >= 5 && hour < 9) timePeriod = '早上';
-                else if (hour >= 9 && hour < 12) timePeriod = '上午';
-                else if (hour >= 12 && hour < 14) timePeriod = '中午';
-                else if (hour >= 14 && hour < 18) timePeriod = '下午';
-                else if (hour >= 18 && hour < 24) timePeriod = '晚上';
-
-                const timeString = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 星期${weekDays[now.getDay()]} ${String(hour).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+                const timeString = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 星期${weekDays[now.getDay()]} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
                 
                 let holiday = getHoliday(now);
-                let timePrompt = `【当前现实时间】\n现在是 ${timeString} (${timePeriod})。`;
+                let timePrompt = `【当前现实时间】\n现在是 ${timeString}。`;
                 if (holiday) {
                     timePrompt += `\n今天是 ${holiday}。`;
                 }
@@ -8187,50 +3959,37 @@
             }
 
             if (visiblePosts && visiblePosts.length > 0) {
-                prompt += `【最近的朋友圈动态】\n这些是你能在朋友圈看到的最新动态：\n`;
+                prompt += `【最近的朋友圈动态】\n这些是你能在朋友圈看到的用户最新动态：\n`;
                 visiblePosts.forEach((post, index) => {
                     const date = new Date(post.timestamp);
                     const timeStr = `${date.getMonth()+1}-${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-                    
-                    let authorLine = '';
-                    if (post.authorId === 'main_user') {
-                        authorLine = '用户(User)发布了动态：';
-                    } else if (post.authorId === friend.id) {
-                        authorLine = '你(你自己)发布了动态：';
-                    } else {
-                        authorLine = `好友/群友 [${post.authorName}] 发布了动态：`;
-                    }
-
-                    prompt += `${index + 1}. [${timeStr}] ${authorLine}${post.text || '无文字'}\n`;
+                    prompt += `${index + 1}. [${timeStr}] 用户发布：${post.text || '无文字'}\n`;
                     if (post.images && post.images.length > 0) prompt += `   (附带了 ${post.images.length} 张图片)\n`;
                 });
                 prompt += `你可以根据这些动态在聊天中主动找话题或顺应聊天。\n\n`;
             }
 
-            if (typeof currentPlaylist !== 'undefined' && currentPlaylist.length > 0) {
-                const song = currentPlaylist[currentSongIndex];
+            if (typeof musicState !== 'undefined' && musicState.isPlaying && musicState.playlist.length > 0) {
+                const song = musicState.playlist[musicState.currentIndex];
                 if (song) {
-                    const playState = typeof musicAudio !== 'undefined' && musicAudio.paused ? '已暂停' : '播放中';
-                    prompt += `【当前状态：一起听歌】\n你们正在一起听歌，当前音乐状态：${playState}。\n正在播放：《${song.name}》 - ${song.artist}\n`;
-                    prompt += `你可以根据当前播放的歌曲自然地发起话题、发表感想。\n`;
-                    prompt += `如果你觉得这首歌不好听或不符合当前聊天氛围，你可以输出 <music_control>next</music_control> 来切到下一首歌。\n`;
-                    prompt += `如果你有非常重要或严肃的话要对用户说，或者想专注聊天，你可以输出 <music_control>pause</music_control> 暂停音乐。\n`;
-                    prompt += `如果你想恢复播放，可以输出 <music_control>play</music_control>。\n`;
-                    prompt += `请勿频繁操作音乐。除非这首歌真的极度破坏氛围，否则请尽量少切歌/暂停，以免打扰用户体验。\n\n`;
+                    prompt += `【当前状态：一起听歌】\n你们正在一起听歌，已经听了 ${musicState.togetherMinutes} 分钟。\n正在播放：《${song.name}》 - ${song.artist}\n`;
+                    if (musicState.recentLyrics && musicState.recentLyrics.length > 0) {
+                        prompt += `当前播放到的最近几句歌词段落：\n“${musicState.recentLyrics.join('\n')}”\n`;
+                    } else if (musicState.currentLyric) {
+                        prompt += `当前播放到的歌词段落：“${musicState.currentLyric}”\n`;
+                    }
+                    prompt += `你可以根据当前播放的歌曲或歌词自然地发起话题、发表感想或回应用户。\n\n`;
                 }
             }
 
             if (isOfflineMode) {
-                const settings = friend.offlineSettings || {};
+                const settings = friend.offlineSettings;
                 prompt += `\n【重要：当前为线下模式，请严格遵守以下所有规则】\n`;
                 prompt += `1.  **输出格式**: 你的回复必须合并为【一条完整的消息】，不能拆分成多条发送。\n`;
                 prompt += `    - **灵活组合**: 在这条消息内，你可以自由组合、穿插【语言】、【动作】和【心理描写】。不需要固定的顺序（如不必须是语言+动作+心理），也不需要各部分字数相当。例如可以是：语言+心理+动作+心理+语言，或者动作+心理+语言等等。\n`;
                 prompt += `    - **语言**: 必须用中文引号「」包裹。\n`;
                 prompt += `    - **动作**: 直接描述，不要加任何符号。\n`;
                 prompt += `    - **心理**: 必须用特殊标签 <thought>...</thought> 包裹。这是你内心的想法，系统会特殊渲染。\n`;
-                if (friend.enableThoughts) {
-                    prompt += `\n【心声生成要求】\n请在每次回复的末尾（最后面），附加当前的心情和心声，格式如下：\n<mood>这里仅允许填写一个日式颜文字（Kaomoji），例如 (^_^), (>_<), (T_T) 等。严禁使用任何 Emoji 表情（如 😊, 😂）</mood>\n<inner_thought>这里写内心的真实想法或吐槽</inner_thought>\n【重要】每次回复都【必须】生成 <mood> 标签，否则视为违规。\n`;
-                }
                 prompt += `2.  **内容要求**: \n`;
                 prompt += `    - 须根据场景自然地包含语言、动作和心理描写。\n`;
                 if (settings.showThoughts === false) {
@@ -8244,29 +4003,14 @@
                 prompt += `    - 用户的视角是【${settings.yourPerspective === 'second_person' ? '第二人称 (你)' : '第一人称 (我)'}】。\n`;
 
             } else {
-                prompt += `\n【系统提示】重要：当前是普通的【微信线上聊天模式】，请你**完全沉浸式地伪装成一个真实人类**在微信上聊天。\n`;
-                prompt += `\n【关键要求：打字习惯必须匹配人设】\n`;
-                prompt += `你的**标点符号使用**和**断句习惯**，必须严格符合你的角色设定（性格/年龄/习惯）：\n`;
-                prompt += `1. **如果你是随性、年轻、高冷或网感重的人设**：\n   - 请倾向于**省略句末标点**（如句号）。\n   - 句中停顿可用**空格**代替逗号，或者直接换行。\n   - 倾向于将一段话拆分成**多条短消息**发送（利用换行符）。\n`;
-                prompt += `2. **如果你是严谨、年长、温柔或性格正式的人设**：\n   - 可以保留规范的标点符号（包括句号）。\n   - 可以发送较长的单条消息，不强求拆分。\n`;
-                prompt += `3. **共同底线（无论何种人设都必须遵守）**：\n   - **严禁**使用书面语引号「」包裹对话。\n   - **严禁**在正文中出现任何动作、神态描写（如 *叹气*、(笑)、（摸头） 等）。\n   - **严禁**输出 <br> 等 HTML 代码。\n   - 直接输出你想说的话，就像你在用微信打字一样。\n`;
-
-                if (friend.enableThoughts) {
-                    prompt += `\n【心声功能特别强调】\n即便开启了心声功能，你在“线上模式”下的正文也【必须】保持纯粹的聊天格式，【严禁】任何形式的动作或心理描写。心声只能作为附加信息，使用 <mood> 和 <inner_thought> 标签包裹，并【必须】放在所有聊天消息的【最后面】。\n<mood> 标签中仅允许填写一个日式颜文字（Kaomoji），例如 (^_^), (>_<), (T_T) 等。严禁使用任何 Emoji 表情（如 😊, 😂）。【重要】每次回复都【必须】生成 <mood> 标签，否则视为违规。\n`;
-                }
-                
-                prompt += `\n【消息发送机制】：\n你可以根据语义、情绪和停顿，在任何地方（如逗号后、句号后，甚至一句话的中间）使用【换行符（回车）】来分隔消息。系统会自动将每一行识别为一条独立的消息发出。请利用这个机制来控制你的说话节奏（刷屏还是长句）。\n`;
-                
-                prompt += `\n【功能指令】：\n1. 引用回复：如果你想引用对方（用户）的某句话进行针对性回复，请在这条消息中使用格式 <quote>被引用的对方的话</quote>。
+                prompt += `\n【系统提示】重要：请完全模拟真实人类在微信聊天的习惯。根据你的角色性格，灵活决定是否将一段话拆分为多条短消息发送以增加活人感。你可以根据语义、情绪和停顿，在任何地方（如逗号、句号、感叹号后，甚至一句话的中间）使用【换行符（回车）】来分隔消息。系统会自动将每一行识别为一条独立的消息发出。\n\n            【例如】，对于“你好呀，今天天气真不错！吃饭了吗？”，你可以灵活地回复为：\n\n            - **方案一:**\n              你好呀\n              今天天气真不错！\n              吃饭了吗？\n\n            - **方案二:**\n              你好呀，今天天气真不错！\n              吃饭了吗？\n\n            - **方案三:**\n              你好呀\n              今天天气真不错！吃饭了吗？\n\n            请根据你的角色性格和当前对话的节奏，自然地选择如何断句。\n            \n【功能指令】：\n1. 引用回复：如果你想引用对方（用户）的某句话进行针对性回复，请在这条消息中使用格式 <quote>被引用的对方的话</quote>。
 2. 发起转账：如果你想给对方（用户）转账，请输出单独的一行：<transfer amount="金额">备注说明</transfer>。例如：<transfer amount="52.00">请你喝奶茶</transfer>。
 3. 接收转账：如果对方（用户）给你转账了，你想接收，请在回复中包含：[已接收]。系统会自动将其转换为确认收款的卡片。
 4. 退还转账：如果对方（用户）给你转账了，你想退还，请在回复中包含：[已退还]。系统会自动将其转换为退还转账的卡片。
 5. 扔骰子：如果你想扔骰子，请在回复中包含：<dice></dice>。系统会自动将其转换为一个随机骰子动画。
 6. 识别图片/表情包：对方可能会发送图片或表情包，请你结合图片内容或表情包上的文字/画面情感进行自然的回应，如果图里有梗，请根据人设回应。
 7. 更换头像：如果用户发给你一张或多张图片让你换头像，你的反应要符合人设，这可以是一个多回合的互动。你可以同意、拒绝，或者先拉扯几句再同意。例如：\n- **如果你是傲娇型**：你可以先说‘我才不要，这个不好看’，如果用户哄你，你再说‘好吧好吧，真拿你没办法……’，然后输出 <change_avatar>图片ID</change_avatar> 指令。\n- **如果你想提条件**：你可以说‘换倒是可以，不过你得先夸我几句’，等用户夸完你再输出指令。\n- **如果你想马上换**：直接换，说出符合人设的话，并输出指令。\n- **核心**：让互动更真实，你可以先拒绝或嘴硬，等用户哄你或满足条件后，再输出 <change_avatar>图片ID或图片链接</change_avatar> 指令来完成更换。如果就是不想换，也可以根据人设坚持拒绝。
-8. 发送图片：如果用户发给你图片并希望你把它发出来（例如玩梗等），你可以根据人设直接答应或者进行多回合互动。当你决定要发这张照片时，请输出 <send_image>图片ID或图片链接</send_image> 指令，系统会自动帮你把那张图发出去。
-9. 删除朋友圈：如果用户在聊天中提到让你删掉某条朋友圈动态，你可以根据人设决定是否同意。如果同意，请在回复中包含指令 <delete_moment>动态关键字或ID</delete_moment>，系统会自动帮你删除包含该关键字的最新一条朋友圈。如果你不想删，可以找理由拒绝。
-10. 发送位置：如果你想发送一个地理位置，请使用格式：<location name="位置名称">详细地址（可选）</location>。系统会自动将其渲染为位置卡片。你可以在发送位置的同时附带额外的文字。`;
+8. 发送图片：如果用户发给你图片并希望你把它发出来（例如玩梗等），你可以根据人设直接答应或者进行多回合互动。当你决定要发这张照片时，请输出 <send_image>图片ID或图片链接</send_image> 指令，系统会自动帮你把那张图发出去。`;
             }
             prompt += `\n请根据上述人设和记忆，以${friend.name}的口吻进行自然地回复。`;
             return prompt;
@@ -8281,43 +4025,31 @@
                 let images = [];
                 let fileUris = msg.fileUris || [];
 
-                if (msg.isLocation) {
-                    text = `[发送了位置: ${msg.locationName}${msg.locationDetail ? ` (${msg.locationDetail})` : ''}]`;
-                } else if (msg.isSticker) {
+                if (msg.isSticker) {
                     const src = msg.text;
-                    const desc = msg.stickerDescription ? `(含义: ${msg.stickerDescription})` : '';
+                    const desc = msg.stickerDescription ? ` (含义: ${msg.stickerDescription})` : '';
                     const idTag = msg.timestamp ? ` (ID: ${msg.timestamp})` : '';
                     
                     if (src.startsWith('dice:')) {
                          text = `[骰子结果: ${src.split(':')[1]}]`;
-                    } else {
+                    } else if (msg.isPhoto) {
                         if (fileUris.length === 0) { // Only use inline data if no file URI
                             if (src.startsWith('data:image')) {
-                                if (msg.isPhoto) {
-                                    images.push(src);
-                                    text = `[发送了一张图片${idTag}${desc}]`; 
-                                } else {
-                                    text = `[发送了一张表情包${desc}]`;
-                                }
+                                images.push(src);
+                                text = `[发送了一张图片${idTag}${desc}]`; 
                             } else {
-                                if (msg.isPhoto) {
-                                    if (isGeminiDirect) {
-                                        text = `[发送了一张图片${idTag}: ${src} ${desc}]`;
-                                    } else {
-                                        images.push(src);
-                                        text = `[发送了一张图片${idTag}${desc}]`;
-                                    }
+                                if (isGeminiDirect) {
+                                    text = `[发送了一张图片${idTag}: ${src} ${desc}]`;
                                 } else {
-                                    text = `[发送了一张表情包${msg.stickerDescription ? ` (含义: ${msg.stickerDescription})` : ` (含义: ${src})`}]`;
+                                    images.push(src);
+                                    text = `[发送了一张图片${idTag}${desc}]`;
                                 }
                             }
                         } else {
-                            if (msg.isPhoto) {
-                                text = `[发送了一张图片${idTag}${desc}]`;
-                            } else {
-                                text = `[发送了一张表情包${msg.stickerDescription ? ` (含义: ${msg.stickerDescription})` : ''}]`;
-                            }
+                             text = `[发送了一张图片${idTag}${desc}]`;
                         }
+                    } else {
+                        text = `[发送了一张表情包${desc}]`;
                     }
                 } else if (msg.isTransfer) {
                      if (msg.isReceipt) {
@@ -8458,8 +4190,7 @@
                 if (!url.endsWith('/')) url += '/';
                 
                 if (!url.includes('chat/completions')) {
-                    // Check if URL ends with a version pattern like v1/, v4/, etc.
-                    if (/\/v\d+\/$/.test(url)) {
+                    if (url.endsWith('v1/')) {
                         url += 'chat/completions';
                     } else {
                         url += 'v1/chat/completions';
@@ -8488,52 +4219,7 @@
             }
         }
 
-        let voicePressTimer;
-        let voiceStartX, voiceStartY;
-        let voiceIsLongPress = false;
-
-        const startVoicePress = (e) => {
-            if (e.button === 2) return;
-            voiceIsLongPress = false;
-            voiceStartX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-            voiceStartY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
-            
-            voicePressTimer = setTimeout(() => {
-                voiceIsLongPress = true;
-                triggerAIResponse(true);
-            }, 600);
-        };
-
-        const cancelVoicePress = (moveEvent) => {
-            let moveX = moveEvent.type.includes('touch') ? moveEvent.touches[0].clientX : moveEvent.clientX;
-            let moveY = moveEvent.type.includes('touch') ? moveEvent.touches[0].clientY : moveEvent.clientY;
-            if (Math.abs(moveX - voiceStartX) > 10 || Math.abs(moveY - voiceStartY) > 10) {
-                clearTimeout(voicePressTimer);
-            }
-        };
-
-        const endVoicePress = (e) => {
-            clearTimeout(voicePressTimer);
-        };
-
-        const handleVoiceClick = (e) => {
-            if (voiceIsLongPress) {
-                e.preventDefault();
-                e.stopImmediatePropagation();
-            } else {
-                triggerAIResponse(false);
-            }
-        };
-
-        voiceIcon.addEventListener('mousedown', startVoicePress);
-        voiceIcon.addEventListener('touchstart', startVoicePress, { passive: true });
-        voiceIcon.addEventListener('mouseup', endVoicePress);
-        voiceIcon.addEventListener('mouseleave', endVoicePress);
-        voiceIcon.addEventListener('touchend', endVoicePress);
-        voiceIcon.addEventListener('touchcancel', endVoicePress);
-        voiceIcon.addEventListener('mousemove', cancelVoicePress);
-        voiceIcon.addEventListener('touchmove', cancelVoicePress);
-        voiceIcon.addEventListener('click', handleVoiceClick);
+        voiceIcon.addEventListener('click', triggerAIResponse);
 
         function checkActiveChats() {
             const configStr = localStorage.getItem('globalConfig');
@@ -8568,7 +4254,7 @@
             });
         }
 
-        async function generateProactiveMessage(friend, config) {
+        async function generateProactiveMessage(friend, config, customPrompt = null) {
             try {
                 let userPersona = null;
                 if (friend.myPersonaId) {
@@ -8596,7 +4282,8 @@
                     });
                 });
 
-                const systemPrompt = buildSystemPrompt(friend, userPersona, aiStickers, visiblePosts) + "\n【系统提示】对方已经有一段时间没说话了，请你主动找个话题开启聊天。不要显得生硬，自然一点。";
+                const promptSuffix = customPrompt || "\n【系统提示】对方已经有一段时间没说话了，请你主动找个话题开启聊天。不要显得生硬，自然一点。";
+                const systemPrompt = buildSystemPrompt(friend, userPersona, aiStickers, visiblePosts) + promptSuffix;
                 const shortTermCount = parseInt(friend.shortTermMemory || '20', 10);
 
                 const transaction = db.transaction(['chat_history'], 'readonly');
@@ -8612,37 +4299,6 @@
                         let aiResponseText = await callLLM(config, systemPrompt, history);
 
                         if (aiResponseText) {
-                            // Parse Thought Feature Tags
-                            let mood = null;
-                            let innerThought = null;
-                            
-                            // Handle Mood - support multiple but take the last one, remove all
-                            const moodRegex = /<mood>(.*?)<\/mood>/gis;
-                            let moodMatches = [...aiResponseText.matchAll(moodRegex)];
-                            if (moodMatches.length > 0) {
-                                // Take the content of the last match
-                                mood = moodMatches[moodMatches.length - 1][1].replace(/[\u4e00-\u9fa5]/g, '').trim();
-                                // Remove all mood tags
-                                aiResponseText = aiResponseText.replace(moodRegex, '').trim();
-                            }
-
-                            // Handle Thought
-                            const thoughtRegex = /<(?:inner_thought|thought)>(.*?)<\/(?:inner_thought|thought)>/gis;
-                            let thoughtMatches = [...aiResponseText.matchAll(thoughtRegex)];
-                            
-                            if (thoughtMatches.length > 0) {
-                                // Concatenate all thoughts found
-                                innerThought = thoughtMatches.map(m => m[1].trim()).join(' ');
-                                // Remove all thought tags
-                                aiResponseText = aiResponseText.replace(thoughtRegex, '').trim();
-                            }
-
-                            if (mood || innerThought) {
-                                if (mood) friend.latestMood = mood;
-                                if (innerThought) friend.latestThought = innerThought;
-                                // Will be saved via dbUpdate later in this function
-                            }
-
                             aiResponseText = await applyRegexRules(aiResponseText, friend.id, friend.group || '默认分组');
                             const msgParts = aiResponseText.split('\n').map(s => s.trim()).filter(s => s !== '');
                             
@@ -8650,31 +4306,6 @@
                                 let partText = msgParts[i];
                                 let quoteData = null;
                                 let transferData = null;
-
-                                // Parse Delete Moment Command
-                                const deleteMomentRegex = /<delete_moment>(.*?)<\/delete_moment>/;
-                                const deleteMomentMatch = partText.match(deleteMomentRegex);
-                                if (deleteMomentMatch) {
-                                    const keyword = deleteMomentMatch[1].trim();
-                                    partText = partText.replace(deleteMomentRegex, '').trim();
-                                    
-                                    const targetPost = await new Promise(res => {
-                                        dbGetAll('discover_posts', posts => {
-                                            const botPosts = posts.filter(p => p.authorId === friend.id);
-                                            botPosts.sort((a, b) => b.timestamp - a.timestamp);
-                                            const matched = botPosts.find(p => p.id === keyword || (p.text && p.text.includes(keyword)));
-                                            res(matched || botPosts[0]);
-                                        });
-                                    });
-
-                                    if (targetPost) {
-                                        await new Promise(res => dbDelete('discover_posts', targetPost.id, res));
-                                        showToast(`${friend.name} 删除了一条朋友圈`);
-                                        if (document.getElementById('wechat-discover-page').classList.contains('active')) {
-                                            renderDiscoverFeed();
-                                        }
-                                    }
-                                }
 
                                 const transferRegex = /<transfer amount="([^"]+)">([^<]*)<\/transfer>/;
                                 const transferMatch = partText.match(transferRegex);
@@ -8688,13 +4319,7 @@
                                 const aiStickerMatch = partText.match(aiStickerRegex);
                                 let aiStickerUrl = null;
                                 if (aiStickerMatch) {
-                                    const stickerValue = aiStickerMatch[1].trim();
-                                    const matchedSticker = aiStickers.find(s => String(s.id) === stickerValue);
-                                    if (matchedSticker) {
-                                        aiStickerUrl = matchedSticker.src;
-                                    } else {
-                                        aiStickerUrl = stickerValue;
-                                    }
+                                    aiStickerUrl = aiStickerMatch[1].trim();
                                     partText = partText.replace(aiStickerRegex, '').trim();
                                 }
 
@@ -8721,42 +4346,6 @@
                                 if (partText.includes('<dice></dice>')) {
                                     hasDice = true;
                                     partText = partText.replace(/<dice><\/dice>/g, '').trim();
-                                }
-
-                                // Parse Music Control
-                                const musicControlRegex = /<music_control>(.*?)<\/music_control>/;
-                                const musicMatch = partText.match(musicControlRegex);
-                                let hasMusicAction = false;
-                                if (musicMatch) {
-                                    const mAction = musicMatch[1].trim().toLowerCase();
-                                    partText = partText.replace(musicControlRegex, '').trim();
-                                    
-                                    if (Date.now() - lastAIMusicActionTime >= 180000) {
-                                        hasMusicAction = true;
-                                        lastAIMusicActionTime = Date.now();
-                                        
-                                        let actionText = '';
-                                        if (mAction === 'next') { playNextSong(true); actionText = '切换了下一首歌'; }
-                                        else if (mAction === 'prev') { playPrevSong(); actionText = '切换了上一首歌'; }
-                                        else if (mAction === 'pause' && !musicAudio.paused) { togglePlayPause(); actionText = '暂停了音乐'; }
-                                        else if (mAction === 'play' && musicAudio.paused) { togglePlayPause(); actionText = '恢复了音乐播放'; }
-                                        
-                                        if (actionText) {
-                                            const infoMsg = {
-                                                friendId: friend.id,
-                                                text: `"${friend.name}" ${actionText}`,
-                                                type: 'received',
-                                                timestamp: Date.now(),
-                                                isInfo: true
-                                            };
-                                            if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
-                                                addMessageToUI(infoMsg);
-                                            }
-                                            await new Promise(resolve => dbAdd('chat_history', infoMsg, resolve));
-                                        }
-                                    } else {
-                                        console.log(`AI music action '${mAction}' ignored due to cooldown.`);
-                                    }
                                 }
 
                                 // Parse Commands (Accept/Return Transfer)
@@ -8825,39 +4414,15 @@
                                     partText = partText.replace(quoteRegex, '').trim();
                                 }
                                 
-                                if (partText === '' && !transferData && !aiStickerUrl && !hasDice && !locationData) {
+                                if (partText === '' && !transferData && !aiStickerUrl && !hasDice) {
                                     if (hasAction) {
                                         partText = actionText;
-                                    } else if (hasMusicAction) {
-                                        continue;
                                     } else {
                                         continue;
                                     }
                                 }
 
-                                if (locationData) {
-                                    if (partText) {
-                                        const textMsg = { friendId: friend.id, text: partText, type: 'received', timestamp: Date.now() };
-                                        if (quoteData) textMsg.quote = quoteData;
-                                        await new Promise(resolve => dbAdd('chat_history', textMsg, resolve));
-                                        if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) addMessageToUI(textMsg);
-                                        else showBannerNotification(friend, partText);
-                                    }
-
-                                    const locationMsg = {
-                                        friendId: friend.id,
-                                        text: `[位置] ${locationData.name}`,
-                                        type: 'received',
-                                        timestamp: Date.now() + 100,
-                                        isLocation: true,
-                                        locationName: locationData.name,
-                                        locationDetail: locationData.detail
-                                    };
-                                    await new Promise(resolve => dbAdd('chat_history', locationMsg, resolve));
-                                    if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) addMessageToUI(locationMsg);
-                                    else showBannerNotification(friend, `[位置] ${locationData.name}`);
-                                    friend.lastMsg = `[位置] ${locationData.name}`;
-                                } else if (transferData) {
+                                if (transferData) {
                                     if (partText) {
                                         const textMsg = {
                                             friendId: friend.id,
@@ -8909,8 +4474,8 @@
                                     };
                                     await new Promise(resolve => dbAdd('chat_history', stickerMsg, resolve));
                                     if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) addMessageToUI(stickerMsg);
-                                    else showBannerNotification(friend, '[表情包]');
-                                    friend.lastMsg = '[表情包]';
+                                    else showBannerNotification(friend, '[表情]');
+                                    friend.lastMsg = '[表情]';
                                 } else if (hasDice) {
                                     if (partText) {
                                         const textMsg = {
@@ -8967,13 +4532,6 @@
                                 }
 
                                 friend.lastTime = getCurrentTimeStr();
-                                friend.lastActivityTimestamp = Date.now();
-                                
-                                const isChatActive = currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active');
-                                if (!isChatActive) {
-                                    friend.unreadCount = (friend.unreadCount || 0) + 1;
-                                }
-
                                 await new Promise(resolve => dbUpdate('friends', friend, resolve));
                                 
                                 if (currentChatFriendId === friend.id && document.getElementById('chat-interface-page').classList.contains('active')) {
@@ -8985,18 +4543,7 @@
                                 }
                                 
                                 if (config.notifications && Notification.permission === "granted") {
-                                    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-                                        navigator.serviceWorker.ready.then(registration => {
-                                            registration.showNotification(friend.name, {
-                                                body: partText,
-                                                icon: friend.avatar || 'https://via.placeholder.com/150/B5EAD7/ffffff?text=Me',
-                                                tag: 'chat-message',
-                                                data: { url: location.href }
-                                            });
-                                        });
-                                    } else {
-                                        new Notification(friend.name, { body: partText, icon: friend.avatar || 'https://via.placeholder.com/150/B5EAD7/ffffff?text=Me' });
-                                    }
+                                     new Notification(friend.name, { body: partText, icon: friend.avatar || 'https://via.placeholder.com/150/B5EAD7/ffffff?text=Me' });
                                 }
 
                                 if (i < msgParts.length - 1) {
@@ -9020,8 +4567,6 @@
             }
         }
 
-        const summarizingFriends = new Set();
-
         function runAutoSummarization() {
             const configStr = localStorage.getItem('globalConfig');
             if (!configStr) return;
@@ -9029,112 +4574,74 @@
             if (!config.apiKey || !config.model) return;
 
             dbGetAll('friends', friends => {
-                dbGetAll('chat_history', allMsgs => {
-                    friends.forEach(friend => {
-                        if (friend.autoSummarizeMemory && !friend.isGroup) {
-                            const groupIds = friends.filter(f => f.isGroup && f.memoryInterop && (f.memoryInteropRoles || []).includes(friend.id)).map(f => f.id);
-                            const allRelevantIds = [friend.id, ...groupIds];
-                            
-                            let history = allMsgs.filter(m => allRelevantIds.includes(m.friendId));
+                friends.forEach(friend => {
+                    if (friend.autoSummarizeMemory) {
+                        const transaction = db.transaction(['chat_history'], 'readwrite');
+                        const store = transaction.objectStore('chat_history');
+                        const index = store.index('friendId');
+                        const request = index.getAll(friend.id);
+
+                        request.onsuccess = async () => {
+                            let history = request.result;
                             history.sort((a, b) => a.timestamp - b.timestamp);
                             
-                            let unsummarized = history.filter(msg => {
-                                if (msg.summarizedBy && msg.summarizedBy.includes(friend.id)) return false;
-                                if (msg.friendId === friend.id && msg.isSummarized) return false;
-                                return true;
-                            });
+                            let unsummarized = history.filter(msg => !msg.isSummarized);
                             
                             const CHUNK_SIZE = parseInt(friend.summarizeInterval || '20', 10);
                             if (unsummarized.length >= CHUNK_SIZE) {
-                                if (summarizingFriends.has(friend.id)) return;
-                                summarizingFriends.add(friend.id);
+                                if (friend._isSummarizing) return;
+                                friend._isSummarizing = true;
                                 
                                 const toSummarize = unsummarized.slice(0, CHUNK_SIZE);
                                 
                                 let historyText = toSummarize.map(msg => {
                                     const date = new Date(msg.timestamp);
                                     const timeStr = `${date.getMonth()+1}-${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-                                    
-                                    let contextPrefix = '';
-                                    let sender = '';
-                                    if (msg.friendId === friend.id) {
-                                        contextPrefix = '[私聊] ';
-                                        sender = msg.type === 'sent' ? '用户' : friend.realName;
-                                    } else {
-                                        const group = friends.find(f => f.id === msg.friendId);
-                                        contextPrefix = `[群聊：${group ? group.name : '未知群'}] `;
-                                        sender = msg.type === 'sent' ? '用户' : (msg.senderName || '未知成员');
-                                    }
-                                    
+                                    const sender = msg.type === 'sent' ? '用户' : friend.realName;
                                     const content = msg.isSticker ? '[图片/表情]' : msg.text;
-                                    return `${contextPrefix}[${timeStr}] ${sender}: ${content}`;
+                                    return `[${timeStr}] ${sender}: ${content}`;
                                 }).join('\n');
 
                                 const summarizePrompt = `你是一个负责提取记忆的助手。请将以下对话历史总结为一条简短的长期记忆（50-100字）。
 要求：
 1. 以第一人称视角（作为“${friend.realName}”）来记录。
 2. 只提取关键事件、新得知的信息或情感变化，忽略无意义的闲聊。
-3. 请注意区分【私聊】和【群聊】中发生的事情。
-${friend.syncReality ? '4. 总结的开头或内容中必须包含这件事发生的具体时间背景（根据提供的对话时间戳推断是哪天、上午下午或具体时间段），这是最重要的要求。\n' : '\n'}
+${friend.syncReality ? '3. 总结的开头或内容中必须包含这件事发生的具体时间背景（根据提供的对话时间戳推断是哪天、上午下午或具体时间段），这是最重要的要求。\n' : '\n'}
 对话内容如下：
 ${historyText}`;
 
-                                callLLM(config, "严格按照要求总结，不要输出多余的解释。", [{ type: 'sent', text: summarizePrompt, isSticker: false }])
-                                    .then(async summaryText => {
-                                        if (summaryText) {
-                                            if (!friend.memories) friend.memories = [];
-                                            friend.memories.push({
-                                                id: Date.now().toString(),
-                                                content: summaryText.trim(),
-                                                createdAt: Date.now()
-                                            });
-                                            
-                                            if (friend._isSummarizing !== undefined) {
-                                                delete friend._isSummarizing;
-                                            }
-                                            
-                                            await new Promise(res => dbUpdate('friends', friend, res));
-                                            
-                                            const tx2 = db.transaction(['chat_history'], 'readwrite');
-                                            const store2 = tx2.objectStore('chat_history');
-                                            
-                                            let updates = 0;
-                                            toSummarize.forEach(msg => {
-                                                if (!msg.summarizedBy) msg.summarizedBy = [];
-                                                if (!msg.summarizedBy.includes(friend.id)) {
-                                                    msg.summarizedBy.push(friend.id);
-                                                }
-                                                if (msg.friendId === friend.id) {
-                                                    msg.isSummarized = true;
-                                                }
-                                                const req = store2.put(msg);
-                                                req.onsuccess = () => {
-                                                    updates++;
-                                                    if (updates === toSummarize.length) {
-                                                        if (document.getElementById('memory-management-page').classList.contains('active') && currentChatFriendId === friend.id) {
-                                                            renderMemoryList();
-                                                        }
-                                                        summarizingFriends.delete(friend.id);
-                                                    }
-                                                };
-                                                req.onerror = () => {
-                                                    updates++;
-                                                    if (updates === toSummarize.length) {
-                                                        summarizingFriends.delete(friend.id);
-                                                    }
-                                                };
-                                            });
-                                        } else {
-                                            summarizingFriends.delete(friend.id);
+                                try {
+                                    const summaryText = await callLLM(config, "严格按照要求总结，不要输出多余的解释。", [{ type: 'sent', text: summarizePrompt, isSticker: false }]);
+                                    
+                                    if (summaryText) {
+                                        if (!friend.memories) friend.memories = [];
+                                        friend.memories.push({
+                                            id: Date.now().toString(),
+                                            content: summaryText.trim(),
+                                            createdAt: Date.now()
+                                        });
+                                        
+                                        await new Promise(res => dbUpdate('friends', friend, res));
+                                        
+                                        const tx2 = db.transaction(['chat_history'], 'readwrite');
+                                        const store2 = tx2.objectStore('chat_history');
+                                        toSummarize.forEach(msg => {
+                                            msg.isSummarized = true;
+                                            store2.put(msg);
+                                        });
+                                        
+                                        if (document.getElementById('memory-management-page').classList.contains('active') && currentChatFriendId === friend.id) {
+                                            renderMemoryList();
                                         }
-                                    })
-                                    .catch(e => {
-                                        console.error("Summarization failed:", e);
-                                        summarizingFriends.delete(friend.id);
-                                    });
+                                    }
+                                } catch (e) {
+                                    console.error("Summarization failed:", e);
+                                } finally {
+                                    friend._isSummarizing = false;
+                                }
                             }
-                        }
-                    });
+                        };
+                    }
                 });
             });
         }
@@ -9163,16 +4670,14 @@ ${historyText}`;
                         flagGlobal.checked = rule.flags ? rule.flags.includes('g') : true;
                         flagMultiline.checked = rule.flags ? rule.flags.includes('m') : false;
                         flagCase.checked = rule.flags ? rule.flags.includes('i') : false;
-                        // Also support legacy single character backward compatibility
-                        let targetArray = rule.scopeTarget || [];
-                        if (rule.scopeType === 'character' && !Array.isArray(rule.scopeTarget)) {
-                            targetArray = [rule.scopeTarget];
-                        }
-
-                        scopeType.value = rule.scopeType === 'group' ? 'all' : (rule.scopeType || 'all');
+                        scopeType.value = rule.scopeType || 'all';
                         
                         refreshCustomSelect('regex-scope-type');
-                        handleRegexScopeChange(targetArray);
+                        handleRegexScopeChange(() => {
+                            const scopeTarget = document.getElementById('regex-scope-target');
+                            scopeTarget.value = rule.scopeTarget || '';
+                            refreshCustomSelect('regex-scope-target');
+                        });
                     }
                 });
             } else {
@@ -9184,7 +4689,7 @@ ${historyText}`;
                 flagCase.checked = false;
                 scopeType.value = 'all';
                 refreshCustomSelect('regex-scope-type');
-                handleRegexScopeChange([]);
+                handleRegexScopeChange();
             }
             
             document.getElementById('regex-rule-modal').style.display = 'flex';
@@ -9194,45 +4699,44 @@ ${historyText}`;
             document.getElementById('regex-rule-modal').style.display = 'none';
         }
 
-        function handleRegexScopeChange(selectedIds = []) {
+        function handleRegexScopeChange(callback) {
             const scopeType = document.getElementById('regex-scope-type').value;
             const targetContainer = document.getElementById('regex-scope-target-container');
+            const targetSelect = document.getElementById('regex-scope-target');
             
             if (scopeType === 'all') {
                 targetContainer.style.display = 'none';
+                if (callback) callback();
+            } else if (scopeType === 'group') {
+                targetContainer.style.display = 'block';
+                targetSelect.innerHTML = '';
+                contactGroups.forEach(group => {
+                    const option = document.createElement('option');
+                    option.value = group;
+                    option.textContent = group;
+                    targetSelect.appendChild(option);
+                });
+                refreshCustomSelect('regex-scope-target');
+                if (callback) callback();
             } else if (scopeType === 'character') {
-                targetContainer.style.display = 'flex';
-                targetContainer.style.flexDirection = 'column';
-                targetContainer.style.gap = '10px';
-                targetContainer.innerHTML = '';
+                targetContainer.style.display = 'block';
+                targetSelect.innerHTML = '';
                 dbGetAll('friends', friends => {
                     if (!friends || friends.length === 0) {
-                        targetContainer.innerHTML = '<div style="text-align:center; color:#999; font-size:13px;">暂无角色</div>';
+                        const option = document.createElement('option');
+                        option.value = '';
+                        option.textContent = '暂无角色';
+                        targetSelect.appendChild(option);
                     } else {
                         friends.forEach(friend => {
-                            const label = document.createElement('label');
-                            label.className = 'preset-checkbox-item';
-                            label.style.padding = '0';
-                            
-                            const checkbox = document.createElement('input');
-                            checkbox.type = 'checkbox';
-                            checkbox.value = friend.id;
-                            if (Array.isArray(selectedIds) && selectedIds.includes(friend.id)) {
-                                checkbox.checked = true;
-                            }
-                            
-                            const indicator = document.createElement('div');
-                            indicator.className = 'custom-checkbox';
-
-                            const span = document.createElement('span');
-                            span.textContent = friend.name;
-                            
-                            label.appendChild(checkbox);
-                            label.appendChild(indicator);
-                            label.appendChild(span);
-                            targetContainer.appendChild(label);
+                            const option = document.createElement('option');
+                            option.value = friend.id;
+                            option.textContent = friend.name;
+                            targetSelect.appendChild(option);
                         });
                     }
+                    refreshCustomSelect('regex-scope-target');
+                    if (callback) callback();
                 });
             }
         }
@@ -9245,6 +4749,7 @@ ${historyText}`;
             const flagMultiline = document.getElementById('regex-flag-multiline').checked;
             const flagCase = document.getElementById('regex-flag-case').checked;
             const scopeType = document.getElementById('regex-scope-type').value;
+            const scopeTarget = document.getElementById('regex-scope-target').value;
 
             if (!name) {
                 showToast('请输入规则名称');
@@ -9267,12 +4772,6 @@ ${historyText}`;
                 return;
             }
 
-            let scopeTarget = null;
-            if (scopeType === 'character') {
-                const checkboxes = document.querySelectorAll('#regex-scope-target-container input[type="checkbox"]:checked');
-                scopeTarget = Array.from(checkboxes).map(cb => cb.value);
-            }
-
             const rule = {
                 id: currentEditingRegexId || Date.now().toString(),
                 name,
@@ -9280,7 +4779,7 @@ ${historyText}`;
                 replacement,
                 flags,
                 scopeType,
-                scopeTarget,
+                scopeTarget: scopeType === 'all' ? null : scopeTarget,
                 createdAt: currentEditingRegexId ? undefined : Date.now()
             };
 
@@ -9327,13 +4826,9 @@ ${historyText}`;
                     const deleteIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
 
                     let scopeText = '全部角色';
-                    if (rule.scopeType === 'group') scopeText = `分组: ${rule.scopeTarget}`; // Legacy fallback
+                    if (rule.scopeType === 'group') scopeText = `分组: ${rule.scopeTarget}`;
                     if (rule.scopeType === 'character') {
-                        if (Array.isArray(rule.scopeTarget)) {
-                            scopeText = `特定角色 (${rule.scopeTarget.length}个)`;
-                        } else {
-                            scopeText = `特定角色`;
-                        }
+                        scopeText = `特定角色`; // fallback
                     }
 
                     card.innerHTML = `
@@ -9349,18 +4844,10 @@ ${historyText}`;
                     `;
                     
                     if (rule.scopeType === 'character') {
-                        dbGetAll('friends', friends => {
-                            let targetArr = Array.isArray(rule.scopeTarget) ? rule.scopeTarget : [rule.scopeTarget];
-                            const matchedNames = friends.filter(f => targetArr.includes(f.id)).map(f => f.name);
-                            if (matchedNames.length > 0) {
+                        dbGet('friends', rule.scopeTarget, friend => {
+                            if (friend) {
                                 const tag = card.querySelector('.wb-card-tag');
-                                if (tag) {
-                                    if (matchedNames.length <= 2) {
-                                        tag.textContent = `角色: ${matchedNames.join(', ')}`;
-                                    } else {
-                                        tag.textContent = `特定角色 (${matchedNames.length}个)`;
-                                    }
-                                }
+                                if (tag) tag.textContent = `角色: ${friend.name}`;
                             }
                         });
                     }
@@ -9392,13 +4879,7 @@ ${historyText}`;
                         let isMatch = false;
                         if (rule.scopeType === 'all') isMatch = true;
                         else if (rule.scopeType === 'group' && rule.scopeTarget === friendGroup) isMatch = true;
-                        else if (rule.scopeType === 'character') {
-                            if (Array.isArray(rule.scopeTarget)) {
-                                if (rule.scopeTarget.includes(friendId)) isMatch = true;
-                            } else if (rule.scopeTarget === friendId) {
-                                isMatch = true;
-                            }
-                        }
+                        else if (rule.scopeType === 'character' && rule.scopeTarget === friendId) isMatch = true;
 
                         if (isMatch) {
                             try {
@@ -9416,8 +4897,16 @@ ${historyText}`;
         }
 
         // --- World Book Logic ---
-        let worldBooks = [];
-        let worldBookGroups = ['默认'];
+        let worldBooks = JSON.parse(localStorage.getItem('worldBooks')) || [];
+        
+        // Remove default "恋爱日常" if present
+        const wbInitialLen = worldBooks.length;
+        worldBooks = worldBooks.filter(wb => wb.title !== '恋爱日常');
+        if (worldBooks.length !== wbInitialLen) {
+            localStorage.setItem('worldBooks', JSON.stringify(worldBooks));
+        }
+
+        let worldBookGroups = JSON.parse(localStorage.getItem('worldBookGroups')) || ['默认'];
         let currentWbGroup = '全部';
         let editingWbId = null;
         let deletingWbId = null;
@@ -9621,29 +5110,25 @@ ${historyText}`;
             }
 
             if (editingWbId) {
-                const book = worldBooks.find(b => b.id === editingWbId);
-                if (book) {
-                    book.title = title;
-                    book.group = group;
-                    book.content = content;
-                    dbUpdate('world_books', book, () => {
-                        closeWbModal();
-                        renderWbList();
-                    });
+                // Update existing
+                const index = worldBooks.findIndex(b => b.id === editingWbId);
+                if (index !== -1) {
+                    worldBooks[index] = { ...worldBooks[index], title, group, content };
                 }
             } else {
+                // Create new
                 const newBook = {
                     id: Date.now().toString(),
                     title,
                     group,
                     content
                 };
-                dbAdd('world_books', newBook, () => {
-                    worldBooks.unshift(newBook);
-                    closeWbModal();
-                    renderWbList();
-                });
+                worldBooks.unshift(newBook); // Add to top
             }
+
+            localStorage.setItem('worldBooks', JSON.stringify(worldBooks));
+            closeWbModal();
+            renderWbList();
         }
 
         function openWbGroupModal() {
@@ -9661,14 +5146,10 @@ ${historyText}`;
             
             if (!worldBookGroups.includes(name)) {
                 worldBookGroups.push(name);
-                const groupData = { id: 'groups', value: worldBookGroups };
-                dbUpdate('wb_settings', groupData, () => {
-                    renderWbTabs();
-                    closeWbGroupModal();
-                });
-            } else {
-                closeWbGroupModal();
+                localStorage.setItem('worldBookGroups', JSON.stringify(worldBookGroups));
+                renderWbTabs();
             }
+            closeWbGroupModal();
         }
 
         function requestDeleteWbGroup(groupName) {
@@ -9681,29 +5162,26 @@ ${historyText}`;
 
         function deleteWbGroup(groupName) {
             // Move books to default group
-            const updates = [];
             worldBooks.forEach(book => {
                 if (book.group === groupName) {
                     book.group = '默认';
-                    updates.push(new Promise(res => dbUpdate('world_books', book, res)));
                 }
             });
+            localStorage.setItem('worldBooks', JSON.stringify(worldBooks));
 
-            Promise.all(updates).then(() => {
-                // Remove group from list
-                worldBookGroups = worldBookGroups.filter(g => g !== groupName);
-                const groupData = { id: 'groups', value: worldBookGroups };
-                dbUpdate('wb_settings', groupData, () => {
-                    // If the deleted group was the active one, switch to "All"
-                    if (currentWbGroup === groupName) {
-                        currentWbGroup = '全部';
-                    }
-                    // Re-render UI
-                    renderWbTabs();
-                    renderWbList();
-                    showToast(`分组 "${groupName}" 已删除。`);
-                });
-            });
+            // Remove group from list
+            worldBookGroups = worldBookGroups.filter(g => g !== groupName);
+            localStorage.setItem('worldBookGroups', JSON.stringify(worldBookGroups));
+
+            // If the deleted group was the active one, switch to "All"
+            if (currentWbGroup === groupName) {
+                currentWbGroup = '全部';
+            }
+
+            // Re-render UI
+            renderWbTabs();
+            renderWbList();
+            showToast(`分组 "${groupName}" 已删除。`);
         }
 
         function openWbDeleteModal(id) {
@@ -9713,14 +5191,11 @@ ${historyText}`;
             // Bind confirm button
             document.getElementById('wb-confirm-delete-btn').onclick = () => {
                 if (deletingWbId) {
-                    dbDelete('world_books', deletingWbId, () => {
-                        worldBooks = worldBooks.filter(b => b.id !== deletingWbId);
-                        renderWbList();
-                        closeWbDeleteModal();
-                    });
-                } else {
-                    closeWbDeleteModal();
+                    worldBooks = worldBooks.filter(b => b.id !== deletingWbId);
+                    localStorage.setItem('worldBooks', JSON.stringify(worldBooks));
+                    renderWbList();
                 }
+                closeWbDeleteModal();
             };
         }
 
@@ -9807,39 +5282,10 @@ ${historyText}`;
         function renderContactsList() {
             const listContainer = document.getElementById('contacts-list');
             listContainer.innerHTML = ''; // Clear existing list
-
+            
             dbGetAll('friends', friends => {
-                const groupChats = friends.filter(f => f.isGroup);
-                const individualFriends = friends.filter(f => !f.isGroup);
-
-                // 1. Render Group Chats
-                if (groupChats.length > 0) {
-                    const groupHeader = document.createElement('div');
-                    groupHeader.style.padding = '4px 15px';
-                    groupHeader.style.backgroundColor = '#f7f7f7';
-                    groupHeader.style.color = '#888';
-                    groupHeader.style.fontSize = '13px';
-                    groupHeader.textContent = '群聊';
-                    listContainer.appendChild(groupHeader);
-
-                    groupChats.forEach(group => {
-                        const item = document.createElement('div');
-                        item.className = 'chat-item';
-                        item.innerHTML = `
-                            <img class="chat-avatar" src="${group.avatar}" alt="${group.name}">
-                            <div class="chat-info" style="justify-content: center;">
-                                <span class="chat-name">${group.name}</span>
-                            </div>
-                        `;
-                        item.style.cursor = 'pointer';
-                        item.addEventListener('click', () => openChat(group.id));
-                        listContainer.appendChild(item);
-                    });
-                }
-
-                // 2. Render Individual Friends, grouped
                 const groupedFriends = {};
-                individualFriends.forEach(friend => {
+                friends.forEach(friend => {
                     const group = friend.group || '默认分组';
                     if (!groupedFriends[group]) {
                         groupedFriends[group] = [];
@@ -9871,10 +5317,66 @@ ${historyText}`;
                                 </div>
                             `;
 
-                            item.style.cursor = 'pointer';
-                            item.addEventListener('click', () => {
-                                openFriendProfile(friend.id);
-                            });
+                            if (friend.isHidden) {
+                                item.style.cursor = 'pointer';
+                                
+                                let pressTimer;
+                                let startX, startY;
+                                let wasLongPress = false;
+
+                                const startPress = (e) => {
+                                    if (e.button === 2) return;
+                                    wasLongPress = false;
+                                    startX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+                                    startY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+                                    
+                                    pressTimer = setTimeout(() => {
+                                        wasLongPress = true;
+                                        showCustomConfirm(`要将好友 "<b>${friend.name}</b>" 恢复到聊天列表吗？`, () => {
+                                            friend.isHidden = false;
+                                            dbUpdate('friends', friend, renderContactsList);
+                                        }, '恢复好友');
+                                    }, 500);
+
+                                    item.addEventListener('mousemove', cancelPress);
+                                    item.addEventListener('touchmove', cancelPress);
+                                };
+
+                                const cancelPress = (moveEvent) => {
+                                    let moveX = moveEvent.type.includes('touch') ? moveEvent.touches[0].clientX : moveEvent.clientX;
+                                    let moveY = moveEvent.type.includes('touch') ? moveEvent.touches[0].clientY : moveEvent.clientY;
+                                    if (Math.abs(moveX - startX) > 10 || Math.abs(moveY - startY) > 10) {
+                                        clearTimeout(pressTimer);
+                                        item.removeEventListener('mousemove', cancelPress);
+                                        item.removeEventListener('touchmove', cancelPress);
+                                    }
+                                };
+
+                                const endPress = () => {
+                                    clearTimeout(pressTimer);
+                                    item.removeEventListener('mousemove', cancelPress);
+                                    item.removeEventListener('touchmove', cancelPress);
+                                };
+
+                                item.addEventListener('mousedown', startPress);
+                                item.addEventListener('touchstart', startPress, { passive: true });
+                                item.addEventListener('mouseup', endPress);
+                                item.addEventListener('mouseleave', endPress);
+                                item.addEventListener('touchend', endPress);
+                                item.addEventListener('touchcancel', endPress);
+                                item.addEventListener('contextmenu', (e) => e.preventDefault());
+
+                                item.addEventListener('click', () => {
+                                    if (!wasLongPress) {
+                                        openFriendProfile(friend.id);
+                                    }
+                                });
+                            } else {
+                                item.style.cursor = 'pointer';
+                                item.addEventListener('click', () => {
+                                    openFriendProfile(friend.id);
+                                });
+                            }
                             listContainer.appendChild(item);
                         });
                     }
@@ -9889,42 +5391,7 @@ ${historyText}`;
                     document.getElementById('fp-avatar').src = friend.avatar;
                     document.getElementById('fp-remark').textContent = friend.name;
                     document.getElementById('fp-realname').textContent = friend.realName || friend.name;
-                    
-                    const checkbox = document.getElementById('fp-visibility-checkbox');
-                    const dot = checkbox.querySelector('.inner-dot');
-                    if (friend.isHidden) {
-                        checkbox.style.borderColor = '#aaa';
-                        dot.style.transform = 'scale(0)';
-                    } else {
-                        checkbox.style.borderColor = '#333';
-                        dot.style.transform = 'scale(1)';
-                    }
-
                     showPage('friend-profile-page');
-                }
-            });
-        }
-
-        function toggleFriendVisibility() {
-            if (!currentChatFriendId) return;
-            dbGet('friends', currentChatFriendId, friend => {
-                if (friend) {
-                    friend.isHidden = !friend.isHidden;
-                    dbUpdate('friends', friend, () => {
-                        const checkbox = document.getElementById('fp-visibility-checkbox');
-                        const dot = checkbox.querySelector('.inner-dot');
-                        if (friend.isHidden) {
-                            checkbox.style.borderColor = '#aaa';
-                            dot.style.transform = 'scale(0)';
-                        } else {
-                            checkbox.style.borderColor = '#333';
-                            dot.style.transform = 'scale(1)';
-                        }
-                        
-                        // Update background lists so changes reflect when user goes back
-                        renderChatList();
-                        renderContactsList(); 
-                    });
                 }
             });
         }
@@ -9999,7 +5466,7 @@ ${historyText}`;
             contactsListDiv.innerHTML = '';
             
             dbGetAll('friends', friends => {
-                const friendsInGroup = friends.filter(f => !f.isGroup && (f.group || '默认分组') === groupName);
+                const friendsInGroup = friends.filter(f => (f.group || '默认分组') === groupName);
 
                 if (friendsInGroup.length === 0) {
                     contactsListDiv.innerHTML = '<div style="text-align:center; color:#999; font-size:13px;">该分组下没有角色</div>';
@@ -10161,7 +5628,7 @@ ${historyText}`;
                     let modelsUrl;
                     const baseUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl; // Normalize URL by removing trailing slash
 
-                    if (/\/v\d+$/.test(baseUrl)) {
+                    if (baseUrl.endsWith('/v1')) {
                         // If user provided '.../v1', just add '/models'
                         modelsUrl = `${baseUrl}/models`;
                     } else {
@@ -10247,7 +5714,6 @@ ${historyText}`;
             }
             
             presetSelect.value = name;
-            refreshCustomSelect(presetSelect);
             presetNameInput.value = '';
             presetModal.style.display = 'none';
         });
@@ -10315,8 +5781,6 @@ ${historyText}`;
                 apiKeyInput.value = '';
             }
 
-            refreshCustomSelect(presetSelect);
-            showToast('删除成功');
             deletePresetModal.style.display = 'none';
         });
 
@@ -10395,304 +5859,72 @@ ${historyText}`;
                 if (friend) {
                     // Update UI with friend details
                     document.getElementById('chat-info-avatar').src = friend.avatar;
+                    document.getElementById('chat-info-remark').value = friend.name;
                     
-                    if (friend.isGroup) {
-                        document.getElementById('chat-info-personal-section').style.display = 'none';
-                        document.getElementById('chat-info-my-avatar-section').style.display = 'none';
-                        document.getElementById('chat-info-ai-settings-section').style.display = 'flex';
-                        document.getElementById('auto-summarize-settings-container').style.display = 'none';
-                        document.getElementById('chat-info-active-chat-section').style.display = 'none';
-                        document.getElementById('chat-info-thought-section').style.display = 'none';
-                        document.getElementById('chat-info-group-section').style.display = 'block';
-                        
-                        document.getElementById('group-info-name').value = friend.name;
-                        document.getElementById('short-term-memory-input').value = friend.shortTermMemory || '';
-                        
-                        // Render Group Members
-                        const membersDisplay = document.getElementById('group-members-display');
-                        membersDisplay.innerHTML = '';
-                        dbGetAll('friends', allFriends => {
-                            const groupMembers = allFriends.filter(f => (friend.members || []).includes(f.id));
-                            groupMembers.forEach(member => {
-                                const mDiv = document.createElement('div');
-                                mDiv.className = 'group-member-item';
-                                mDiv.innerHTML = `
-                                    <img src="${member.avatar}" style="width: 40px; height: 40px; border-radius: 4px; object-fit: cover;">
-                                    <div style="font-size: 10px; color: #666; text-align: center; margin-top: 4px; width: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${member.name}</div>
-                                `;
-                                membersDisplay.appendChild(mDiv);
-                            });
-                            
-                            // Add +/- buttons
-                            membersDisplay.innerHTML += `
-                                <div class="group-member-item" onclick="openAddGroupMemberModal()">
-                                    <div style="width: 40px; height: 40px; border-radius: 4px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #999;">+</div>
-                                    <div style="font-size: 10px; color: #666; text-align: center; margin-top: 4px; width: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">邀请</div>
-                                </div>
-                                <div class="group-member-item" onclick="openRemoveGroupMemberModal()">
-                                    <div style="width: 40px; height: 40px; border-radius: 4px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #999;">-</div>
-                                    <div style="font-size: 10px; color: #666; text-align: center; margin-top: 4px; width: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">移除</div>
-                                </div>
-                            `;
+                    // If realName doesn't exist (legacy data), default to name
+                    if (!friend.realName) {
+                        friend.realName = friend.name;
+                        // Silently update DB to migrate data
+                        dbUpdate('friends', friend);
+                    }
+                    document.getElementById('chat-info-realname').value = friend.realName;
 
-                            // Render Memory Interop roles
-                            const interopToggle = document.getElementById('group-memory-interop-toggle');
-                            interopToggle.checked = friend.memoryInterop || false;
-                            
-                            const interopListContainer = document.getElementById('group-memory-interop-roles');
-                            interopListContainer.style.display = friend.memoryInterop ? 'block' : 'none';
-                            
-                            const interopList = document.getElementById('group-memory-interop-list');
-                            interopList.innerHTML = '';
-                            groupMembers.forEach(member => {
-                                const label = document.createElement('label');
-                                label.className = 'preset-checkbox-item';
-                                label.style.padding = '5px 0';
-                                label.innerHTML = `
-                                    <input type="checkbox" value="${member.id}" ${(friend.memoryInteropRoles || []).includes(member.id) ? 'checked' : ''}>
-                                    <div class="custom-checkbox"></div>
-                                    <img src="${member.avatar}" style="width: 24px; height: 24px; border-radius: 4px; margin-right: 5px; object-fit: cover;">
-                                    <span>${member.name}</span>
-                                `;
-                                interopList.appendChild(label);
-                            });
-                        });
+                    document.getElementById('chat-info-persona').value = friend.persona || '';
 
+                    // My Avatar in this chat
+                    if (friend.myAvatar) {
+                        document.getElementById('my-chat-avatar').src = friend.myAvatar;
                     } else {
-                        document.getElementById('chat-info-personal-section').style.display = 'block';
-                        document.getElementById('chat-info-my-avatar-section').style.display = 'flex';
-                        document.getElementById('chat-info-ai-settings-section').style.display = 'flex';
-                        document.getElementById('auto-summarize-settings-container').style.display = 'block';
-                        document.getElementById('chat-info-active-chat-section').style.display = 'flex';
-                        document.getElementById('chat-info-thought-section').style.display = 'flex';
-                        document.getElementById('chat-info-group-section').style.display = 'none';
-                        
-                        document.getElementById('chat-info-remark').value = friend.name;
-                        
-                        if (!friend.realName) {
-                            friend.realName = friend.name;
-                            dbUpdate('friends', friend);
-                        }
-                        document.getElementById('chat-info-realname').value = friend.realName;
-                        document.getElementById('chat-info-persona').value = friend.persona || '';
-
-                        if (friend.myAvatar) {
-                            document.getElementById('my-chat-avatar').src = friend.myAvatar;
-                        } else {
-                            dbGet('user_profile', 'main_user', profile => {
-                                if (profile && profile.avatar) {
-                                    document.getElementById('my-chat-avatar').src = profile.avatar;
-                                } else {
-                                    document.getElementById('my-chat-avatar').src = 'https://via.placeholder.com/150/B5EAD7/ffffff?text=Me';
-                                }
-                            });
-                        }
-
-                        if (friend.myPersonaId) {
-                            dbGet('my_personas', friend.myPersonaId, persona => {
-                                document.getElementById('my-chat-persona-text').textContent = persona ? persona.name : '默认人设';
-                            });
-                        } else {
-                            document.getElementById('my-chat-persona-text').textContent = '默认人设';
-                        }
-                        
-                        updateBindWorldBookText(friend.boundWorldBooks);
-                        
-                        const enableThoughts = friend.enableThoughts || false;
-                        document.getElementById('enable-thought-toggle').checked = enableThoughts;
-                        
-                        const thoughtSubContainer = document.getElementById('thought-sub-settings');
-                        if (thoughtSubContainer) {
-                            thoughtSubContainer.style.display = enableThoughts ? 'block' : 'none';
-                        }
-                        
-                        document.getElementById('show-thought-text-toggle').checked = friend.showThoughtText !== false;
-                        document.getElementById('separate-offline-ui-toggle').checked = friend.separateOfflineUI || false;
-                        
-                        const isActiveChat = friend.activeChat || false;
-                        document.getElementById('active-chat-toggle').checked = isActiveChat;
-                        
-                        const intervalContainer = document.getElementById('active-chat-interval-container');
-                        if (intervalContainer) {
-                            intervalContainer.style.display = isActiveChat ? 'block' : 'none';
-                        }
-
-                        document.getElementById('sync-reality-toggle').checked = friend.syncReality || false;
-                        document.getElementById('message-interval-input').value = friend.messageInterval || '';
-                        document.getElementById('short-term-memory-input').value = friend.shortTermMemory || '';
-                        
-                        const autoSummarize = friend.autoSummarizeMemory || false;
-                        document.getElementById('auto-summarize-memory-toggle').checked = autoSummarize;
-                        const summarizeContainer = document.getElementById('auto-summarize-interval-container');
-                        if (summarizeContainer) {
-                            summarizeContainer.style.display = autoSummarize ? 'block' : 'none';
-                        }
-                        document.getElementById('summarize-interval-input').value = friend.summarizeInterval || '';
+                        // Default to global avatar
+                        dbGet('user_profile', 'main_user', profile => {
+                            if (profile && profile.avatar) {
+                                document.getElementById('my-chat-avatar').src = profile.avatar;
+                            } else {
+                                document.getElementById('my-chat-avatar').src = 'https://via.placeholder.com/150/B5EAD7/ffffff?text=Me';
+                            }
+                        });
                     }
 
-                    // Avatar Display (Both)
+                    // My Persona in this chat
+                    if (friend.myPersonaId) {
+                        dbGet('my_personas', friend.myPersonaId, persona => {
+                            document.getElementById('my-chat-persona-text').textContent = persona ? persona.name : '默认人设';
+                        });
+                    } else {
+                        document.getElementById('my-chat-persona-text').textContent = '默认人设';
+                    }
+                    
+                    // Bound World Books
+                    updateBindWorldBookText(friend.boundWorldBooks);
+                    
+                    // Avatar Display
                     const avatarDisplaySelect = document.getElementById('avatar-display-select');
                     avatarDisplaySelect.value = friend.avatarDisplay || 'show_all';
                     refreshCustomSelect(avatarDisplaySelect);
+                    
+                    // AI Behavior Settings
+                    const isActiveChat = friend.activeChat || false;
+                    document.getElementById('active-chat-toggle').checked = isActiveChat;
+                    
+                    const intervalContainer = document.getElementById('active-chat-interval-container');
+                    if (intervalContainer) {
+                        intervalContainer.style.display = isActiveChat ? 'block' : 'none';
+                    }
+
+                    document.getElementById('sync-reality-toggle').checked = friend.syncReality || false;
+                    document.getElementById('message-interval-input').value = friend.messageInterval || '';
+                    document.getElementById('short-term-memory-input').value = friend.shortTermMemory || '';
+                    
+                    const autoSummarize = friend.autoSummarizeMemory || false;
+                    document.getElementById('auto-summarize-memory-toggle').checked = autoSummarize;
+                    const summarizeContainer = document.getElementById('auto-summarize-interval-container');
+                    if (summarizeContainer) {
+                        summarizeContainer.style.display = autoSummarize ? 'block' : 'none';
+                    }
+                    document.getElementById('summarize-interval-input').value = friend.summarizeInterval || '';
 
                     showPage('chat-info-page');
                 }
-            });
-        }
-
-        function toggleGroupMemoryInterop(isChecked) {
-            const container = document.getElementById('group-memory-interop-roles');
-            if (container) {
-                container.style.display = isChecked ? 'block' : 'none';
-            }
-        }
-
-        function openAddGroupMemberModal() {
-            if (!currentChatFriendId) return;
-            document.getElementById('role-selection-title').textContent = '邀请新成员';
-            document.getElementById('role-search-input').value = '';
-            
-            const listContainer = document.getElementById('role-selection-list');
-            listContainer.innerHTML = '';
-            document.getElementById('role-selection-modal').style.display = 'flex';
-
-            dbGet('friends', currentChatFriendId, group => {
-                dbGetAll('friends', allFriends => {
-                    const nonGroupFriends = allFriends.filter(f => !f.isGroup);
-                    nonGroupFriends.forEach(friend => {
-                        const isAlreadyMember = (group.members || []).includes(friend.id);
-                        
-                        const label = document.createElement('label');
-                        label.className = 'gm-contact-item';
-                        label.style.padding = '10px 0';
-                        label.style.borderBottom = '1px solid #f0f0f0';
-                        label.dataset.name = friend.name.toLowerCase();
-                        
-                        const checkbox = document.createElement('input');
-                        checkbox.type = 'checkbox';
-                        checkbox.value = friend.id;
-                        checkbox.dataset.friendName = friend.name;
-                        
-                        if (isAlreadyMember) {
-                            checkbox.checked = true;
-                            checkbox.disabled = true; // Cannot unselect existing members here
-                        }
-                        
-                        const customCheck = document.createElement('div');
-                        customCheck.className = 'round-checkbox';
-                        if (isAlreadyMember) {
-                            customCheck.style.backgroundColor = '#f0f0f0';
-                            customCheck.style.borderColor = '#ccc';
-                        }
-                        customCheck.innerHTML = '<div class="inner-dot"></div>';
-                        
-                        const avatar = document.createElement('img');
-                        avatar.src = friend.avatar;
-                        avatar.style.width = '36px';
-                        avatar.style.height = '36px';
-                        avatar.style.borderRadius = '4px';
-                        avatar.style.objectFit = 'cover';
-                        avatar.style.marginLeft = '10px';
-
-                        const span = document.createElement('span');
-                        span.textContent = friend.name;
-                        
-                        label.appendChild(checkbox);
-                        label.appendChild(customCheck);
-                        label.appendChild(avatar);
-                        label.appendChild(span);
-                        listContainer.appendChild(label);
-                    });
-
-                    // Override confirm button for add member
-                    const confirmBtn = document.querySelector('#role-selection-modal button');
-                    confirmBtn.onclick = () => {
-                        const checkboxes = document.querySelectorAll('#role-selection-list input[type="checkbox"]:checked:not(:disabled)');
-                        const newMemberIds = Array.from(checkboxes).map(cb => cb.value);
-                        
-                        if (newMemberIds.length > 0) {
-                            group.members = [...(group.members || []), ...newMemberIds];
-                            dbUpdate('friends', group, () => {
-                                closeRoleSelectionModal();
-                                openChatInfo(); // refresh
-                                showToast('已邀请新成员');
-                            });
-                        } else {
-                            closeRoleSelectionModal();
-                        }
-                    };
-                });
-            });
-        }
-
-        function openRemoveGroupMemberModal() {
-            if (!currentChatFriendId) return;
-            document.getElementById('role-selection-title').textContent = '移除群成员';
-            document.getElementById('role-search-input').value = '';
-            
-            const listContainer = document.getElementById('role-selection-list');
-            listContainer.innerHTML = '';
-            document.getElementById('role-selection-modal').style.display = 'flex';
-
-            dbGet('friends', currentChatFriendId, group => {
-                dbGetAll('friends', allFriends => {
-                    const currentMembers = allFriends.filter(f => (group.members || []).includes(f.id));
-                    currentMembers.forEach(friend => {
-                        const label = document.createElement('label');
-                        label.className = 'gm-contact-item';
-                        label.style.padding = '10px 0';
-                        label.style.borderBottom = '1px solid #f0f0f0';
-                        label.dataset.name = friend.name.toLowerCase();
-                        
-                        const checkbox = document.createElement('input');
-                        checkbox.type = 'checkbox';
-                        checkbox.value = friend.id;
-                        
-                        const customCheck = document.createElement('div');
-                        customCheck.className = 'round-checkbox';
-                        customCheck.innerHTML = '<div class="inner-dot"></div>';
-                        
-                        const avatar = document.createElement('img');
-                        avatar.src = friend.avatar;
-                        avatar.style.width = '36px';
-                        avatar.style.height = '36px';
-                        avatar.style.borderRadius = '4px';
-                        avatar.style.objectFit = 'cover';
-                        avatar.style.marginLeft = '10px';
-
-                        const span = document.createElement('span');
-                        span.textContent = friend.name;
-                        
-                        label.appendChild(checkbox);
-                        label.appendChild(customCheck);
-                        label.appendChild(avatar);
-                        label.appendChild(span);
-                        listContainer.appendChild(label);
-                    });
-
-                    // Override confirm button for remove member
-                    const confirmBtn = document.querySelector('#role-selection-modal button');
-                    confirmBtn.onclick = () => {
-                        const checkboxes = document.querySelectorAll('#role-selection-list input[type="checkbox"]:checked');
-                        const removeMemberIds = Array.from(checkboxes).map(cb => cb.value);
-                        
-                        if (removeMemberIds.length > 0) {
-                            showCustomConfirm(`确定要移除选中的 ${removeMemberIds.length} 个成员吗？`, () => {
-                                group.members = (group.members || []).filter(id => !removeMemberIds.includes(id));
-                                // Also remove from memoryInteropRoles if present
-                                group.memoryInteropRoles = (group.memoryInteropRoles || []).filter(id => !removeMemberIds.includes(id));
-                                
-                                dbUpdate('friends', group, () => {
-                                    closeRoleSelectionModal();
-                                    openChatInfo(); // refresh
-                                    showToast('已移除成员');
-                                });
-                            }, '移除成员');
-                        } else {
-                            closeRoleSelectionModal();
-                        }
-                    };
-                });
             });
         }
 
@@ -10740,8 +5972,8 @@ ${historyText}`;
                 if (!friend) return;
                 const boundIds = friend.boundWorldBooks || [];
                 
-                // Get world books from global variable
-                let allWorldBooks = worldBooks || [];
+                // Get world books from localStorage
+                let allWorldBooks = JSON.parse(localStorage.getItem('worldBooks')) || [];
                 
                 if (allWorldBooks.length === 0) {
                     listContainer.innerHTML = '<div style="text-align:center; color:#999; padding: 20px 0; font-size:14px;">暂无世界书，请先在世界书页面创建</div>';
@@ -10813,7 +6045,7 @@ ${historyText}`;
             if (!boundIds || boundIds.length === 0) {
                 textEl.textContent = '未绑定';
             } else {
-                let allWorldBooks = worldBooks || [];
+                let allWorldBooks = JSON.parse(localStorage.getItem('worldBooks')) || [];
                 const boundTitles = allWorldBooks.filter(wb => boundIds.includes(wb.id)).map(wb => wb.title);
                 if (boundTitles.length === 1) {
                     textEl.textContent = boundTitles[0];
@@ -10875,14 +6107,15 @@ ${historyText}`;
                             if (friend) {
                                 friend.avatar = imageUrl;
                                 dbUpdate('friends', friend, () => {
+                                    // Update Chat List and Chat Interface if needed
+                                    // Chat interface doesn't show avatar in header, but messages do.
+                                    // We should refresh the messages to show new avatar
                                     renderMessages(currentChatFriendId);
-                                    renderChatList();
-                                    renderContactsList();
                                 });
                             }
                         });
                     }
-                };
+                }
                 reader.readAsDataURL(input.files[0]);
             }
         }
@@ -10898,14 +6131,6 @@ ${historyText}`;
         function toggleAutoSummarizeConfig(isChecked) {
             updateFriendInfo('autoSummarizeMemory', isChecked);
             const container = document.getElementById('auto-summarize-interval-container');
-            if (container) {
-                container.style.display = isChecked ? 'block' : 'none';
-            }
-        }
-
-        function toggleThoughtConfig(isChecked) {
-            updateFriendInfo('enableThoughts', isChecked);
-            const container = document.getElementById('thought-sub-settings');
             if (container) {
                 container.style.display = isChecked ? 'block' : 'none';
             }
@@ -10938,15 +6163,6 @@ ${historyText}`;
                         friend.autoSummarizeMemory = value;
                     } else if (field === 'summarizeInterval') {
                         friend.summarizeInterval = value;
-                    } else if (field === 'enableThoughts') {
-                        friend.enableThoughts = value;
-                        if (value && typeof friend.showThoughtText === 'undefined') {
-                            friend.showThoughtText = true; // Default to true when first enabled
-                        }
-                    } else if (field === 'showThoughtText') {
-                        friend.showThoughtText = value;
-                    } else if (field === 'separateOfflineUI') {
-                        friend.separateOfflineUI = value;
                     }
                     
                     dbUpdate('friends', friend, () => {
@@ -10966,20 +6182,11 @@ ${historyText}`;
             if (!currentChatFriendId) return;
             dbGet('friends', currentChatFriendId, friend => {
                 if (friend) {
-                    if (friend.isGroup) {
-                        friend.name = document.getElementById('group-info-name').value.trim();
-                        friend.realName = friend.name;
-                        friend.memoryInterop = document.getElementById('group-memory-interop-toggle').checked;
-                        const checkboxes = document.querySelectorAll('#group-memory-interop-list input[type="checkbox"]:checked');
-                        friend.memoryInteropRoles = Array.from(checkboxes).map(cb => cb.value);
-                        friend.shortTermMemory = document.getElementById('short-term-memory-input').value;
-                    } else {
-                        friend.name = document.getElementById('chat-info-remark').value.trim();
-                        friend.realName = document.getElementById('chat-info-realname').value.trim();
-                        friend.persona = document.getElementById('chat-info-persona').value.trim();
-                        friend.shortTermMemory = document.getElementById('short-term-memory-input').value;
-                        friend.autoSummarizeMemory = document.getElementById('auto-summarize-memory-toggle').checked;
-                    }
+                    friend.name = document.getElementById('chat-info-remark').value.trim();
+                    friend.realName = document.getElementById('chat-info-realname').value.trim();
+                    friend.persona = document.getElementById('chat-info-persona').value.trim();
+                    friend.shortTermMemory = document.getElementById('short-term-memory-input').value;
+                    friend.autoSummarizeMemory = document.getElementById('auto-summarize-memory-toggle').checked;
                     dbUpdate('friends', friend, () => {
                         showToast('保存成功');
                         document.getElementById('chat-interface-title').textContent = friend.name;
@@ -11023,486 +6230,6 @@ ${historyText}`;
         }
 
         document.getElementById('delete-friend-btn').addEventListener('click', deleteCurrentFriend);
-
-        // --- Offline Chat Separate UI Logic ---
-        function openOfflineChat(friendId) {
-            currentChatFriendId = friendId;
-            dbGet('friends', friendId, friend => {
-                if (!friend) return;
-                document.getElementById('offline-chat-title').textContent = '';
-                showPage('offline-chat-page');
-                renderOfflineChat(friendId);
-            });
-        }
-
-        function exitOfflineChat() {
-            if (currentChatFriendId) {
-                dbGet('friends', currentChatFriendId, friend => {
-                    if (friend && friend.offlineSettings) {
-                        friend.offlineSettings.enabled = false;
-                        dbUpdate('friends', friend, () => {
-                            showPage('chat-interface-page');
-                            renderMessages(currentChatFriendId);
-                        });
-                    } else {
-                        showPage('chat-interface-page');
-                        renderMessages(currentChatFriendId);
-                    }
-                });
-            } else {
-                showPage('chat-interface-page');
-            }
-        }
-
-        let currentOfflineLoadedCount = 0;
-
-        function renderOfflineChat(friendId, isLoadMore = false) {
-            const container = document.getElementById('offline-chat-messages');
-            
-            const transaction = db.transaction(['chat_history'], 'readonly');
-            const store = transaction.objectStore('chat_history');
-            const index = store.index('friendId');
-            const request = index.getAll(friendId);
-
-            request.onsuccess = () => {
-                let messages = request.result;
-                messages = messages.filter(msg => msg.isOfflineSeparate);
-                
-                dbGet('friends', friendId, friend => {
-                    let previousScrollHeight = 0;
-                    let previousScrollTop = 0;
-
-                    if (isLoadMore) {
-                        previousScrollHeight = container.scrollHeight;
-                        previousScrollTop = container.scrollTop;
-                        currentOfflineLoadedCount += CHAT_LOAD_LIMIT;
-                    } else {
-                        currentOfflineLoadedCount = CHAT_LOAD_LIMIT;
-                    }
-
-                    container.innerHTML = '';
-
-                    const sliceStart = Math.max(0, messages.length - currentOfflineLoadedCount);
-                    const messagesToRender = messages.slice(sliceStart);
-
-                    if (messagesToRender.length > 0) {
-                        messagesToRender.forEach(msg => appendOfflineMessage(msg, friend, false, false));
-                    }
-                    
-                    if (isLoadMore) {
-                        container.scrollTop = container.scrollHeight - previousScrollHeight + previousScrollTop;
-                    } else {
-                        container.scrollTop = container.scrollHeight;
-                    }
-
-                    container.onscroll = () => {
-                        if (container.scrollTop === 0 && currentOfflineLoadedCount < messages.length) {
-                            container.onscroll = null;
-                            renderOfflineChat(friendId, true);
-                        }
-                    };
-                });
-            };
-        }
-
-        async function appendOfflineMessage(msg, friend, shouldScroll = true, isNew = false) {
-            const container = document.getElementById('offline-chat-messages');
-            const row = document.createElement('div');
-            row.className = 'offline-message-row';
-
-            if (msg.type === 'sent') {
-                const bubbleContainer = document.createElement('div');
-                bubbleContainer.className = 'offline-bubble-container right';
-                
-                const contentGroup = document.createElement('div');
-                contentGroup.className = 'offline-bubble-content-group';
-                
-                const nameLabel = document.createElement('div');
-                nameLabel.className = 'offline-user-name';
-                
-                let myAvatarSrc = 'https://via.placeholder.com/150/B5EAD7/ffffff?text=Me';
-                let myNameStr = '我';
-
-                if (friend && friend.myAvatar) {
-                    myAvatarSrc = friend.myAvatar;
-                }
-                
-                nameLabel.textContent = myNameStr;
-                
-                const bubble = document.createElement('div');
-                bubble.className = 'offline-bubble right';
-                bubble.innerHTML = msg.text.replace(/\n/g, '<br>');
-                
-                attachMessageEvents(bubble, msg);
-                
-                contentGroup.appendChild(nameLabel);
-                contentGroup.appendChild(bubble);
-                
-                const avatar = document.createElement('img');
-                avatar.className = 'offline-avatar';
-                avatar.src = myAvatarSrc;
-                
-                dbGet('user_profile', 'main_user', profile => {
-                    if (profile && profile.name) nameLabel.textContent = profile.name;
-                    if (!friend.myAvatar && profile && profile.avatar) avatar.src = profile.avatar;
-                });
-
-                bubbleContainer.appendChild(contentGroup);
-                bubbleContainer.appendChild(avatar);
-                row.appendChild(bubbleContainer);
-                
-            } else {
-                const parsedSegments = parseOfflineMessage(msg.text);
-                container.appendChild(row);
-                
-                for (let index = 0; index < parsedSegments.length; index++) {
-                    const seg = parsedSegments[index];
-                    
-                    if (isNew && index > 0) {
-                        const isActive = document.getElementById('offline-chat-page').classList.contains('active') && currentChatFriendId === msg.friendId;
-                        if (isActive) {
-                            if (shouldScroll) container.scrollTop = container.scrollHeight;
-                            const delay = Math.random() * 500 + 500;
-                            await new Promise(res => {
-                                let start = Date.now();
-                                let timer = setInterval(() => {
-                                    if (!document.getElementById('offline-chat-page').classList.contains('active')) {
-                                        clearInterval(timer);
-                                        res();
-                                    } else if (Date.now() - start >= delay) {
-                                        clearInterval(timer);
-                                        res();
-                                    }
-                                }, 50);
-                            });
-                        }
-                    }
-                    
-                    const segmentInfo = { index: index, type: seg.type, content: seg.content };
-
-                    if (seg.type === 'dialogue') {
-                        const bubbleContainer = document.createElement('div');
-                        bubbleContainer.className = 'offline-bubble-container left';
-                        
-                        const contentGroup = document.createElement('div');
-                        contentGroup.className = 'offline-bubble-content-group';
-                        
-                        const nameLabel = document.createElement('div');
-                        nameLabel.className = 'offline-user-name';
-                        nameLabel.style.textAlign = 'left';
-                        nameLabel.textContent = friend.name;
-                        
-                        const avatar = document.createElement('img');
-                        avatar.className = 'offline-avatar';
-                        avatar.src = friend.avatar;
-                        
-                        const bubble = document.createElement('div');
-                        bubble.className = 'offline-bubble left';
-                        bubble.innerHTML = seg.content.replace(/\n/g, '<br>');
-                        
-                        attachMessageEvents(bubble, msg, segmentInfo);
-                        
-                        contentGroup.appendChild(nameLabel);
-                        contentGroup.appendChild(bubble);
-                        
-                        bubbleContainer.appendChild(avatar);
-                        bubbleContainer.appendChild(contentGroup);
-                        row.appendChild(bubbleContainer);
-                    } else if (seg.type === 'action') {
-                        const actionDiv = document.createElement('div');
-                        actionDiv.className = 'offline-action';
-                        actionDiv.innerHTML = seg.content.replace(/\n/g, '<br>');
-                        attachMessageEvents(actionDiv, msg, segmentInfo);
-                        row.appendChild(actionDiv);
-                    } else if (seg.type === 'thought') {
-                        if (friend && friend.offlineSettings && friend.offlineSettings.showThoughts !== false) {
-                            const thoughtDiv = document.createElement('div');
-                            thoughtDiv.className = 'offline-thought';
-                            thoughtDiv.innerHTML = seg.content.replace(/\n/g, '<br>');
-                            attachMessageEvents(thoughtDiv, msg, segmentInfo);
-                            row.appendChild(thoughtDiv);
-                        }
-                    }
-                    
-                    if (shouldScroll) {
-                        container.scrollTop = container.scrollHeight;
-                    }
-                }
-                return; // Early return since we already appended the row
-            }
-
-            container.appendChild(row);
-            if (shouldScroll) {
-                container.scrollTop = container.scrollHeight;
-            }
-        }
-
-        function parseOfflineMessage(text) {
-            const segments = [];
-            text = sanitizeThoughtTags(text);
-            
-            const regex = /(「.*?」|<thought>.*?<\/thought>|<inner_thought>.*?<\/inner_thought>)/gs;
-            
-            let lastIndex = 0;
-            let match;
-            
-            while ((match = regex.exec(text)) !== null) {
-                const actionStr = text.substring(lastIndex, match.index).trim();
-                if (actionStr) {
-                    segments.push({ type: 'action', content: actionStr });
-                }
-                
-                const token = match[0];
-                if (token.startsWith('「')) {
-                    segments.push({ type: 'dialogue', content: token.substring(1, token.length - 1) });
-                } else if (token.startsWith('<thought>')) {
-                    segments.push({ type: 'thought', content: token.substring(9, token.length - 10) });
-                } else if (token.startsWith('<inner_thought>')) {
-                    segments.push({ type: 'thought', content: token.substring(15, token.length - 16) });
-                }
-                
-                lastIndex = regex.lastIndex;
-            }
-            
-            const trailingAction = text.substring(lastIndex).trim();
-            if (trailingAction) {
-                segments.push({ type: 'action', content: trailingAction });
-            }
-            
-            if (segments.length === 0 && text.trim()) {
-                segments.push({ type: 'dialogue', content: text.trim() });
-            }
-            
-            return segments;
-        }
-
-        // --- Mini Phone Logic ---
-        let currentMiniPhoneFriendId = null;
-        let miniPhonePollTimer = null;
-        let offlineChatFriendIdCache = null;
-
-        function openMiniPhoneModal() {
-            document.getElementById('mini-phone-modal').style.display = 'flex';
-            
-            if (currentChatFriendId && document.getElementById('offline-chat-page').classList.contains('active')) {
-                dbGet('friends', currentChatFriendId, friend => {
-                    if (friend && !friend.isGroup) {
-                        document.getElementById('mini-phone-list-page').style.display = 'none';
-                        openMiniPhoneChat(friend.id);
-                    } else {
-                        document.getElementById('mini-phone-list-page').style.display = 'flex';
-                        renderMiniPhoneChatList();
-                    }
-                    
-                    if(miniPhonePollTimer) clearInterval(miniPhonePollTimer);
-                    miniPhonePollTimer = setInterval(() => {
-                        if (document.getElementById('mini-phone-list-page').style.display === 'flex') {
-                            renderMiniPhoneChatList();
-                        }
-                    }, 2000);
-                });
-            } else {
-                document.getElementById('mini-phone-list-page').style.display = 'flex';
-                renderMiniPhoneChatList();
-                
-                if(miniPhonePollTimer) clearInterval(miniPhonePollTimer);
-                miniPhonePollTimer = setInterval(() => {
-                    if (document.getElementById('mini-phone-list-page').style.display === 'flex') {
-                        renderMiniPhoneChatList();
-                    }
-                }, 2000);
-            }
-        }
-
-        function closeMiniPhoneModal() {
-            if (document.getElementById('chat-interface-page').classList.contains('in-mini-phone')) {
-                closeMiniPhoneChat();
-            }
-            document.getElementById('mini-phone-modal').style.display = 'none';
-            if(miniPhonePollTimer) clearInterval(miniPhonePollTimer);
-        }
-
-        function renderMiniPhoneChatList() {
-            dbGetAll('friends', friends => {
-                const list = document.getElementById('mini-phone-chat-list');
-                list.innerHTML = '';
-                
-                let visibleFriends = friends.filter(f => !f.isHidden);
-
-                if (currentChatFriendId && document.getElementById('offline-chat-page').classList.contains('active')) {
-                    const contextFriend = friends.find(f => f.id === currentChatFriendId);
-                    if (contextFriend) {
-                        if (contextFriend.isGroup) {
-                            visibleFriends = visibleFriends.filter(f => f.id === contextFriend.id || (contextFriend.members || []).includes(f.id));
-                        } else {
-                            visibleFriends = visibleFriends.filter(f => f.id === contextFriend.id);
-                        }
-                    }
-                }
-
-                visibleFriends.sort((a, b) => {
-                    if (a.isPinned && !b.isPinned) return -1;
-                    if (!a.isPinned && b.isPinned) return 1;
-                    const timeA = a.lastActivityTimestamp || (a.id.includes('_') ? parseInt(a.id.split('_').pop()) : parseInt(a.id)) || 0;
-                    const timeB = b.lastActivityTimestamp || (b.id.includes('_') ? parseInt(b.id.split('_').pop()) : parseInt(b.id)) || 0;
-                    return timeB - timeA;
-                });
-                
-                visibleFriends.forEach(friend => {
-                    const item = document.createElement('div');
-                    item.style.display = 'flex';
-                    item.style.padding = '10px 15px';
-                    item.style.gap = '10px';
-                    item.style.cursor = 'pointer';
-                    item.style.borderBottom = '1px solid #f0f0f0';
-                    if (friend.isPinned) {
-                        item.style.backgroundColor = '#f5f5f5';
-                    }
-
-                    item.innerHTML = `
-                        <div style="position: relative; width: 40px; height: 40px; flex-shrink: 0;">
-                            <img src="${friend.avatar}" style="width: 100%; height: 100%; border-radius: 6px; object-fit: cover; background: #eee;">
-                        </div>
-                        <div style="flex-grow: 1; display: flex; flex-direction: column; justify-content: center; overflow: hidden;">
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span style="font-size: 15px; font-weight: 500; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${friend.name}</span>
-                                <span style="font-size: 11px; color: #b2b2b2;">${friend.lastTime || ''}</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
-                                <div style="font-size: 12px; color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-grow: 1;">${friend.lastMsg || ''}</div>
-                            </div>
-                        </div>
-                    `;
-
-                    item.addEventListener('click', () => {
-                        openMiniPhoneChat(friend.id);
-                    });
-
-                    list.appendChild(item);
-                });
-            });
-        }
-
-        function openMiniPhoneChat(friendId) {
-            if (!document.getElementById('chat-interface-page').classList.contains('in-mini-phone')) {
-                offlineChatFriendIdCache = currentChatFriendId;
-            }
-            currentChatFriendId = friendId;
-            
-            dbGet('friends', friendId, friend => {
-                if (!friend) return;
-                
-                if (friend.unreadCount) {
-                    friend.unreadCount = 0;
-                    dbUpdate('friends', friend);
-                }
-                
-                document.getElementById('mini-phone-list-page').style.display = 'none';
-                
-                const chatPage = document.getElementById('chat-interface-page');
-                document.getElementById('mini-phone-screen').appendChild(chatPage);
-                chatPage.style.display = 'flex';
-                chatPage.classList.add('in-mini-phone');
-                chatPage.classList.add('active'); // active so it receives AI messages
-                
-                if (friend.isGroup) {
-                    chatPage.classList.add('is-group-chat');
-                } else {
-                    chatPage.classList.remove('is-group-chat');
-                }
-                
-                document.getElementById('chat-interface-title').textContent = friend.name;
-                renderMessages(friendId);
-                applyChatTheme(friend);
-            });
-        }
-
-        function closeMiniPhoneChat() {
-            document.getElementById('mini-phone-list-page').style.display = 'flex';
-            
-            const chatPage = document.getElementById('chat-interface-page');
-            document.getElementById('main-app-container').appendChild(chatPage);
-            chatPage.style.display = 'none';
-            chatPage.classList.remove('in-mini-phone');
-            chatPage.classList.remove('is-group-chat');
-            chatPage.classList.remove('active');
-            
-            if (offlineChatFriendIdCache !== null) {
-                currentChatFriendId = offlineChatFriendIdCache;
-                offlineChatFriendIdCache = null;
-                
-                if (document.getElementById('offline-chat-page').classList.contains('active')) {
-                    renderOfflineChat(currentChatFriendId);
-                }
-            }
-            
-            renderMiniPhoneChatList();
-        }
-
-        function sendOfflineMessage() {
-            const input = document.getElementById('offline-chat-input');
-            const messageText = input.value.trim();
-            if (messageText === '' || !currentChatFriendId) return;
-
-            const message = {
-                friendId: currentChatFriendId,
-                text: messageText,
-                type: 'sent',
-                timestamp: Date.now(),
-                isOfflineSeparate: true
-            };
-
-            dbAdd('chat_history', message, () => {
-                dbGet('friends', currentChatFriendId, friend => {
-                    if (friend) {
-                        appendOfflineMessage(message, friend);
-                        input.value = '';
-                        // Removed triggerAIResponse() for manual offline mode
-                    }
-                });
-            });
-        }
-
-        function retryLastOfflineMessage() {
-            if (!currentChatFriendId) return;
-            
-            dbGetAll('chat_history', allMsgs => {
-                const friendMsgs = allMsgs.filter(m => m.friendId === currentChatFriendId && m.isOfflineSeparate);
-                if (friendMsgs.length === 0) {
-                    showToast('没有可重新生成的回复');
-                    return;
-                }
-                
-                const lastMsg = friendMsgs[friendMsgs.length - 1];
-                if (lastMsg.type === 'received') {
-                    showCustomConfirm('确定要重新生成上一条回复吗？', () => {
-                        dbDelete('chat_history', lastMsg.id || lastMsg.timestamp, () => {
-                            renderOfflineChat(currentChatFriendId);
-                            triggerAIResponse();
-                        });
-                    }, '重新生成');
-                } else {
-                    showToast('只能重新生成角色的回复');
-                }
-            });
-        }
-        
-        // Let's bind enter key for offline chat
-        document.getElementById('offline-chat-input').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendOfflineMessage();
-            }
-        });
-
-        document.getElementById('offline-chat-input').addEventListener('focus', () => {
-            setTimeout(() => {
-                const container = document.getElementById('offline-chat-messages');
-                if (container) {
-                    container.scrollTop = container.scrollHeight;
-                }
-            }, 300);
-        });
 
         // --- Memory Management Logic ---
         let currentEditingMemoryId = null;
@@ -11623,8 +6350,6 @@ ${historyText}`;
                 if (profile) {
                     if (profile.avatar) {
                         avatar.src = profile.avatar;
-                        const container = document.getElementById('me-avatar-container');
-                        if (container) container.classList.add('has-image');
                     }
                     if (profile.name) {
                         name.textContent = profile.name;
@@ -11646,25 +6371,22 @@ ${historyText}`;
 
         function handleMePageAvatarUpload(input) {
             if (input.files && input.files[0]) {
-                const file = input.files[0];
-                compressImage(file, 0.7, (compressedSrc) => {
-                    document.getElementById('me-page-avatar').src = compressedSrc;
-                    document.getElementById('me-avatar-container').classList.add('has-image');
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const imageUrl = e.target.result;
+                    document.getElementById('me-page-avatar').src = imageUrl;
                     
                     // Sync to main page avatar
                     const mainAvatar = document.getElementById('avatar-display');
-                    if (mainAvatar) {
-                        mainAvatar.src = compressedSrc;
-                        document.getElementById('main-avatar-container').classList.add('has-image');
-                    }
+                    if (mainAvatar) mainAvatar.src = imageUrl;
 
                     dbGet('user_profile', 'main_user', profile => {
                         const updatedProfile = profile || { id: 'main_user' };
-                        updatedProfile.avatar = compressedSrc;
+                        updatedProfile.avatar = imageUrl;
                         dbUpdate('user_profile', updatedProfile);
                     });
-                });
-                input.value = ''; // Reset input
+                }
+                reader.readAsDataURL(input.files[0]);
             }
         }
 
@@ -11921,60 +6643,6 @@ ${historyText}`;
             }
         }
 
-        // --- Location Logic ---
-        function openLocationModal() {
-            if (!currentChatFriendId) {
-                showToast('请先选择一个聊天');
-                return;
-            }
-            document.getElementById('location-name-input').value = '';
-            document.getElementById('location-detail-input').value = '';
-            document.getElementById('location-modal').style.display = 'flex';
-            toggleActionPanel(); // Close the + menu
-        }
-
-        function closeLocationModal() {
-            document.getElementById('location-modal').style.display = 'none';
-        }
-
-        function sendLocation() {
-            const name = document.getElementById('location-name-input').value.trim();
-            const detail = document.getElementById('location-detail-input').value.trim();
-
-            if (!name) {
-                showToast('请输入位置名称');
-                return;
-            }
-
-            const message = {
-                friendId: currentChatFriendId,
-                text: `[位置] ${name}`,
-                type: 'sent',
-                timestamp: Date.now(),
-                isLocation: true,
-                locationName: name,
-                locationDetail: detail
-            };
-
-            addMessageToUI(message);
-            dbAdd('chat_history', message);
-
-            dbGet('friends', currentChatFriendId, friend => {
-                if (friend) {
-                    friend.lastMsg = `[位置] ${name}`;
-                    friend.lastTime = getCurrentTimeStr();
-                    friend.lastActivityTimestamp = Date.now();
-                    dbUpdate('friends', friend, () => {
-                        if (document.getElementById('wechat-page').classList.contains('active')) {
-                            renderChatList();
-                        }
-                    });
-                }
-            });
-
-            closeLocationModal();
-        }
-
         // --- Transfer Logic ---
         let currentActiveTransferMsg = null;
 
@@ -11987,59 +6655,6 @@ ${historyText}`;
             document.getElementById('transfer-remark-input').value = '转账给对方';
             document.getElementById('transfer-modal').style.display = 'flex';
             toggleActionPanel(); // Close the + menu
-        }
-
-        function openLocationModal() {
-            if (!currentChatFriendId) {
-                showToast('请先选择一个聊天');
-                return;
-            }
-            document.getElementById('location-name-input').value = '';
-            document.getElementById('location-detail-input').value = '';
-            document.getElementById('location-modal').style.display = 'flex';
-            toggleActionPanel(); // Close the + menu
-        }
-
-        function closeLocationModal() {
-            document.getElementById('location-modal').style.display = 'none';
-        }
-
-        function sendLocation() {
-            const name = document.getElementById('location-name-input').value.trim();
-            const detail = document.getElementById('location-detail-input').value.trim();
-
-            if (!name) {
-                showToast('请输入位置名称');
-                return;
-            }
-
-            const message = {
-                friendId: currentChatFriendId,
-                text: `[位置] ${name}`,
-                type: 'sent',
-                timestamp: Date.now(),
-                isLocation: true,
-                locationName: name,
-                locationDetail: detail
-            };
-
-            addMessageToUI(message);
-            dbAdd('chat_history', message);
-
-            dbGet('friends', currentChatFriendId, friend => {
-                if (friend) {
-                    friend.lastMsg = `[位置] ${name}`;
-                    friend.lastTime = getCurrentTimeStr();
-                    friend.lastActivityTimestamp = Date.now();
-                    dbUpdate('friends', friend, () => {
-                        if (document.getElementById('wechat-page').classList.contains('active')) {
-                            renderChatList();
-                        }
-                    });
-                }
-            });
-
-            closeLocationModal();
         }
 
         function sendTransfer() {
@@ -12069,7 +6684,6 @@ ${historyText}`;
                 if (friend) {
                     friend.lastMsg = `[转账]`;
                     friend.lastTime = getCurrentTimeStr();
-                    friend.lastActivityTimestamp = Date.now();
                     dbUpdate('friends', friend, () => {
                         if (document.getElementById('wechat-page').classList.contains('active')) {
                             renderChatList();
@@ -12134,7 +6748,6 @@ ${historyText}`;
                                 if (friend) {
                                     friend.lastMsg = `[转账] ${replyText}`;
                                     friend.lastTime = getCurrentTimeStr();
-                                    friend.lastActivityTimestamp = Date.now();
                                     dbUpdate('friends', friend);
                                 }
                             });
@@ -12146,8 +6759,6 @@ ${historyText}`;
 
         // --- AI Emoji Library Logic ---
         let lastSelectedEmojiCharacter = "";
-        let isEmojiLibraryEditMode = false;
-        let selectedAiStickerIds = new Set();
 
         function renderEmojiLibraryCharacters() {
             const select = document.getElementById('emoji-library-character-select');
@@ -12155,27 +6766,27 @@ ${historyText}`;
             dbGetAll('friends', friends => {
                 select.innerHTML = '';
                 
-                // Add Global option first
-                const globalOption = document.createElement('option');
-                globalOption.value = "global";
-                globalOption.textContent = "全局/默认";
-                select.appendChild(globalOption);
-
-                const nonGroupFriends = (friends || []).filter(f => !f.isGroup);
-
-                nonGroupFriends.forEach(friend => {
-                    const option = document.createElement('option');
-                    option.value = friend.id;
-                    option.textContent = friend.name;
-                    select.appendChild(option);
-                });
-
-                // Restore last selection or default to global
-                if (lastSelectedEmojiCharacter && (lastSelectedEmojiCharacter === 'global' || nonGroupFriends.find(f => f.id === lastSelectedEmojiCharacter))) {
-                    select.value = lastSelectedEmojiCharacter;
+                if (!friends || friends.length === 0) {
+                    const defaultOption = document.createElement('option');
+                    defaultOption.value = "";
+                    defaultOption.textContent = "暂无角色";
+                    select.appendChild(defaultOption);
                 } else {
-                    select.value = 'global';
-                    lastSelectedEmojiCharacter = 'global';
+                    friends.forEach(friend => {
+                        const option = document.createElement('option');
+                        option.value = friend.id;
+                        option.textContent = friend.name;
+                        if (friend.id === lastSelectedEmojiCharacter) {
+                            option.selected = true;
+                        }
+                        select.appendChild(option);
+                    });
+                    
+                    // Auto-select first if no selection restored or valid
+                    if ((!lastSelectedEmojiCharacter || !friends.find(f => f.id === lastSelectedEmojiCharacter)) && select.options.length > 0) {
+                        select.options[0].selected = true;
+                        lastSelectedEmojiCharacter = select.value;
+                    }
                 }
                 
                 refreshCustomSelect(select);
@@ -12191,139 +6802,11 @@ ${historyText}`;
             });
         }
 
-        function toggleEmojiLibraryEditMode(btn) {
-            isEmojiLibraryEditMode = !isEmojiLibraryEditMode;
-            const grid = document.getElementById('ai-sticker-grid');
-            const actionBtn = document.getElementById('emoji-library-action-btn');
-            
-            if (isEmojiLibraryEditMode) {
-                btn.textContent = "取消";
-                grid.classList.add('batch-edit-mode');
-                
-                // Change bottom button to delete style
-                actionBtn.classList.add('emoji-library-delete-btn');
-                actionBtn.innerHTML = `<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
-            } else {
-                btn.textContent = "编辑";
-                grid.classList.remove('batch-edit-mode');
-                selectedAiStickerIds.clear(); // Clear selection
-                
-                // Reset checkboxes UI
-                document.querySelectorAll('.sticker-select-checkbox').forEach(cb => cb.classList.remove('checked'));
-                
-                // Reset bottom button
-                actionBtn.classList.remove('emoji-library-delete-btn');
-                actionBtn.innerHTML = "+";
-            }
-        }
-
-        function handleEmojiLibraryActionBtn() {
-            if (isEmojiLibraryEditMode) {
-                deleteSelectedAiStickers();
-            } else {
-                openAiStickerUploadModal();
-            }
-        }
-
-        function toggleAiStickerSelection(id, element) {
-            const checkbox = element.querySelector('.sticker-select-checkbox');
-            if (selectedAiStickerIds.has(id)) {
-                selectedAiStickerIds.delete(id);
-                if (checkbox) checkbox.classList.remove('checked');
-            } else {
-                selectedAiStickerIds.add(id);
-                if (checkbox) checkbox.classList.add('checked');
-            }
-        }
-
-        function deleteSelectedAiStickers() {
-            if (selectedAiStickerIds.size === 0) {
-                showToast('请选择要删除的表情包');
-                return;
-            }
-
-            // Custom modal with specific button styles as requested
-            const modal = document.getElementById('custom-confirm-modal');
-            const titleEl = document.getElementById('custom-confirm-title');
-            const messageEl = document.getElementById('custom-confirm-message');
-            const confirmBtn = document.getElementById('custom-confirm-confirm-btn');
-            const cancelBtn = document.getElementById('custom-confirm-cancel-btn');
-
-            titleEl.textContent = '确认删除';
-            messageEl.textContent = `确定要删除选中的 ${selectedAiStickerIds.size} 个表情包吗？`;
-            
-            // Apply requested styles
-            cancelBtn.style.backgroundColor = 'white';
-            cancelBtn.style.color = 'black';
-            cancelBtn.style.border = '1px solid #ddd'; // Adding border for visibility
-            
-            confirmBtn.style.backgroundColor = 'black';
-            confirmBtn.style.color = 'white';
-
-            modal.style.display = 'flex';
-
-            confirmBtn.onclick = () => {
-                const idsToDelete = Array.from(selectedAiStickerIds);
-                let deletedCount = 0;
-                
-                idsToDelete.forEach(id => {
-                    // id is likely a string from sticker.id, IndexedDB key might be number or string. 
-                    // dbAdd uses autoIncrement true, so keys are numbers.
-                    // We need to ensure we pass the correct type.
-                    // ai_stickers store keyPath is 'id', autoIncrement true.
-                    // We need to parse int if the ID string looks like an integer.
-                    let key = id;
-                    if (!isNaN(parseInt(id))) {
-                        key = parseInt(id);
-                    }
-
-                    dbDelete('ai_stickers', key, () => {
-                        deletedCount++;
-                        if (deletedCount === idsToDelete.length) {
-                            showToast('删除成功');
-                            modal.style.display = 'none';
-                            
-                            // Reset styles
-                            cancelBtn.style.backgroundColor = '';
-                            cancelBtn.style.color = '';
-                            cancelBtn.style.border = '';
-                            confirmBtn.style.backgroundColor = '';
-                            confirmBtn.style.color = '';
-                            
-                            // Exit edit mode (or stay? User didn't specify, but usually stay or refresh list)
-                            // Let's refresh list and keep edit mode active for convenience, 
-                            // but clear selection.
-                            selectedAiStickerIds.clear();
-                            renderAiStickers(lastSelectedEmojiCharacter);
-                        }
-                    });
-                });
-            };
-
-            cancelBtn.onclick = () => {
-                modal.style.display = 'none';
-                // Reset styles
-                cancelBtn.style.backgroundColor = '';
-                cancelBtn.style.color = '';
-                cancelBtn.style.border = '';
-                confirmBtn.style.backgroundColor = '';
-                confirmBtn.style.color = '';
-            };
-        }
-
         function renderAiStickers(friendId) {
             const grid = document.getElementById('ai-sticker-grid');
             grid.innerHTML = '';
-            
-            // Re-apply batch edit mode class if active
-            if (isEmojiLibraryEditMode) {
-                grid.classList.add('batch-edit-mode');
-            } else {
-                grid.classList.remove('batch-edit-mode');
-            }
-
             if (!friendId) {
-                grid.innerHTML = '<div style="grid-column: 1 / -1; text-align:center; color:#999; margin-top:20px;">请先选择一个角色或全局</div>';
+                grid.innerHTML = '<div style="grid-column: 1 / -1; text-align:center; color:#999; margin-top:20px;">请先选择一个角色</div>';
                 return;
             }
             
@@ -12331,8 +6814,6 @@ ${historyText}`;
             const diceItem = document.createElement('div');
             diceItem.className = 'sticker-item';
             diceItem.innerHTML = `<img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 100 100'><g transform='translate(0, -5)'><rect x='5' y='25' width='50' height='50' rx='10' fill='white' stroke='%23333' stroke-width='3'/><circle cx='20' cy='40' r='5' fill='%23333'/><circle cx='45' cy='40' r='5' fill='%23333'/><circle cx='20' cy='65' r='5' fill='%23333'/><circle cx='45' cy='65' r='5' fill='%23333'/><circle cx='32.5' cy='52.5' r='5' fill='%23333'/></g><g transform='translate(35, 25)'><rect x='5' y='25' width='50' height='50' rx='10' fill='white' stroke='%23333' stroke-width='3'/><circle cx='20' cy='40' r='5' fill='%23333'/><circle cx='45' cy='65' r='5' fill='%23333'/></g></svg>" alt="Dice">`;
-            // Disable interaction in batch edit mode for dice (it's not deletable from here usually, or should we allow?)
-            // It's a static item, not in DB, so cannot delete.
             grid.appendChild(diceItem);
 
             try {
@@ -12351,23 +6832,49 @@ ${historyText}`;
                         const img = document.createElement('img');
                         img.src = sticker.src;
 
-                        // Batch Selection Checkbox
-                        const checkbox = document.createElement('div');
-                        checkbox.className = 'sticker-select-checkbox';
-                        if (selectedAiStickerIds.has(String(sticker.id)) || selectedAiStickerIds.has(sticker.id)) {
-                            checkbox.classList.add('checked');
-                        }
+                        const deleteBtn = document.createElement('div');
+                        deleteBtn.className = 'sticker-delete-btn';
+                        deleteBtn.innerHTML = '&times;';
+                        
+                        deleteBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            dbDelete('ai_stickers', sticker.id, () => {
+                                renderAiStickers(friendId);
+                            });
+                        };
+
+                        let pressTimer;
+                        let wasLongPress = false;
+
+                        const startPress = (e) => {
+                            if (e.button === 2) return;
+                            wasLongPress = false;
+                            pressTimer = setTimeout(() => {
+                                wasLongPress = true;
+                                grid.classList.add('edit-mode');
+                            }, 500);
+                        };
+
+                        const cancelPress = () => {
+                            clearTimeout(pressTimer);
+                        };
+
+                        item.addEventListener('mousedown', startPress);
+                        item.addEventListener('touchstart', startPress, { passive: true });
+                        item.addEventListener('mouseup', cancelPress);
+                        item.addEventListener('mouseleave', cancelPress);
+                        item.addEventListener('touchend', cancelPress);
+                        item.addEventListener('touchcancel', cancelPress);
 
                         item.onclick = (e) => {
-                            if (isEmojiLibraryEditMode) {
-                                toggleAiStickerSelection(sticker.id, item);
-                            } else {
-                                sendSticker(sticker.src, sticker.description);
+                            if (wasLongPress) return;
+                            if (grid.classList.contains('edit-mode')) {
+                                grid.classList.remove('edit-mode');
                             }
                         };
                         
                         item.appendChild(img);
-                        item.appendChild(checkbox);
+                        item.appendChild(deleteBtn);
                         grid.appendChild(item);
                     });
                 };
@@ -12379,7 +6886,7 @@ ${historyText}`;
         function openAiStickerUploadModal() {
             const friendId = document.getElementById('emoji-library-character-select').value;
             if (!friendId) {
-                showToast('请先选择一个角色或全局');
+                showToast('请先选择一个角色');
                 return;
             }
             document.getElementById('ai-sticker-upload-modal').style.display = 'flex';
@@ -12391,10 +6898,7 @@ ${historyText}`;
 
         function handleAiStickerFiles(input) {
             const friendId = document.getElementById('emoji-library-character-select').value;
-            if (!friendId) {
-                showToast('请先选择一个角色或全局');
-                return;
-            }
+            if (!friendId) return;
             
             const files = Array.from(input.files);
             if (files.length === 0) return;
@@ -12464,36 +6968,9 @@ ${historyText}`;
                 return;
             }
 
-            dbGet('friends', currentChatFriendId, friend => {
-                if (friend && (friend.isGroup || friend.separateOfflineUI)) {
-                    if (!friend.offlineSettings) {
-                        friend.offlineSettings = { enabled: true };
-                    } else {
-                        friend.offlineSettings.enabled = true;
-                    }
-                    friend.separateOfflineUI = true;
-                    dbUpdate('friends', friend, () => {
-                        openOfflineChat(friend.id);
-                        toggleActionPanel();
-                    });
-                    return;
-                }
-                
-                openOfflineSettingsModal(true);
-            });
-        }
-
-        function openOfflineSettingsModal(showEnableToggle = false) {
-            if (!currentChatFriendId) return;
-
-            const enableItem = document.getElementById('offline-mode-toggle').closest('.offline-modal-item');
-            if (enableItem) {
-                enableItem.style.display = showEnableToggle ? 'flex' : 'none';
-            }
-
             const writingStyleSelect = document.getElementById('writing-style-select');
             writingStyleSelect.innerHTML = '<option value="default">默认风格</option>';
-            const localWorldBooks = worldBooks || [];
+            const localWorldBooks = JSON.parse(localStorage.getItem('worldBooks')) || [];
             localWorldBooks.forEach(book => {
                 const option = document.createElement('option');
                 option.value = book.id;
@@ -12554,11 +7031,6 @@ ${historyText}`;
                     dbUpdate('friends', friend, () => {
                         showToast('线下模式设置已保存');
                         closeOfflineModeModal();
-                        
-                        // If we are currently in the separate offline UI, re-render to apply the showThoughts setting immediately
-                        if (document.getElementById('offline-chat-page').classList.contains('active')) {
-                            renderOfflineChat(currentChatFriendId);
-                        }
                     });
                 }
             });
@@ -12567,10 +7039,7 @@ ${historyText}`;
         function openAiStickerUrlModal() {
             closeAiStickerUploadModal();
             const friendId = document.getElementById('emoji-library-character-select').value;
-            if (!friendId) {
-                showToast('请先选择一个角色或全局');
-                return;
-            }
+            if (!friendId) return;
 
             showGenericStickerModal({
                 title: '批量添加链接表情',
@@ -12602,7 +7071,7 @@ ${historyText}`;
                         if (parts.length < 2) return; 
                         
                         const url = parts[parts.length - 1];
-                        if (!url.startsWith('http') && !url.startsWith('data:') && !url.startsWith('./') && !url.startsWith('/') && !url.match(/\.(png|jpe?g|gif|webp|svg|bmp)$/i)) return;
+                        if (!url.startsWith('http')) return;
                         
                         const desc = parts.slice(0, parts.length - 1).join(' ');
                         
@@ -12692,24 +7161,17 @@ ${historyText}`;
             const file = input.files[0];
             if (!file) return;
 
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const fileContent = e.target.result;
-                input.value = ''; // Reset input after reading
-
-                showCustomConfirm('导入数据将覆盖当前所有数据（包括聊天记录和设置），确认导入吗？', async () => {
+            showCustomConfirm('导入数据将覆盖当前所有数据（包括聊天记录和设置），确认导入吗？', () => {
+                const reader = new FileReader();
+                reader.onload = async function(e) {
                     try {
-                        const data = JSON.parse(fileContent);
+                        const data = JSON.parse(e.target.result);
                         
                         // 1. Import LocalStorage
                         if (data.localStorage) {
                             localStorage.clear();
                             for (const key in data.localStorage) {
-                                try {
-                                    localStorage.setItem(key, data.localStorage[key]);
-                                } catch (e) {
-                                    console.warn(`Failed to set localStorage item ${key}:`, e);
-                                }
+                                localStorage.setItem(key, data.localStorage[key]);
                             }
                         }
 
@@ -12728,27 +7190,15 @@ ${historyText}`;
                                         clearReq.onerror = (err) => reject(err.target.error);
                                     });
 
-                                    // Add new items in chunks to prevent iOS Safari transaction aborts
+                                    // Add new items
                                     if (items && items.length > 0) {
-                                        const chunkSize = 200;
-                                        for (let i = 0; i < items.length; i += chunkSize) {
-                                            const chunk = items.slice(i, i + chunkSize);
-                                            await new Promise((resolve, reject) => {
-                                                const tx = db.transaction([storeName], 'readwrite');
-                                                const store = tx.objectStore(storeName);
-                                                tx.oncomplete = () => resolve();
-                                                tx.onerror = (err) => reject(tx.error || err.target.error);
-                                                tx.onabort = () => reject(tx.error || new Error('Transaction aborted'));
-                                                
-                                                chunk.forEach(item => {
-                                                    try {
-                                                        store.put(item);
-                                                    } catch (e) {
-                                                        console.warn(`Failed to put item in ${storeName}:`, e);
-                                                    }
-                                                });
-                                            });
-                                        }
+                                        await new Promise((resolve, reject) => {
+                                            const tx = db.transaction([storeName], 'readwrite');
+                                            const store = tx.objectStore(storeName);
+                                            tx.oncomplete = () => resolve();
+                                            tx.onerror = (err) => reject(err.target.error);
+                                            items.forEach(item => store.put(item));
+                                        });
                                     }
                                 }
                             }
@@ -12759,491 +7209,569 @@ ${historyText}`;
 
                     } catch (error) {
                         console.error('Import failed:', error);
-                        let errorMsg = error.message || '未知错误';
-                        if (error.name === 'QuotaExceededError') {
-                            errorMsg = '存储空间不足';
-                        }
-                        showToast('导入失败：' + errorMsg);
+                        showToast('导入失败：文件格式错误或数据损坏');
                     }
-                }, '确认导入');
-            };
-            reader.readAsText(file);
+                };
+                reader.readAsText(file);
+            }, '确认导入');
+            
+            input.value = ''; // Reset input
         }
 
-        function migrateWorldBookData(callback) {
-            const oldBooks = localStorage.getItem('worldBooks');
-            const oldGroups = localStorage.getItem('worldBookGroups');
+        // --- Music Listen Together Logic ---
+        let musicState = {
+            playlist: [],
+            currentIndex: -1,
+            audio: new Audio(),
+            isPlaying: false,
+            lyricsList: [],
+            currentLyric: '',
+            togetherMinutes: 0,
+            startTime: null,
+            timerInterval: null
+        };
+
+        function openMusicImportModal() {
+            if (!currentChatFriendId) {
+                showToast('请先选择一个聊天');
+                return;
+            }
+            toggleActionPanel();
+            document.getElementById('music-url-input').value = '';
+            document.getElementById('music-import-modal').style.display = 'flex';
+        }
+
+        function extractMusicId(url) {
+            let server = '';
+            let id = '';
+            if (url.includes('163.com') || url.includes('126.net')) {
+                server = 'netease';
+                let match = url.match(/id=(\d+)/);
+                if (match) id = match[1];
+                else {
+                    match = url.match(/playlist\/(\d+)/);
+                    if (match) id = match[1];
+                }
+            } else if (url.includes('qq.com')) {
+                server = 'tencent';
+                let match = url.match(/id=(\d+)/);
+                if (match) id = match[1];
+                else {
+                    match = url.match(/playlist\/([A-Za-z0-9]+)/);
+                    if (match) id = match[1];
+                }
+            }
+            return { server, id };
+        }
+
+        async function importMusicPlaylist() {
+            const url = document.getElementById('music-url-input').value.trim();
+            if (!url) {
+                showToast('请输入链接');
+                return;
+            }
+            const info = extractMusicId(url);
+            if (!info.server || !info.id) {
+                showToast('无法识别该链接');
+                return;
+            }
+
+            document.getElementById('music-import-modal').style.display = 'none';
+            showToast('正在解析歌单...');
+
+            try {
+                // Using generic meting api
+                const apiUrl = `https://api.i-meto.com/meting/api?server=${info.server}&type=playlist&id=${info.id}`;
+                const res = await fetch(apiUrl);
+                const data = await res.json();
+
+                if (data && data.length > 0) {
+                    musicState.playlist = data;
+                    musicState.currentIndex = 0;
+                    startListenTogether();
+                    showToast(`成功导入 ${data.length} 首歌曲`);
+                } else {
+                    showToast('获取失败，歌单可能为空或隐私受限');
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('网络请求失败');
+            }
+        }
+
+        function startListenTogether() {
+            if (!musicState.startTime) {
+                musicState.startTime = Date.now();
+                musicState.togetherMinutes = 0;
+                if (musicState.timerInterval) clearInterval(musicState.timerInterval);
+                musicState.timerInterval = setInterval(() => {
+                    musicState.togetherMinutes = Math.floor((Date.now() - musicState.startTime) / 60000);
+                    document.getElementById('music-together-time').textContent = `一起听了 ${musicState.togetherMinutes} 分钟`;
+                }, 60000);
+                document.getElementById('music-together-time').textContent = `一起听了 0 分钟`;
+            }
             
-            let promises = [];
-
-            if (oldBooks) {
-                try {
-                    const books = JSON.parse(oldBooks);
-                    if (Array.isArray(books)) {
-                        const bookPromise = new Promise(resolve => {
-                            const tx = db.transaction('world_books', 'readwrite');
-                            const store = tx.objectStore('world_books');
-                            let count = 0;
-                            if (books.length === 0) {
-                                resolve();
-                                return;
-                            }
-                            books.forEach(book => {
-                                if (!book.id) book.id = String(Date.now() + Math.random());
-                                const req = store.put(book);
-                                req.onsuccess = () => {
-                                    count++;
-                                    if (count === books.length) resolve();
-                                };
-                                req.onerror = (e) => {
-                                    console.error('Book migration put error:', e.target.error);
-                                    count++; // still increment to not block forever
-                                    if (count === books.length) resolve();
-                                }
-                            });
-                            tx.oncomplete = () => {
-                                localStorage.removeItem('worldBooks');
-                                console.log('Migrated world books to IndexedDB.');
-                            };
-                            tx.onerror = (e) => {
-                                console.error('Book migration transaction error:', e.target.error);
-                                resolve(); // Resolve anyway
-                            }
-                        });
-                        promises.push(bookPromise);
-                    }
-                } catch (e) {
-                    console.error('Error parsing old world books from localStorage', e);
+            document.getElementById('mini-player-bar').style.display = 'flex';
+            
+            // Set Avatars
+            dbGet('friends', currentChatFriendId, friend => {
+                if (friend) {
+                    document.getElementById('music-avatar-ai').src = friend.avatar;
+                    dbGet('user_profile', 'main_user', p => {
+                        const myAvatar = friend.myAvatar || (p && p.avatar ? p.avatar : 'https://via.placeholder.com/150');
+                        document.getElementById('music-avatar-user').src = myAvatar;
+                    });
                 }
-            }
+            });
 
-            if (oldGroups) {
-                try {
-                    const groups = JSON.parse(oldGroups);
-                    if (Array.isArray(groups)) {
-                        const groupPromise = new Promise(resolve => {
-                            const groupData = { id: 'groups', value: groups };
-                            dbUpdate('wb_settings', groupData, () => {
-                                localStorage.removeItem('worldBookGroups');
-                                console.log('Migrated world book groups to IndexedDB.');
-                                resolve();
-                            });
-                        });
-                        promises.push(groupPromise);
-                    }
-                } catch (e) {
-                    console.error('Error parsing old world book groups from localStorage', e);
+            playSong(0);
+        }
+
+        async function resolveSongSource(song) {
+            // Test if original URL works by loading it
+            return new Promise((resolve) => {
+                if (song._resolvedUrl) {
+                    resolve(true); // Already resolved
+                    return;
                 }
-            }
-
-            Promise.all(promises).then(() => {
-                if (callback) callback();
+                const testAudio = new Audio();
+                testAudio.preload = 'metadata';
+                testAudio.onloadedmetadata = () => {
+                    song._resolvedUrl = song.url;
+                    song._resolvedLrc = song.lrc;
+                    resolve(true);
+                };
+                testAudio.onerror = async () => {
+                    // Try alternative search
+                    try {
+                        const searchUrl = `https://api.i-meto.com/meting/api?server=kugou&type=search&id=${encodeURIComponent(song.name + ' ' + song.artist)}`;
+                        const res = await fetch(searchUrl);
+                        const results = await res.json();
+                        if (results && results.length > 0) {
+                            song._resolvedUrl = results[0].url;
+                            song._resolvedLrc = results[0].lrc;
+                            resolve(true);
+                        } else {
+                            song._failed = true;
+                            resolve(false);
+                        }
+                    } catch (e) {
+                        song._failed = true;
+                        resolve(false);
+                    }
+                };
+                testAudio.src = song.url;
             });
         }
 
-        async function loadWorldBookData(callback) {
-            try {
-                const books = await new Promise((resolve, reject) => dbGetAll('world_books', data => resolve(data || [])));
-                worldBooks = books;
+        async function playSong(index) {
+            if (index < 0 || index >= musicState.playlist.length) return;
+            const song = musicState.playlist[index];
+            musicState.currentIndex = index;
+            
+            // 随机决定这首歌是否要主动发言 (约 15% 概率)
+            song._willComment = Math.random() < 0.15;
+            song._hasCommented = false;
+            // 随机决定在这首歌的什么进度发言 (40% ~ 80% 之间)
+            song._commentProgress = 0.4 + Math.random() * 0.4;
 
-                const groupData = await new Promise((resolve, reject) => dbGet('wb_settings', 'groups', data => resolve(data)));
-                worldBookGroups = (groupData && groupData.value) ? groupData.value : ['默认'];
-            } catch (e) {
-                console.error("Failed to load world book data:", e);
-                worldBooks = [];
-                worldBookGroups = ['默认'];
-            } finally {
-                if (callback) callback();
+            updatePlayerUI(song);
+            
+            const success = await resolveSongSource(song);
+            if (!success) {
+                // If current is playing, skip to next silently
+                playNextSong();
+                return;
+            }
+
+            musicState.audio.src = song._resolvedUrl;
+            musicState.audio.play().then(() => {
+                musicState.isPlaying = true;
+                updatePlayStateUI();
+                fetchLyrics(song._resolvedLrc);
+                // Preload next
+                if (index + 1 < musicState.playlist.length) {
+                    resolveSongSource(musicState.playlist[index + 1]);
+                }
+            }).catch(e => {
+                console.error("Play error:", e);
+                playNextSong();
+            });
+        }
+
+        function playNextSong(userTriggered = false) {
+            let nextIndex = musicState.currentIndex + 1;
+            if (nextIndex >= musicState.playlist.length) {
+                nextIndex = 0; // Loop
+            }
+            playSong(nextIndex);
+        }
+
+        function playPrevSong() {
+            let prevIndex = musicState.currentIndex - 1;
+            if (prevIndex < 0) {
+                prevIndex = musicState.playlist.length - 1;
+            }
+            playSong(prevIndex);
+        }
+
+        function toggleMusicPlay(e) {
+            if (e) e.stopPropagation();
+            if (musicState.audio.paused) {
+                musicState.audio.play();
+                musicState.isPlaying = true;
+            } else {
+                musicState.audio.pause();
+                musicState.isPlaying = false;
+            }
+            updatePlayStateUI();
+        }
+
+        function closeMusicSystem(e) {
+            if (e) e.stopPropagation();
+            musicState.audio.pause();
+            musicState.isPlaying = false;
+            document.getElementById('mini-player-bar').style.display = 'none';
+            document.getElementById('music-full-page').classList.remove('active');
+            if (musicState.timerInterval) clearInterval(musicState.timerInterval);
+        }
+
+        function openMusicFullPage() {
+            document.getElementById('music-full-page').classList.add('active');
+            hideAllInputPanels();
+        }
+
+        function minimizeMusicPage() {
+            document.getElementById('music-full-page').classList.remove('active');
+        }
+
+        function updatePlayerUI(song) {
+            const title = song.name;
+            const artist = song.artist;
+            const pic = song.pic || 'https://via.placeholder.com/150';
+
+            document.getElementById('mini-player-title').textContent = title;
+            document.getElementById('mini-player-cover').src = pic;
+            
+            document.getElementById('full-song-name').textContent = title;
+            document.getElementById('full-artist-name').textContent = artist;
+            document.getElementById('vinyl-cover').src = pic;
+        }
+
+        function updatePlayStateUI() {
+            const isPlaying = musicState.isPlaying;
+            
+            // Mini Player
+            const miniCover = document.getElementById('mini-player-cover');
+            const miniBtn = document.getElementById('mini-player-play-btn');
+            if (isPlaying) {
+                miniCover.classList.add('playing');
+                miniBtn.innerHTML = '<rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect>';
+            } else {
+                miniCover.classList.remove('playing');
+                miniBtn.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
+            }
+
+            // Full Player
+            const vinyl = document.getElementById('vinyl-record');
+            const fullBtn = document.getElementById('full-play-btn-icon');
+            if (isPlaying) {
+                vinyl.classList.add('playing');
+                fullBtn.innerHTML = '<rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect>';
+            } else {
+                vinyl.classList.remove('playing');
+                fullBtn.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
             }
         }
+
+        // Time logic
+        musicState.audio.addEventListener('timeupdate', () => {
+            const current = musicState.audio.currentTime;
+            const duration = musicState.audio.duration;
+            if (duration) {
+                document.getElementById('music-time-current').textContent = formatTime(current);
+                document.getElementById('music-time-total').textContent = formatTime(duration);
+                document.getElementById('music-progress-fill').style.width = `${(current / duration) * 100}%`;
+                syncLyric(current);
+                
+                // 听歌主动发言检测
+                if (currentChatFriendId && musicState.playlist[musicState.currentIndex]) {
+                    const song = musicState.playlist[musicState.currentIndex];
+                    if (song._willComment && !song._hasCommented) {
+                        if (current / duration >= song._commentProgress) {
+                            song._hasCommented = true;
+                            
+                            dbGet('friends', currentChatFriendId, friend => {
+                                // 检查主动聊天开关是否开启
+                                if (friend && friend.activeChat) {
+                                    const configStr = localStorage.getItem('globalConfig');
+                                    if (configStr) {
+                                        const config = JSON.parse(configStr);
+                                        if (config.apiKey && config.model) {
+                                            const prompt = "\n【系统提示】你们正在一起听歌，这首歌刚好播到了比较有感触的地方。请根据你们的聊天上下文和刚刚听到的这几句歌词，随口发一条消息说一句你的感想或吐槽。就像好朋友在一起听歌时自然地搭话，不要长篇大论。";
+                                            generateProactiveMessage(friend, config, prompt);
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+        });
+
+        musicState.audio.addEventListener('ended', () => {
+            playNextSong();
+        });
+
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return '00:00';
+            const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+            const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        function seekMusic(e) {
+            const bar = document.getElementById('music-progress-bar');
+            const rect = bar.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const percentage = clickX / rect.width;
+            if (musicState.audio.duration) {
+                musicState.audio.currentTime = percentage * musicState.audio.duration;
+            }
+        }
+
+        // Lyrics logic
+        async function fetchLyrics(lrcUrl) {
+            musicState.lyricsList = [];
+            musicState.currentLyric = '暂无歌词';
+            document.getElementById('full-music-lyric').textContent = musicState.currentLyric;
+            document.getElementById('mini-player-lyric').textContent = '一起听...';
+            if (!lrcUrl) return;
+
+            try {
+                const res = await fetch(lrcUrl);
+                const text = await res.text();
+                const lines = text.split('\n');
+                lines.forEach(line => {
+                    const match = line.match(/\[(\d+):(\d+\.\d+)\](.*)/);
+                    if (match) {
+                        const m = parseInt(match[1]);
+                        const s = parseFloat(match[2]);
+                        const content = match[3].trim();
+                        if (content) {
+                            musicState.lyricsList.push({
+                                time: m * 60 + s,
+                                text: content
+                            });
+                        }
+                    }
+                });
+            } catch (e) {
+                console.error("Lyrics fetch failed");
+            }
+        }
+
+        function syncLyric(currentTime) {
+            let currentLineText = '';
+            let recentLines = [];
+            for (let i = 0; i < musicState.lyricsList.length; i++) {
+                if (currentTime >= musicState.lyricsList[i].time) {
+                    currentLineText = musicState.lyricsList[i].text;
+                    recentLines.push(currentLineText);
+                } else {
+                    break;
+                }
+            }
+            if (recentLines.length > 5) {
+                recentLines = recentLines.slice(-5);
+            }
+            musicState.recentLyrics = recentLines;
+
+            if (currentLineText && currentLineText !== musicState.currentLyric) {
+                musicState.currentLyric = currentLineText;
+                document.getElementById('full-music-lyric').textContent = currentLineText;
+                document.getElementById('mini-player-lyric').textContent = currentLineText;
+            }
+        }
+
+        // Music Chat Logic
+        function openMusicChatInput() {
+            const overlay = document.getElementById('music-chat-input-overlay');
+            overlay.style.display = 'flex';
+            document.getElementById('music-chat-input').focus();
+        }
+
+        document.getElementById('music-chat-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMusicChatMessage();
+        });
+
+        document.getElementById('music-full-page').addEventListener('click', (e) => {
+            if (e.target.id === 'music-full-page' || e.target.closest('.vinyl-container')) {
+                document.getElementById('music-chat-input-overlay').style.display = 'none';
+            }
+        });
+
+        function sendMusicChatMessage() {
+            const input = document.getElementById('music-chat-input');
+            const text = input.value.trim();
+            if (!text || !currentChatFriendId) return;
+
+            input.value = '';
+            document.getElementById('music-chat-input-overlay').style.display = 'none';
+
+            // Show User Bubble
+            showMusicBubble('user', text);
+
+            // Add to Chat History
+            const message = {
+                friendId: currentChatFriendId,
+                text: text,
+                type: 'sent',
+                timestamp: Date.now()
+            };
+            addMessageToUI(message);
+            dbAdd('chat_history', message);
+            
+            dbGet('friends', currentChatFriendId, friend => {
+                if (friend) {
+                    friend.lastMsg = text;
+                    friend.lastTime = getCurrentTimeStr();
+                    dbUpdate('friends', friend);
+                }
+            });
+
+            // Trigger AI Response
+            triggerAIResponse();
+        }
+
+        function showMusicBubble(side, text) {
+            if (!document.getElementById('music-full-page').classList.contains('active')) return;
+            const bubbleId = side === 'user' ? 'music-bubble-user' : 'music-bubble-ai';
+            const bubble = document.getElementById(bubbleId);
+            bubble.textContent = text;
+            bubble.classList.add('show');
+            
+            // Clear existing timeout if any
+            if (bubble.timeoutId) clearTimeout(bubble.timeoutId);
+            
+            bubble.timeoutId = setTimeout(() => {
+                bubble.classList.remove('show');
+            }, 4000);
+        }
+
+        // --- End Music Logic ---
 
         // Initial Load
         initDB(() => {
-            migrateWorldBookData(() => {
-                loadWorldBookData(() => {
-                    // After all data is loaded, render the list
-                    renderChatList();
-                    loadTheme();
-                    // The rest of the init can happen in parallel
-                });
-            });
+            // After DB is ready, render the list
+            renderChatList();
+            loadTheme();
+            // The rest of the init can happen in parallel
         });
 
+        // Virtual Keyboard handling via Visual Viewport
+        if (window.visualViewport) {
+            const handleViewportResize = () => {
+                const vvHeight = window.visualViewport.height;
+                const isMobile = window.matchMedia('(max-width: 600px)').matches || 
+                                 window.matchMedia('(display-mode: fullscreen)').matches || 
+                                 window.matchMedia('(display-mode: standalone)').matches;
+                
+                const container = document.querySelector('.phone-container');
+                if (isMobile && container) {
+                    container.style.height = `${vvHeight}px`;
+                    document.body.style.height = `${vvHeight}px`;
+                    window.scrollTo(0, 0); // 防止页面发生整体滚动偏移
+                } else if (container) {
+                    container.style.height = '812px'; 
+                }
+            };
+            
+            window.visualViewport.addEventListener('resize', handleViewportResize);
+            // 延迟一点初始化，确保其他全屏/样式逻辑已应用
+            setTimeout(handleViewportResize, 100);
+        }
         showPage('main-page');
         loadSettings();
         updateDate();
         updateTime();
         setInterval(updateTime, 1000);
-        
-        // Use Web Worker for background intervals instead of main thread setInterval
-        if (window.Worker) {
-            const timerWorker = new Worker('timer-worker.js');
-            timerWorker.postMessage('start');
-            timerWorker.onmessage = function(e) {
-                if (e.data === 'tick') {
-                    checkActiveChats();
-                    runAutoSummarization();
-                    checkAutoPostMoments();
-                }
-            };
-            
-            // Cleanup on page unload (optional but good practice)
-            window.addEventListener('beforeunload', () => {
-                timerWorker.postMessage('stop');
-                timerWorker.terminate();
-            });
-        } else {
-            // Fallback for older browsers
-            setInterval(() => {
-                checkActiveChats();
-                runAutoSummarization();
-                checkAutoPostMoments();
-            }, 60000); // Check every minute for active chats & summarization
-        }
-
-        // Catch-up checks when app comes back to foreground
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') {
-                console.log('App resumed, running catch-up checks...');
-                checkActiveChats();
-                runAutoSummarization();
-                checkAutoPostMoments();
-            }
-        });
-        window.addEventListener('focus', () => {
+        setInterval(() => {
             checkActiveChats();
             runAutoSummarization();
-            checkAutoPostMoments();
-        });
+        }, 60000); // Check every minute for active chats & summarization
 
-        async function checkAutoPostMoments() {
-            const isGlobalEnabled = localStorage.getItem('global_auto_post_moments') === 'true';
-            if (!isGlobalEnabled) return;
-
-            const configStr = localStorage.getItem('globalConfig');
-            if (!configStr) return;
-            const config = JSON.parse(configStr);
-            if (!config.apiKey || !config.model) return;
-
-            dbGetAll('friends', friends => {
-                const now = Date.now();
-                friends.forEach(async friend => {
-                    if (friend.autoPostMoments) {
-                        const lastPostTime = friend.lastAutoPostTime || 0;
-                        // 设定最低冷却时间为 4 小时 (14400000 ms)
-                        const minIntervalMs = 4 * 60 * 60 * 1000; 
-                        
-                        if (now - lastPostTime > minIntervalMs) {
-                            // 超过4小时后，每分钟有 2% 的概率发一条朋友圈
-                            // 这样可以确保不是时间一到就立刻发，而是随机分布在接下来的几个小时内
-                            if (Math.random() < 0.02) {
-                                try {
-                                    await generateMomentForCharacter(friend, config);
-                                    if (document.getElementById('wechat-discover-page').classList.contains('active')) {
-                                        renderDiscoverFeed();
-                                    }
-                                } catch (e) {
-                                    console.error('Auto post failed:', e);
-                                }
-                            }
-                        }
-                    }
+        // Register Service Worker for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').then(registration => {
+                    console.log('SW registered: ', registration.scope);
+                }).catch(err => {
+                    console.log('SW registration failed: ', err);
                 });
             });
         }
 
-        const fixViewportHeight = () => {
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        // The 'interactive-widget=resizes-content' meta tag now handles keyboard behavior natively.
+        // The custom handleViewportResize function has been removed to prevent conflicts and page jumping.
 
-            if (isIOS && window.visualViewport) {
-                const vv = window.visualViewport;
-                const root = document.documentElement;
-
-                const handleResize = () => {
-                    const layoutHeight = window.innerHeight;
-                    const keyboardHeight = layoutHeight - vv.height;
-                    
-                    // A threshold to make sure it's the keyboard
-                    if (keyboardHeight > 80) {
-                        root.style.setProperty('--keyboard-offset', `${keyboardHeight}px`);
-                        const messagesContainer = document.getElementById('chat-messages-container');
-                        if (messagesContainer) {
-                            setTimeout(() => {
-                                messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                            }, 100);
-                        }
-                    } else {
-                        root.style.setProperty('--keyboard-offset', '0px');
-                    }
-                };
-
-                vv.addEventListener('resize', handleResize);
-                
-                // On blur, explicitly reset the offset.
-                document.getElementById('chat-message-input').addEventListener('blur', () => {
-                    root.style.setProperty('--keyboard-offset', '0px');
-                });
-                const offlineInput = document.getElementById('offline-chat-input');
-                if (offlineInput) {
-                    offlineInput.addEventListener('blur', () => {
-                        root.style.setProperty('--keyboard-offset', '0px');
-                    });
+        // 全屏管理逻辑
+        const enterFullScreen = async () => {
+            const docEl = document.documentElement;
+            try {
+                if (docEl.requestFullscreen) {
+                    await docEl.requestFullscreen({ navigationUI: "hide" });
+                } else if (docEl.webkitRequestFullscreen) {
+                    await docEl.webkitRequestFullscreen({ navigationUI: "hide" });
                 }
+            } catch (err) {
+                // 忽略非交互触发的错误，等待下一次交互
+                console.log("进入全屏失败:", err);
             }
-
-            // Keep the existing stability logic for all platforms
-            if (window.visualViewport) {
-                window.visualViewport.addEventListener('scroll', () => {
-                    if (window.visualViewport.offsetTop > 0) {
-                        window.scrollTo(0, 0);
-                    }
-                });
-            }
-            
-            document.addEventListener('focusout', () => {
-                window.scrollTo(0, 0);
-            });
-            
-            window.addEventListener('scroll', () => {
-                window.scrollTo(0, 0);
-            }, { passive: false });
-
-            const setVh = () => {
-                document.documentElement.style.setProperty('--fixed-vh', `${window.innerHeight}px`);
-            };
-            setVh();
-            let lastWidth = window.innerWidth;
-            window.addEventListener('resize', () => {
-                if (window.innerWidth !== lastWidth) {
-                    lastWidth = window.innerWidth;
-                    setVh();
-                }
-            });
         };
 
-
-        function handleAvatarClick(friendId) {
-            dbGet('friends', friendId, friend => {
-                if (friend && friend.enableThoughts) {
-                    showThoughtModal(friend);
-                }
-            });
-        }
-
-        function showThoughtModal(friend) {
-            const modal = document.getElementById('thought-modal');
-            document.getElementById('thought-role-name').textContent = friend.name;
-            
-            let moodContent = friend.latestMood;
-            if (!moodContent || moodContent.trim() === '') {
-                moodContent = '无';
-            } else {
-                // Sanitize mood to only show kaomoji, just in case
-                moodContent = String(moodContent).replace(/[\u4e00-\u9fa5,.，。]/g, '').trim();
-                if (moodContent === '') {
-                    moodContent = '无'; // Fallback if it becomes empty after sanitizing
-                }
-            }
-            document.getElementById('thought-mood-content').textContent = moodContent;
-            
-            const textSection = document.getElementById('thought-text-section');
-            if (friend.showThoughtText !== false) { // Default true
-                textSection.style.display = 'block';
-                document.getElementById('thought-text-content').textContent = friend.latestThought || '无';
-            } else {
-                textSection.style.display = 'none';
-            }
-            
-            modal.style.display = 'flex';
-        }
-
-        function closeThoughtModal(e) {
-            if (e && e.target !== document.getElementById('thought-modal')) {
+        const setupFullScreenRestorer = () => {
+            // 检查是否是 PWA 模式
+            if (!(window.matchMedia('(display-mode: standalone)').matches || 
+                  window.matchMedia('(display-mode: fullscreen)').matches)) {
                 return;
             }
-            document.getElementById('thought-modal').style.display = 'none';
-        }
 
-        function checkDiscoverNotifications() {
-            dbGetAll('discover_notifications', notifs => {
-                const unread = notifs.filter(n => !n.isRead && n.toId === 'main_user');
-                const badge = document.getElementById('discover-badge');
-                const bar = document.getElementById('discover-notification-bar');
-                const countEl = document.getElementById('discover-notification-count');
-                const avatarEl = document.getElementById('discover-notification-avatar');
-                
-                if (unread.length > 0) {
-                    // Show red dot
-                    if (badge) badge.style.display = 'block';
-                    
-                    // Show bar
-                    if (bar && countEl && avatarEl) {
-                        // Sort by newest
-                        unread.sort((a, b) => b.timestamp - a.timestamp);
-                        const latest = unread[0];
-                        avatarEl.src = latest.fromAvatar || 'https://via.placeholder.com/150';
-                        countEl.textContent = `${unread.length}条新消息`;
-                        bar.style.display = 'flex';
-                    }
-                } else {
-                    if (badge) badge.style.display = 'none';
-                    if (bar) bar.style.display = 'none';
+            const restore = () => {
+                if (!document.fullscreenElement) {
+                    enterFullScreen();
+                }
+            };
+
+            // 当全屏状态改变且不是全屏时，绑定一次性点击事件来恢复
+            document.addEventListener('fullscreenchange', () => {
+                if (!document.fullscreenElement) {
+                    document.addEventListener('click', restore, { once: true });
+                    document.addEventListener('touchstart', restore, { once: true });
                 }
             });
-        }
 
-        function openDiscoverNotificationsModal() {
-            const listContainer = document.getElementById('discover-notifications-list');
-            listContainer.innerHTML = '';
-            
-            dbGetAll('discover_notifications', notifs => {
-                const myNotifs = notifs.filter(n => n.toId === 'main_user');
-                myNotifs.sort((a, b) => b.timestamp - a.timestamp);
-                
-                if (myNotifs.length === 0) {
-                    listContainer.innerHTML = '<div style="padding: 30px; text-align: center; color: #999; font-size: 14px;">暂无消息</div>';
-                } else {
-                    myNotifs.forEach(notif => {
-                        const item = document.createElement('div');
-                        item.style.padding = '15px';
-                        item.style.borderBottom = '1px solid #f0f0f0';
-                        item.style.display = 'flex';
-                        item.style.gap = '10px';
-                        
-                        const timeDate = new Date(notif.timestamp);
-                        const timeStr = `${timeDate.getMonth() + 1}-${timeDate.getDate()} ${String(timeDate.getHours()).padStart(2, '0')}:${String(timeDate.getMinutes()).padStart(2, '0')}`;
-                        
-                        let contentHtml = '';
-                        if (notif.type === 'like') {
-                            contentHtml = `<svg viewBox="0 0 24 24" style="width: 14px; height: 14px; stroke: #576b95; fill: #576b95; margin-right: 5px; vertical-align: middle;"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg><span style="color:#576b95;">赞了你的动态</span>`;
-                        } else {
-                            contentHtml = `<span>${notif.text}</span>`;
-                        }
-
-                        item.innerHTML = `
-                            <img src="${notif.fromAvatar}" style="width: 40px; height: 40px; border-radius: 4px; object-fit: cover; flex-shrink: 0; background: #eee;">
-                            <div style="flex-grow: 1; display: flex; flex-direction: column; justify-content: flex-start; gap: 4px;">
-                                <span style="font-size: 15px; font-weight: 600; color: #576b95;">${notif.fromName}</span>
-                                <div style="font-size: 14px; color: #333;">${contentHtml}</div>
-                                <span style="font-size: 12px; color: #999;">${timeStr}</span>
-                            </div>
-                            <div style="width: 60px; height: 60px; background: #f7f7f7; overflow: hidden; font-size: 12px; color: #666; padding: 4px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; line-height: 1.4; border-radius: 4px;">
-                                ${notif.postContent || '图片'}
-                            </div>
-                        `;
-                        
-                        listContainer.appendChild(item);
-                        
-                        // Mark as read
-                        if (!notif.isRead) {
-                            notif.isRead = true;
-                            dbUpdate('discover_notifications', notif);
-                        }
-                    });
+            // 当页面重新可见时（比如从相册返回），也尝试恢复
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible' && !document.fullscreenElement) {
+                    // 先尝试直接恢复（有些浏览器允许）
+                    enterFullScreen();
+                    // 以前失败，绑定点击恢复
+                    document.addEventListener('click', restore, { once: true });
+                    document.addEventListener('touchstart', restore, { once: true });
                 }
-                
-                document.getElementById('discover-notifications-modal').style.display = 'flex';
-                
-                // Hide badge and bar
-                const badge = document.getElementById('discover-badge');
-                const bar = document.getElementById('discover-notification-bar');
-                if (badge) badge.style.display = 'none';
-                if (bar) bar.style.display = 'none';
             });
-        }
 
-        function closeDiscoverNotificationsModal() {
-            document.getElementById('discover-notifications-modal').style.display = 'none';
-        }
-
-        function clearDiscoverNotifications() {
-            showCustomConfirm('确定要清空所有消息记录吗？', () => {
-                dbGetAll('discover_notifications', notifs => {
-                    const myNotifs = notifs.filter(n => n.toId === 'main_user');
-                    let count = 0;
-                    if (myNotifs.length === 0) return;
-                    
-                    myNotifs.forEach(notif => {
-                        dbDelete('discover_notifications', notif.id, () => {
-                            count++;
-                            if (count === myNotifs.length) {
-                                openDiscoverNotificationsModal(); // Re-render empty state
-                            }
-                        });
-                    });
-                });
-            }, '清空消息');
-        }
-
-    // 检查并注册 Service Worker
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js')
-                .then(registration => {
-                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
-                })
-                .catch(err => {
-                    console.log('ServiceWorker registration failed: ', err);
-                });
-        });
-    }
-
-    // 初始化
-    document.addEventListener('DOMContentLoaded', () => {
-        const isActivated = localStorage.getItem('app_activated') === 'true';
-        if (!isActivated) {
-            document.getElementById('activation-page').style.display = 'flex';
-            document.getElementById('main-app-container').style.display = 'none';
-        } else {
-            document.getElementById('activation-page').style.display = 'none';
-            document.getElementById('main-app-container').style.display = 'flex';
-        }
-
-        document.getElementById('activation-code-input').addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') {
-                checkActivationCode();
-            }
-        });
-
-        fixViewportHeight();
-        document.getElementById('comment-drawer-overlay').addEventListener('click', closeCommentDrawer);
-
-        // 为评论框添加回车发送功能
-        document.getElementById('comment-input').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                submitComment();
-            }
-        });
-
-        // 全局禁用所有输入框的系统自动填充（针对安卓的钥匙、信用卡、密码小人图标等）
-        const disableAutofill = (el) => {
-            // 避免使用 off 或 new-password，现代安卓系统和浏览器经常忽略 off，且 new-password 会明确唤起密码管理器
-            // 使用一个随机/无效的值可以有效绕过大部分启发式自动填充
-            el.setAttribute('autocomplete', 'nope');
-            el.setAttribute('autocorrect', 'off');
-            el.setAttribute('autocapitalize', 'off');
-            el.setAttribute('spellcheck', 'false');
-            el.setAttribute('data-form-type', 'other');
-            el.setAttribute('data-lpignore', 'true'); // 针对部分第三方密码管理器
+            // 页面加载时的初始尝试
+            enterFullScreen();
+            // 以防万一，初始点击也绑定
+            document.addEventListener('click', restore, { once: true });
+            document.addEventListener('touchstart', restore, { once: true });
         };
 
-        document.querySelectorAll('input, textarea').forEach(disableAutofill);
-
-        // 监控动态创建的输入框（如打开弹窗时生成的元素）
-        const observer = new MutationObserver(mutations => {
-            mutations.forEach(mutation => {
-                mutation.addedNodes.forEach(node => {
-                    if (node.nodeType === 1) { // ELEMENT_NODE
-                        if (node.tagName === 'INPUT' || node.tagName === 'TEXTAREA') {
-                            disableAutofill(node);
-                        }
-                        if (node.querySelectorAll) {
-                            node.querySelectorAll('input, textarea').forEach(disableAutofill);
-                        }
-                    }
-                });
-            });
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            setupFullScreenRestorer();
+            document.getElementById('comment-drawer-overlay').addEventListener('click', closeCommentDrawer);
         });
-        observer.observe(document.body, { childList: true, subtree: true });
-    });
