@@ -3992,14 +3992,37 @@
         .tieba-tag-text {
             padding: 4px 12px;
             border-radius: 20px;
-            border: 1px dashed lightgreen;
+            border: 1px solid black;
             background-color: white;
             color: #333;
             font-size: 13px;
             transition: all 0.2s;
+            position: relative;
         }
         .tieba-tag-label input:checked + .tieba-tag-text {
-            background-color: #e8f5e9;
+            background-color: #f0f0f0;
+        }
+        .tieba-tag-delete {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            width: 16px;
+            height: 16px;
+            background-color: #ff3b30;
+            color: white;
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            z-index: 10;
+        }
+        .tieba-tag-label.edit-mode .tieba-tag-delete {
+            display: flex;
+        }
+        .tieba-tag-label.edit-mode .tieba-tag-text {
+            animation: shake 0.3s infinite;
         }
 
         .tieba-sidebar-overlay {
@@ -4095,6 +4118,7 @@
             font-weight: bold;
             font-size: 17px;
             position: relative;
+            cursor: pointer;
         }
         .tieba-tab-active::after {
             content: '';
@@ -4109,6 +4133,7 @@
         }
         .tieba-tab-inactive {
             color: #999;
+            cursor: pointer;
         }
         .tieba-content {
             flex-grow: 1;
@@ -5381,11 +5406,11 @@
                     <span style="font-size: 24px; font-weight: bold; color: #000; margin-left: -5px;"><</span>
                 </div>
                 <div class="tieba-header-center">
-                    <div class="tieba-tab-inactive">关注</div>
-                    <div class="tieba-tab-active">推荐</div>
+                    <div class="tieba-tab-inactive" id="tieba-tab-follow" onclick="switchTiebaTab('关注')">关注</div>
+                    <div class="tieba-tab-active" id="tieba-tab-recommend" onclick="switchTiebaTab('推荐')">推荐</div>
                 </div>
                 <div class="tieba-header-right" style="display: flex; gap: 15px; align-items: center;">
-                    <svg onclick="openTiebaSearchModal()" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="cursor: pointer;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <svg onclick="handleTiebaSearchBtnClick()" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="cursor: pointer;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                     <svg onclick="openTiebaSidebar()" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor: pointer;"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
                 </div>
             </div>
@@ -5421,6 +5446,54 @@
                 </div>
             </div>
         </div>
+
+        <!-- Tieba Role Search Modal (关注页) -->
+        <div class="modal-overlay" id="tieba-role-search-modal" style="z-index: 1000;">
+            <div class="modal-content" style="width: 320px; padding: 20px;">
+                <h3 style="text-align: center; margin-bottom: 15px;">选择发帖角色</h3>
+                <div id="tieba-role-search-list" style="max-height: 250px; overflow-y: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                    <!-- Fixed size checkboxes/avatars -->
+                </div>
+                <div class="modal-actions" style="margin-top: 20px;">
+                    <button class="cancel-btn" onclick="closeTiebaRoleSearchModal()">取消</button>
+                    <button class="save-btn" onclick="performTiebaRoleSearch()">搜索</button>
+                </div>
+            </div>
+        </div>
+
+        <style>
+            .tieba-role-item {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 5px;
+                cursor: pointer;
+                position: relative;
+            }
+            .tieba-role-item img {
+                width: 50px;
+                height: 50px;
+                border-radius: 8px;
+                object-fit: cover;
+                border: 2px solid transparent;
+                transition: border-color 0.2s;
+            }
+            .tieba-role-item input:checked + img {
+                border-color: #000;
+            }
+            .tieba-role-item span {
+                font-size: 12px;
+                color: #333;
+                text-align: center;
+                width: 100%;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            .tieba-role-item input {
+                display: none;
+            }
+        </style>
 
         <!-- Tieba Search Modal -->
         <div class="modal-overlay" id="tieba-search-modal" style="z-index: 1000;">
@@ -19876,6 +19949,152 @@ ${historyText}`;
 
         // --- Tieba Search & Feed Logic ---
         let tiebaTags = [];
+        let currentTiebaTab = '推荐'; // '推荐' or '关注'
+
+        function switchTiebaTab(tabName) {
+            currentTiebaTab = tabName;
+            const followTab = document.getElementById('tieba-tab-follow');
+            const recommendTab = document.getElementById('tieba-tab-recommend');
+            
+            if (tabName === '推荐') {
+                recommendTab.className = 'tieba-tab-active';
+                followTab.className = 'tieba-tab-inactive';
+            } else {
+                followTab.className = 'tieba-tab-active';
+                recommendTab.className = 'tieba-tab-inactive';
+            }
+            renderTiebaFeed();
+        }
+
+        function handleTiebaSearchBtnClick() {
+            if (currentTiebaTab === '推荐') {
+                openTiebaSearchModal();
+            } else {
+                openTiebaRoleSearchModal();
+            }
+        }
+
+        function openTiebaRoleSearchModal() {
+            const list = document.getElementById('tieba-role-search-list');
+            list.innerHTML = '';
+            
+            dbGetAll('friends', friends => {
+                const nonGroupFriends = friends.filter(f => !f.isGroup);
+                if (nonGroupFriends.length === 0) {
+                    list.innerHTML = '<div style="grid-column: 1 / -1; text-align:center; color:#999; font-size:13px; padding: 10px 0;">暂无角色</div>';
+                } else {
+                    nonGroupFriends.forEach(friend => {
+                        const label = document.createElement('label');
+                        label.className = 'tieba-role-item';
+                        
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.name = 'tieba-role-radio'; // treat like checkbox for multiple, or change to radio if single
+                        checkbox.value = friend.id;
+                        
+                        const img = document.createElement('img');
+                        img.src = friend.avatar;
+                        
+                        const span = document.createElement('span');
+                        span.textContent = friend.name;
+                        
+                        label.appendChild(checkbox);
+                        label.appendChild(img);
+                        label.appendChild(span);
+                        list.appendChild(label);
+                    });
+                }
+                document.getElementById('tieba-role-search-modal').style.display = 'flex';
+            });
+        }
+
+        function closeTiebaRoleSearchModal() {
+            document.getElementById('tieba-role-search-modal').style.display = 'none';
+        }
+
+        async function performTiebaRoleSearch() {
+            const checkboxes = document.querySelectorAll('#tieba-role-search-list input[type="checkbox"]:checked');
+            const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+            
+            if (selectedIds.length === 0) {
+                showToast('请至少选择一个角色');
+                return;
+            }
+            
+            closeTiebaRoleSearchModal();
+            
+            const configStr = localStorage.getItem('globalConfig');
+            if (!configStr) {
+                showToast('请先在设置页面配置 API 信息');
+                return;
+            }
+            const config = JSON.parse(configStr);
+            if (!config.apiKey || !config.model) {
+                showToast('请先配置完整的 API Key 和模型');
+                return;
+            }
+
+            const indicator = document.getElementById('tieba-searching-indicator');
+            indicator.style.display = 'block';
+            
+            try {
+                // To support multiple characters, we might loop or ask them to discuss.
+                // For simplicity, we just trigger a post generation for the first selected character
+                const friendId = selectedIds[0];
+                const friend = await new Promise(res => dbGet('friends', friendId, res));
+                
+                if (friend) {
+                    let userPersona = null;
+                    if (friend.myPersonaId) {
+                        userPersona = await new Promise(resolve => dbGet('my_personas', friend.myPersonaId, resolve));
+                    }
+
+                    const aiStickers = await new Promise(resolve => {
+                        const tx = db.transaction(['ai_stickers'], 'readonly');
+                        const store = tx.objectStore('ai_stickers');
+                        const index = store.index('friendId');
+                        const req = index.getAll(friend.id);
+                        req.onsuccess = () => resolve(req.result);
+                        req.onerror = () => resolve([]);
+                    });
+
+                    let prompt = buildSystemPrompt(friend, userPersona, aiStickers, []);
+                    prompt += `\n【系统指令】请模仿贴吧、微博或论坛的用户，发布一条符合你人设的帖子。只需要输出帖子的纯文本内容，不要带有任何标题或HTML标签。语气要像你在发动态一样。内容长度100-300字左右。如果觉得需要配图，可以附带<sticker>标签。`;
+
+                    const history = [{
+                        type: 'system',
+                        text: prompt,
+                        timestamp: Date.now()
+                    }];
+
+                    let aiResponseText = await callLLM(config, prompt, history);
+                    
+                    if (aiResponseText) {
+                        aiResponseText = aiResponseText.replace(/<(?:inner_thought|thought)>(.*?)<\/(?:inner_thought|thought)>/gis, '').trim();
+                        aiResponseText = aiResponseText.replace(/<mood>(.*?)<\/mood>/gis, '').trim();
+
+                        const post = {
+                            id: Date.now().toString(),
+                            authorName: friend.realName || friend.name,
+                            authorAvatar: friend.avatar,
+                            content: aiResponseText.trim(),
+                            timestamp: Date.now(),
+                            isRolePost: true
+                        };
+
+                        dbAdd('tieba_posts', post, () => {
+                            renderTiebaFeed();
+                        });
+                    }
+                }
+            } catch (e) {
+                showToast('生成帖子失败');
+                console.error(e);
+            } finally {
+                indicator.style.display = 'none';
+            }
+        }
+
 
         function openTiebaSearchModal() {
             document.getElementById('tieba-tag-input').value = '';
@@ -19893,7 +20112,56 @@ ${historyText}`;
             if (tag && !tiebaTags.includes(tag)) {
                 tiebaTags.push(tag);
                 input.value = '';
-                renderTiebaTags();
+                // renderTiebaTags(); // Let's just append
+                const container = document.getElementById('tieba-tags-container');
+                const label = document.createElement('label');
+                label.className = 'tieba-tag-label';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = tag;
+                // DO NOT CHECK BY DEFAULT
+                
+                const span = document.createElement('span');
+                span.className = 'tieba-tag-text';
+                span.textContent = tag;
+                
+                const deleteBtn = document.createElement('div');
+                deleteBtn.className = 'tieba-tag-delete';
+                deleteBtn.innerHTML = '&times;';
+                deleteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    tiebaTags = tiebaTags.filter(t => t !== tag);
+                    label.remove();
+                };
+                
+                let pressTimer;
+                let isLongPress = false;
+                
+                label.addEventListener('mousedown', (e) => {
+                    if (e.button === 2) return;
+                    isLongPress = false;
+                    pressTimer = setTimeout(() => {
+                        isLongPress = true;
+                        label.classList.add('edit-mode');
+                    }, 500);
+                });
+                
+                label.addEventListener('mouseup', () => clearTimeout(pressTimer));
+                label.addEventListener('mouseleave', () => clearTimeout(pressTimer));
+                label.addEventListener('click', (e) => {
+                    if (isLongPress) {
+                        e.preventDefault();
+                    } else if (label.classList.contains('edit-mode')) {
+                        e.preventDefault();
+                        label.classList.remove('edit-mode');
+                    }
+                });
+
+                label.appendChild(checkbox);
+                label.appendChild(span);
+                label.appendChild(deleteBtn);
+                container.appendChild(label);
             } else if (!tag) {
                 showToast('请输入标签名');
             } else {
@@ -19911,14 +20179,47 @@ ${historyText}`;
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 checkbox.value = tag;
-                checkbox.checked = true; // default to checked when added
+                // Not checked by default
                 
                 const span = document.createElement('span');
                 span.className = 'tieba-tag-text';
                 span.textContent = tag;
                 
+                const deleteBtn = document.createElement('div');
+                deleteBtn.className = 'tieba-tag-delete';
+                deleteBtn.innerHTML = '&times;';
+                deleteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    tiebaTags = tiebaTags.filter(t => t !== tag);
+                    label.remove();
+                };
+                
+                let pressTimer;
+                let isLongPress = false;
+                
+                label.addEventListener('mousedown', (e) => {
+                    if (e.button === 2) return;
+                    isLongPress = false;
+                    pressTimer = setTimeout(() => {
+                        isLongPress = true;
+                        label.classList.add('edit-mode');
+                    }, 500);
+                });
+                
+                label.addEventListener('mouseup', () => clearTimeout(pressTimer));
+                label.addEventListener('mouseleave', () => clearTimeout(pressTimer));
+                label.addEventListener('click', (e) => {
+                    if (isLongPress) {
+                        e.preventDefault();
+                    } else if (label.classList.contains('edit-mode')) {
+                        e.preventDefault();
+                        label.classList.remove('edit-mode');
+                    }
+                });
+
                 label.appendChild(checkbox);
                 label.appendChild(span);
+                label.appendChild(deleteBtn);
                 container.appendChild(label);
             });
         }
@@ -19965,14 +20266,14 @@ ${historyText}`;
             }
 
             prompt += `\n\n【要求】：
-1. 只需要输出帖子的纯文本内容，不要带有任何标题如“帖子内容：”或HTML标签。
+1. 请生成 3-5 条不同网友的帖子内容，每条帖子占一行，用换行符分隔。不要带有任何编号或标题。
 2. 语气要像真实的网民，可以带一些口语化词汇或网络用语。
-3. 内容长度100-300字左右。`;
+3. 每条帖子内容长度在50-200字左右。`;
 
             try {
                 let aiResponseText = await callLLM(config, prompt, []);
                 if (aiResponseText) {
-                    // Random avatar for post
+                    const lines = aiResponseText.split('\n').filter(l => l.trim() !== '');
                     const randomAvatars = [
                         'https://via.placeholder.com/150/FFB7B2/ffffff?text=U',
                         'https://via.placeholder.com/150/B5EAD7/ffffff?text=A',
@@ -19980,19 +20281,28 @@ ${historyText}`;
                         'https://via.placeholder.com/150/FFDAC1/ffffff?text=X',
                         'https://via.placeholder.com/150/E2F0CB/ffffff?text=Y',
                     ];
-                    const randomNames = ['匿名网友', '吃瓜群众', '路过的风', '贴吧老哥', '潜水员'];
+                    const randomNames = ['匿名网友', '吃瓜群众', '路过的风', '贴吧老哥', '潜水员', '网络冲浪员'];
                     
-                    const post = {
-                        id: Date.now().toString(),
-                        authorName: randomNames[Math.floor(Math.random() * randomNames.length)] + Math.floor(Math.random() * 1000),
-                        authorAvatar: randomAvatars[Math.floor(Math.random() * randomAvatars.length)],
-                        content: aiResponseText.trim(),
-                        timestamp: Date.now()
-                    };
+                    let count = 0;
+                    for (let i = 0; i < lines.length; i++) {
+                        const content = lines[i].trim();
+                        // remove leading numbers if any
+                        const cleanContent = content.replace(/^\d+[\.、]\s*/, '');
+                        if (cleanContent) {
+                            const post = {
+                                id: Date.now().toString() + '_' + i,
+                                authorName: randomNames[Math.floor(Math.random() * randomNames.length)] + Math.floor(Math.random() * 1000),
+                                authorAvatar: randomAvatars[Math.floor(Math.random() * randomAvatars.length)],
+                                content: cleanContent,
+                                timestamp: Date.now() - i * 1000, // Slightly offset so they order properly
+                                isRolePost: false
+                            };
 
-                    dbAdd('tieba_posts', post, () => {
-                        renderTiebaFeed();
-                    });
+                            await new Promise(res => dbAdd('tieba_posts', post, res));
+                            count++;
+                        }
+                    }
+                    renderTiebaFeed();
                 }
             } catch (e) {
                 showToast('搜索生成失败');
@@ -20008,14 +20318,21 @@ ${historyText}`;
             dbGetAll('tieba_posts', posts => {
                 container.innerHTML = '';
                 
-                if (!posts || posts.length === 0) {
+                let visiblePosts = posts || [];
+                if (currentTiebaTab === '推荐') {
+                    visiblePosts = visiblePosts.filter(p => !p.isRolePost);
+                } else {
+                    visiblePosts = visiblePosts.filter(p => p.isRolePost);
+                }
+                
+                if (visiblePosts.length === 0) {
                     container.innerHTML = '<div style="text-align:center; padding: 30px; color:#999; font-size:14px;">暂无帖子，点击右上角搜索生成</div>';
                     return;
                 }
 
-                posts.sort((a, b) => b.timestamp - a.timestamp);
+                visiblePosts.sort((a, b) => b.timestamp - a.timestamp);
 
-                posts.forEach(post => {
+                visiblePosts.forEach(post => {
                     const postDate = new Date(post.timestamp);
                     const timeStr = `${postDate.getMonth()+1}-${postDate.getDate()} ${String(postDate.getHours()).padStart(2, '0')}:${String(postDate.getMinutes()).padStart(2, '0')}`;
 
