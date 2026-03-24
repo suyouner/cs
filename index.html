@@ -11329,7 +11329,7 @@
                 if (activeMessageSegment) {
                     showCustomConfirm('确定要删除这条片段吗？', () => {
                         dbGetAll('chat_history', allMsgs => {
-                            const dbMsg = allMsgs.find(m => m.friendId === activeMessage.friendId && m.timestamp === activeMessage.timestamp);
+                            const dbMsg = allMsgs.find(m => m.id === activeMessage.id || (m.friendId === activeMessage.friendId && m.timestamp === activeMessage.timestamp));
                             if (dbMsg) {
                                 let parts = parseOfflineMessage(dbMsg.text);
                                 parts.splice(activeMessageSegment.index, 1);
@@ -11348,7 +11348,7 @@
                                 } else {
                                     dbMsg.text = newText;
                                     dbUpdate('chat_history', dbMsg, () => {
-                                        renderOfflineChat(currentChatFriendId);
+                                        renderOfflineChat(currentChatFriendId, false, dbMsg.id || dbMsg.timestamp);
                                     });
                                 }
                             }
@@ -11357,7 +11357,7 @@
                 } else {
                     showCustomConfirm('确定要删除这条消息吗？', () => {
                         dbGetAll('chat_history', allMsgs => {
-                            const dbMsg = allMsgs.find(m => m.friendId === activeMessage.friendId && m.timestamp === activeMessage.timestamp);
+                            const dbMsg = allMsgs.find(m => m.id === activeMessage.id || (m.friendId === activeMessage.friendId && m.timestamp === activeMessage.timestamp));
                             if (dbMsg) {
                                 dbDelete('chat_history', dbMsg.id, () => {
                                     if (dbMsg.isOfflineSeparate) {
@@ -11543,7 +11543,7 @@
             }
             if (activeMessage) {
                 dbGetAll('chat_history', allMsgs => {
-                    const dbMsg = allMsgs.find(m => m.friendId === activeMessage.friendId && m.timestamp === activeMessage.timestamp);
+                    const dbMsg = allMsgs.find(m => (m.id && activeMessage.id && String(m.id) === String(activeMessage.id)) || (m.friendId === activeMessage.friendId && String(m.timestamp) === String(activeMessage.timestamp)));
                     if (dbMsg) {
                         if (activeMessageSegment) {
                             let parts = parseOfflineMessage(dbMsg.text);
@@ -11559,13 +11559,17 @@
                             dbMsg.text = combinedText;
                             dbUpdate('chat_history', dbMsg, () => {
                                 document.getElementById('edit-message-modal').style.display = 'none';
-                                renderOfflineChat(currentChatFriendId);
+                                renderOfflineChat(currentChatFriendId, false, dbMsg.id || dbMsg.timestamp);
                             });
                         } else {
                             dbMsg.text = newText;
                             dbUpdate('chat_history', dbMsg, () => {
                                 document.getElementById('edit-message-modal').style.display = 'none';
-                                renderMessages(currentChatFriendId, dbMsg.id || dbMsg.timestamp);
+                                if (dbMsg.isOfflineSeparate || document.getElementById('offline-chat-page').classList.contains('active')) {
+                                    renderOfflineChat(currentChatFriendId, false, dbMsg.id || dbMsg.timestamp);
+                                } else {
+                                    renderMessages(currentChatFriendId, dbMsg.id || dbMsg.timestamp);
+                                }
                             });
                         }
                     }
@@ -17171,7 +17175,7 @@ ${historyText}`;
 
         let currentOfflineLoadedCount = 0;
 
-        function renderOfflineChat(friendId, isLoadMore = false) {
+        function renderOfflineChat(friendId, isLoadMore = false, targetMsgId = null) {
             const container = document.getElementById('offline-chat-messages');
             
             const transaction = db.transaction(['chat_history'], 'readonly');
@@ -17192,7 +17196,17 @@ ${historyText}`;
                         previousScrollTop = container.scrollTop;
                         currentOfflineLoadedCount += CHAT_LOAD_LIMIT;
                     } else {
-                        currentOfflineLoadedCount = CHAT_LOAD_LIMIT;
+                        if (targetMsgId) {
+                            const targetIndex = messages.findIndex(m => String(m.id) === String(targetMsgId) || String(m.timestamp) === String(targetMsgId));
+                            if (targetIndex !== -1) {
+                                const messagesAfterTarget = messages.length - targetIndex;
+                                currentOfflineLoadedCount = Math.max(CHAT_LOAD_LIMIT, messagesAfterTarget + 10);
+                            } else {
+                                currentOfflineLoadedCount = CHAT_LOAD_LIMIT;
+                            }
+                        } else {
+                            currentOfflineLoadedCount = CHAT_LOAD_LIMIT;
+                        }
                     }
 
                     container.innerHTML = '';
@@ -17206,6 +17220,13 @@ ${historyText}`;
                     
                     if (isLoadMore) {
                         container.scrollTop = container.scrollHeight - previousScrollHeight + previousScrollTop;
+                    } else if (targetMsgId) {
+                        setTimeout(() => {
+                            let targetEl = document.querySelector(`.offline-message-row[data-msg-id="${targetMsgId}"]`);
+                            if (targetEl) {
+                                targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }
+                        }, 100);
                     } else {
                         container.scrollTop = container.scrollHeight;
                     }
@@ -17224,6 +17245,7 @@ ${historyText}`;
             const container = document.getElementById('offline-chat-messages');
             const row = document.createElement('div');
             row.className = 'offline-message-row';
+            row.dataset.msgId = msg.id || msg.timestamp;
 
             if (msg.type === 'sent') {
                 const bubbleContainer = document.createElement('div');
