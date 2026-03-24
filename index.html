@@ -3981,6 +3981,51 @@
         }
 
         /* Tieba Page Styles */
+        .tieba-sidebar-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.4);
+            display: none;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .tieba-sidebar-overlay.show {
+            display: block;
+            opacity: 1;
+        }
+        .tieba-sidebar {
+            position: absolute;
+            top: 0;
+            right: -80%;
+            width: 80%;
+            height: 100%;
+            background: #f7f7f7;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+            transition: right 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            z-index: 1001;
+        }
+        .tieba-sidebar-overlay.show .tieba-sidebar {
+            right: 0;
+        }
+        .tieba-sidebar-header {
+            padding: calc(max(34px, env(safe-area-inset-top)) + 15px) 20px 15px 20px;
+            background: #fff;
+            border-bottom: 1px solid #eee;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .tieba-sidebar-content {
+            padding: 20px;
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+
         #tieba-page {
             background-color: #f5f5f5;
             flex-direction: column;
@@ -5307,7 +5352,7 @@
                 </div>
                 <div class="tieba-header-right" style="display: flex; gap: 15px; align-items: center;">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                    <svg onclick="openTiebaSidebar()" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor: pointer;"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
                 </div>
             </div>
             <div class="tieba-content">
@@ -5339,6 +5384,34 @@
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                     </div>
                     <span class="tieba-footer-text">我</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tieba Sidebar Overlay -->
+        <div class="tieba-sidebar-overlay" id="tieba-sidebar-overlay" onclick="closeTiebaSidebar(event)">
+            <div class="tieba-sidebar" id="tieba-sidebar" onclick="event.stopPropagation()">
+                <div class="tieba-sidebar-header">
+                    贴吧设置
+                </div>
+                <div class="tieba-sidebar-content">
+                    <div class="settings-item">
+                        <label style="font-weight: 600; font-size: 15px; color: #333;">绑定世界书 (世界观)</label>
+                        <select id="tieba-worldbook-select" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 12px; margin-top: 8px; background: white;" onchange="saveTiebaSettings()">
+                            <option value="">不绑定</option>
+                        </select>
+                        <p style="font-size: 12px; color: #666; margin-top: 5px;">绑定的世界书将影响生成的帖子内容</p>
+                    </div>
+                    
+                    <div class="settings-item" style="margin-top: 25px;">
+                        <label style="font-weight: 600; font-size: 15px; color: #333; display: flex; justify-content: space-between; align-items: center;">
+                            参与贴吧的角色
+                            <span style="font-size: 13px; font-weight: normal; color: #576b95; cursor: pointer;" onclick="selectAllTiebaRoles()">全选/反选</span>
+                        </label>
+                        <div id="tieba-roles-list" style="margin-top: 10px; display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; border: 1px solid #eee; padding: 10px; border-radius: 12px; background: #fff;">
+                            <!-- Checkboxes injected by JS -->
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -19605,6 +19678,126 @@ ${historyText}`;
                     });
                 });
             }, '清空消息');
+        }
+
+        // --- Tieba Logic ---
+        function openTiebaSidebar() {
+            const overlay = document.getElementById('tieba-sidebar-overlay');
+            overlay.style.display = 'block';
+            void overlay.offsetWidth; // trigger reflow
+            overlay.classList.add('show');
+            
+            // Populate World Books
+            const wbSelect = document.getElementById('tieba-worldbook-select');
+            const savedWbId = localStorage.getItem('tieba_bound_worldbook_id') || '';
+            
+            wbSelect.innerHTML = '<option value="">不绑定</option>';
+            if (typeof worldBooks !== 'undefined') {
+                worldBooks.forEach(wb => {
+                    const option = document.createElement('option');
+                    option.value = wb.id;
+                    option.textContent = wb.title;
+                    if (wb.id === savedWbId) {
+                        option.selected = true;
+                    }
+                    wbSelect.appendChild(option);
+                });
+            }
+            refreshCustomSelect(wbSelect);
+            
+            // Populate Roles
+            const rolesList = document.getElementById('tieba-roles-list');
+            rolesList.innerHTML = '';
+            
+            let savedRoles = [];
+            try {
+                savedRoles = JSON.parse(localStorage.getItem('tieba_participating_roles') || '[]');
+            } catch(e){}
+            
+            dbGetAll('friends', friends => {
+                const nonGroupFriends = friends.filter(f => !f.isGroup);
+                if (nonGroupFriends.length === 0) {
+                    rolesList.innerHTML = '<div style="text-align:center; color:#999; font-size:13px; padding: 10px 0;">暂无角色</div>';
+                    return;
+                }
+                nonGroupFriends.forEach(friend => {
+                    const label = document.createElement('label');
+                    label.className = 'preset-checkbox-item';
+                    label.style.padding = '5px 0';
+                    
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.value = friend.id;
+                    if (savedRoles.includes(friend.id)) {
+                        checkbox.checked = true;
+                    }
+                    checkbox.onchange = saveTiebaSettings;
+                    
+                    const customCheck = document.createElement('div');
+                    customCheck.className = 'custom-checkbox';
+                    
+                    const avatar = document.createElement('img');
+                    avatar.src = friend.avatar;
+                    avatar.style.width = '24px';
+                    avatar.style.height = '24px';
+                    avatar.style.borderRadius = '4px';
+                    avatar.style.marginRight = '8px';
+                    avatar.style.objectFit = 'cover';
+
+                    const span = document.createElement('span');
+                    span.textContent = friend.name;
+                    
+                    label.appendChild(checkbox);
+                    label.appendChild(customCheck);
+                    label.appendChild(avatar);
+                    label.appendChild(span);
+                    rolesList.appendChild(label);
+                });
+            });
+        }
+
+        function closeTiebaSidebar(e) {
+            if (e && e.target.id !== 'tieba-sidebar-overlay') return;
+            const overlay = document.getElementById('tieba-sidebar-overlay');
+            overlay.classList.remove('show');
+            setTimeout(() => {
+                overlay.style.display = 'none';
+            }, 300);
+        }
+
+        function saveTiebaSettings() {
+            const wbSelect = document.getElementById('tieba-worldbook-select');
+            const wbId = wbSelect.value;
+            localStorage.setItem('tieba_bound_worldbook_id', wbId);
+            
+            if (wbId && typeof worldBooks !== 'undefined') {
+                const wb = worldBooks.find(b => b.id === wbId);
+                if (wb) {
+                    localStorage.setItem('tieba_bound_worldbook_name', wb.title);
+                    localStorage.setItem('tieba_bound_worldbook_content', wb.content);
+                }
+            } else {
+                localStorage.removeItem('tieba_bound_worldbook_name');
+                localStorage.removeItem('tieba_bound_worldbook_content');
+            }
+            
+            const checkboxes = document.querySelectorAll('#tieba-roles-list input[type="checkbox"]:checked');
+            const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+            localStorage.setItem('tieba_participating_roles', JSON.stringify(selectedIds));
+        }
+
+        function selectAllTiebaRoles() {
+            const checkboxes = document.querySelectorAll('#tieba-roles-list input[type="checkbox"]');
+            if (checkboxes.length === 0) return;
+            let allChecked = true;
+            checkboxes.forEach(cb => {
+                if (!cb.checked) allChecked = false;
+            });
+            
+            checkboxes.forEach(cb => {
+                cb.checked = !allChecked;
+            });
+            saveTiebaSettings();
         }
 
     // 检查并注册 Service Worker
