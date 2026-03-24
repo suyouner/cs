@@ -6659,6 +6659,9 @@
             if (pageId === 'bubble-theme-page') {
                 renderBubbleThemePage();
             }
+            if (pageId === 'tieba-page') {
+                renderTiebaFeed();
+            }
         }
 
         let currentChatFriend = null;
@@ -19951,8 +19954,12 @@ ${historyText}`;
         }
 
         // --- Tieba Search & Feed Logic ---
-        let tiebaTags = [];
+        let tiebaTags = JSON.parse(localStorage.getItem('tieba_search_tags')) || [];
         let currentTiebaTab = '推荐'; // '推荐' or '关注'
+
+        function saveTiebaTags() {
+            localStorage.setItem('tieba_search_tags', JSON.stringify(tiebaTags));
+        }
 
         function switchTiebaTab(tabName) {
             currentTiebaTab = tabName;
@@ -20114,6 +20121,7 @@ ${historyText}`;
             const tag = input.value.trim();
             if (tag && !tiebaTags.includes(tag)) {
                 tiebaTags.push(tag);
+                saveTiebaTags();
                 input.value = '';
                 // renderTiebaTags(); // Let's just append
                 const container = document.getElementById('tieba-tags-container');
@@ -20135,6 +20143,7 @@ ${historyText}`;
                 deleteBtn.onclick = (e) => {
                     e.stopPropagation();
                     tiebaTags = tiebaTags.filter(t => t !== tag);
+                    saveTiebaTags();
                     label.remove();
                 };
                 
@@ -20194,6 +20203,7 @@ ${historyText}`;
                 deleteBtn.onclick = (e) => {
                     e.stopPropagation();
                     tiebaTags = tiebaTags.filter(t => t !== tag);
+                    saveTiebaTags();
                     label.remove();
                 };
                 
