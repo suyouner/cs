@@ -4014,16 +4014,29 @@
             right: 0;
         }
         .tieba-sidebar-header {
-            padding: calc(max(34px, env(safe-area-inset-top)) + 15px) 20px 15px 20px;
+            padding: calc(max(10px, env(safe-area-inset-top)) + 10px) 20px 15px 20px;
             background: #fff;
             border-bottom: 1px solid #eee;
             font-size: 18px;
             font-weight: bold;
         }
         .tieba-sidebar-content {
-            padding: 20px;
+            padding: 15px 20px;
             flex-grow: 1;
             overflow-y: auto;
+        }
+        #tieba-worldbook-list::-webkit-scrollbar,
+        #tieba-roles-list::-webkit-scrollbar {
+            display: none;
+        }
+        .tieba-small-checkbox .custom-checkbox {
+            width: 16px !important;
+            height: 16px !important;
+            border-width: 1.5px !important;
+        }
+        .tieba-small-checkbox .custom-checkbox::after {
+            width: 8px !important;
+            height: 8px !important;
         }
 
         #tieba-page {
@@ -5397,18 +5410,18 @@
                 <div class="tieba-sidebar-content">
                     <div class="settings-item">
                         <label style="font-weight: 600; font-size: 15px; color: #333;">绑定世界书 (世界观)</label>
-                        <select id="tieba-worldbook-select" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 12px; margin-top: 8px; background: white;" onchange="saveTiebaSettings()">
-                            <option value="">不绑定</option>
-                        </select>
+                        <div id="tieba-worldbook-list" style="margin-top: 10px; display: flex; flex-direction: column; gap: 10px; max-height: 200px; overflow-y: auto; border: 1px solid #eee; padding: 10px; border-radius: 12px; background: #fff;">
+                            <!-- Checkboxes injected by JS -->
+                        </div>
                         <p style="font-size: 12px; color: #666; margin-top: 5px;">绑定的世界书将影响生成的帖子内容</p>
                     </div>
                     
-                    <div class="settings-item" style="margin-top: 25px;">
+                    <div class="settings-item" style="margin-top: 20px;">
                         <label style="font-weight: 600; font-size: 15px; color: #333; display: flex; justify-content: space-between; align-items: center;">
                             参与贴吧的角色
                             <span style="font-size: 13px; font-weight: normal; color: #576b95; cursor: pointer;" onclick="selectAllTiebaRoles()">全选/反选</span>
                         </label>
-                        <div id="tieba-roles-list" style="margin-top: 10px; display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; border: 1px solid #eee; padding: 10px; border-radius: 12px; background: #fff;">
+                        <div id="tieba-roles-list" style="margin-top: 10px; display: flex; flex-direction: column; gap: 10px; max-height: 350px; overflow-y: auto; border: 1px solid #eee; padding: 10px; border-radius: 12px; background: #fff;">
                             <!-- Checkboxes injected by JS -->
                         </div>
                     </div>
@@ -19688,22 +19701,45 @@ ${historyText}`;
             overlay.classList.add('show');
             
             // Populate World Books
-            const wbSelect = document.getElementById('tieba-worldbook-select');
-            const savedWbId = localStorage.getItem('tieba_bound_worldbook_id') || '';
+            const wbList = document.getElementById('tieba-worldbook-list');
+            wbList.innerHTML = '';
             
-            wbSelect.innerHTML = '<option value="">不绑定</option>';
-            if (typeof worldBooks !== 'undefined') {
+            let savedWbIds = [];
+            try {
+                savedWbIds = JSON.parse(localStorage.getItem('tieba_bound_worldbook_ids') || '[]');
+            } catch(e){}
+            
+            if (typeof worldBooks !== 'undefined' && worldBooks.length > 0) {
                 worldBooks.forEach(wb => {
-                    const option = document.createElement('option');
-                    option.value = wb.id;
-                    option.textContent = wb.title;
-                    if (wb.id === savedWbId) {
-                        option.selected = true;
+                    const label = document.createElement('label');
+                    label.className = 'preset-checkbox-item';
+                    label.style.padding = '5px 0';
+                    
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.value = wb.id;
+                    if (savedWbIds.includes(wb.id)) {
+                        checkbox.checked = true;
                     }
-                    wbSelect.appendChild(option);
+                    checkbox.onchange = saveTiebaSettings;
+                    
+                    const customCheck = document.createElement('div');
+                    customCheck.className = 'custom-checkbox';
+                    
+                    const span = document.createElement('span');
+                    span.textContent = wb.title;
+                    span.style.overflow = "hidden";
+                    span.style.textOverflow = "ellipsis";
+                    span.style.whiteSpace = "nowrap";
+                    
+                    label.appendChild(checkbox);
+                    label.appendChild(customCheck);
+                    label.appendChild(span);
+                    wbList.appendChild(label);
                 });
+            } else {
+                wbList.innerHTML = '<div style="text-align:center; color:#999; font-size:13px; padding: 10px 0;">暂无世界书</div>';
             }
-            refreshCustomSelect(wbSelect);
             
             // Populate Roles
             const rolesList = document.getElementById('tieba-roles-list');
@@ -19722,7 +19758,7 @@ ${historyText}`;
                 }
                 nonGroupFriends.forEach(friend => {
                     const label = document.createElement('label');
-                    label.className = 'preset-checkbox-item';
+                    label.className = 'preset-checkbox-item tieba-small-checkbox';
                     label.style.padding = '5px 0';
                     
                     const checkbox = document.createElement('input');
@@ -19766,19 +19802,15 @@ ${historyText}`;
         }
 
         function saveTiebaSettings() {
-            const wbSelect = document.getElementById('tieba-worldbook-select');
-            const wbId = wbSelect.value;
-            localStorage.setItem('tieba_bound_worldbook_id', wbId);
+            const wbCheckboxes = document.querySelectorAll('#tieba-worldbook-list input[type="checkbox"]:checked');
+            const wbIds = Array.from(wbCheckboxes).map(cb => cb.value);
+            localStorage.setItem('tieba_bound_worldbook_ids', JSON.stringify(wbIds));
             
-            if (wbId && typeof worldBooks !== 'undefined') {
-                const wb = worldBooks.find(b => b.id === wbId);
-                if (wb) {
-                    localStorage.setItem('tieba_bound_worldbook_name', wb.title);
-                    localStorage.setItem('tieba_bound_worldbook_content', wb.content);
-                }
+            if (wbIds.length > 0 && typeof worldBooks !== 'undefined') {
+                const boundWbs = worldBooks.filter(b => wbIds.includes(b.id));
+                localStorage.setItem('tieba_bound_worldbooks', JSON.stringify(boundWbs.map(wb => ({name: wb.title, content: wb.content}))));
             } else {
-                localStorage.removeItem('tieba_bound_worldbook_name');
-                localStorage.removeItem('tieba_bound_worldbook_content');
+                localStorage.removeItem('tieba_bound_worldbooks');
             }
             
             const checkboxes = document.querySelectorAll('#tieba-roles-list input[type="checkbox"]:checked');
