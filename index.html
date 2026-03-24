@@ -17344,7 +17344,7 @@ ${historyText}`;
                         // 绑定点击事件显示便利贴或全局心声
                         avatar.onclick = (e) => {
                             e.stopPropagation();
-                            if (currentThoughts.length > 0 && friend.offlineSettings && friend.offlineSettings.showThoughts !== false) {
+                            if (currentThoughts.length > 0) {
                                 showStickyNote(e, currentThoughts.join('<br>'));
                             } else {
                                 handleAvatarClick(msg.friendId);
@@ -17370,56 +17370,54 @@ ${historyText}`;
                         attachMessageEvents(actionDiv, msg, segmentInfo);
                         row.appendChild(actionDiv);
                     } else if (seg.type === 'thought') {
-                        if (friend.offlineSettings && friend.offlineSettings.showThoughts !== false) {
-                            const bubbleContainer = document.createElement('div');
-                            bubbleContainer.className = 'offline-bubble-container left';
-                            
-                            const contentGroup = document.createElement('div');
-                            contentGroup.className = 'offline-bubble-content-group';
-                            
-                            const nameLabel = document.createElement('div');
-                            nameLabel.className = 'offline-user-name';
-                            nameLabel.style.textAlign = 'left';
-                            nameLabel.textContent = msg.senderName || friend.name;
-                            
-                            const avatar = document.createElement('img');
-                            avatar.className = 'offline-avatar';
-                            avatar.src = msg.senderAvatar || friend.avatar;
-                            
-                            avatar.onclick = (e) => {
-                                e.stopPropagation();
-                                handleAvatarClick(msg.friendId);
-                            };
-                            
-                            const bubble = document.createElement('div');
-                            bubble.className = 'offline-bubble left';
-                            bubble.innerHTML = seg.content.replace(/\n/g, '<br>');
-                            
-                            bubble.style.color = '#888';
-                            bubble.style.backgroundColor = 'transparent';
-                            bubble.style.border = '1px dashed #ccc';
-                            bubble.style.fontStyle = 'italic';
-
-                            attachMessageEvents(bubble, msg, segmentInfo);
-                            
-                            contentGroup.appendChild(nameLabel);
-                            contentGroup.appendChild(bubble);
-                            
-                            bubbleContainer.appendChild(avatar);
-                            bubbleContainer.appendChild(contentGroup);
-                            row.appendChild(bubbleContainer);
-                            
-                            if (shouldScroll) {
-                                container.scrollTop = container.scrollHeight;
-                            }
-                        }
-                        continue;
+                        continue; // 不再直接将 thought 渲染到聊天流中，统一通过点击头像显示便利贴
                     }
                     
                     if (shouldScroll) {
                         container.scrollTop = container.scrollHeight;
                     }
                 }
+
+                // 如果整条消息只有 thought，没有 action 也没有 dialogue，给一个占位符避免无法点击头像
+                if (row.children.length === 0 && currentThoughts.length > 0) {
+                    const bubbleContainer = document.createElement('div');
+                    bubbleContainer.className = 'offline-bubble-container left';
+                    
+                    const contentGroup = document.createElement('div');
+                    contentGroup.className = 'offline-bubble-content-group';
+                    
+                    const nameLabel = document.createElement('div');
+                    nameLabel.className = 'offline-user-name';
+                    nameLabel.style.textAlign = 'left';
+                    nameLabel.textContent = msg.senderName || friend.name;
+                    
+                    const avatar = document.createElement('img');
+                    avatar.className = 'offline-avatar';
+                    avatar.src = msg.senderAvatar || friend.avatar;
+                    
+                    avatar.onclick = (e) => {
+                        e.stopPropagation();
+                        showStickyNote(e, currentThoughts.join('<br>'));
+                    };
+                    
+                    const bubble = document.createElement('div');
+                    bubble.className = 'offline-bubble left';
+                    bubble.innerHTML = '...';
+                    bubble.style.color = '#ccc';
+                    bubble.style.backgroundColor = 'transparent';
+                    bubble.style.border = 'none';
+                    bubble.style.padding = '12px 0';
+                    
+                    attachMessageEvents(bubble, msg, { index: 0, type: 'thought', content: currentThoughts[0] });
+                    
+                    contentGroup.appendChild(nameLabel);
+                    contentGroup.appendChild(bubble);
+                    
+                    bubbleContainer.appendChild(avatar);
+                    bubbleContainer.appendChild(contentGroup);
+                    row.appendChild(bubbleContainer);
+                }
+
                 return; // Early return since we already appended the row
             }
 
