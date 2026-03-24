@@ -6467,7 +6467,7 @@
         }
 
         function initDB(callback) {
-            const request = indexedDB.open('UserData', 13); // Version 13
+            const request = indexedDB.open('UserData', 14); // Version 14
 
             request.onerror = (event) => {
                 console.error("Database error: ", event.target.error);
@@ -6518,6 +6518,9 @@
                 }
                 if (!db.objectStoreNames.contains('theme_settings')) {
                     db.createObjectStore('theme_settings', { keyPath: 'id' });
+                }
+                if (!db.objectStoreNames.contains('tieba_posts')) {
+                    db.createObjectStore('tieba_posts', { keyPath: 'id' });
                 }
             };
 
@@ -19287,7 +19290,7 @@ ${historyText}`;
             }
 
             // 2. Export IndexedDB
-            const stores = ['friends', 'chat_history', 'user_profile', 'ai_stickers', 'stickers', 'my_personas', 'discover_posts'];
+            const stores = ['friends', 'chat_history', 'user_profile', 'ai_stickers', 'stickers', 'my_personas', 'discover_posts', 'tieba_posts'];
             
             try {
                 for (const storeName of stores) {
