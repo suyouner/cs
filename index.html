@@ -138,11 +138,11 @@
             max-height: 100%;
         }
 
-        #main-page, #theme-page, #desktop-theme-page, #chat-theme-page, #bubble-theme-page, #settings-page, #world-book-page, #wechat-page, #chat-interface-page, #chat-info-page, #wechat-me-page, #friend-profile-page, #memory-management-page, #emoji-library-page, #wechat-discover-page, #regex-app-page, #global-font-page, #offline-chat-page {
+        #main-page, #theme-page, #desktop-theme-page, #chat-theme-page, #bubble-theme-page, #settings-page, #world-book-page, #wechat-page, #chat-interface-page, #chat-info-page, #wechat-me-page, #friend-profile-page, #memory-management-page, #emoji-library-page, #wechat-discover-page, #regex-app-page, #global-font-page, #offline-chat-page, #tieba-page {
             display: none;
         }
 
-        #main-page.active, #theme-page.active, #desktop-theme-page.active, #chat-theme-page.active, #settings-page.active, #world-book-page.active, #wechat-page.active, #wechat-contacts-page.active, #chat-interface-page.active, #chat-info-page.active, #wechat-me-page.active, #friend-profile-page.active, #memory-management-page.active, #emoji-library-page.active, #wechat-discover-page.active, #regex-app-page.active, #global-font-page.active, #offline-chat-page.active {
+        #main-page.active, #theme-page.active, #desktop-theme-page.active, #chat-theme-page.active, #settings-page.active, #world-book-page.active, #wechat-page.active, #wechat-contacts-page.active, #chat-interface-page.active, #chat-info-page.active, #wechat-me-page.active, #friend-profile-page.active, #memory-management-page.active, #emoji-library-page.active, #wechat-discover-page.active, #regex-app-page.active, #global-font-page.active, #offline-chat-page.active, #tieba-page.active {
             display: flex;
         }
 
@@ -3979,6 +3979,95 @@
             from { opacity: 0; transform: scale(0.8) translateY(10px); }
             to { opacity: 1; transform: scale(1) translateY(0); }
         }
+
+        /* Tieba Page Styles */
+        #tieba-page {
+            background-color: #f5f5f5;
+            flex-direction: column;
+            padding-top: calc(34px + env(safe-area-inset-top)); /* Space for status bar */
+        }
+        .tieba-header {
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 15px;
+            background-color: #fff;
+            flex-shrink: 0;
+            position: relative;
+        }
+        .tieba-header-left {
+            width: 30px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+        .tieba-header-center {
+            display: flex;
+            gap: 24px;
+            font-size: 16px;
+            font-weight: 500;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        .tieba-tab-active {
+            color: #000;
+            font-weight: bold;
+            font-size: 17px;
+            position: relative;
+        }
+        .tieba-tab-active::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 14px;
+            height: 3px;
+            background-color: #000;
+            border-radius: 2px;
+        }
+        .tieba-tab-inactive {
+            color: #999;
+        }
+        .tieba-content {
+            flex-grow: 1;
+            background-color: #f5f5f5;
+            overflow-y: auto;
+        }
+        .tieba-footer {
+            height: 50px;
+            background-color: #fff;
+            border-top: 1px solid #eaeaea;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            flex-shrink: 0;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        .tieba-footer-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            color: #999;
+            cursor: pointer;
+        }
+        .tieba-footer-item.active {
+            color: #000;
+        }
+        .tieba-footer-icon {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .tieba-footer-text {
+            font-size: 10px;
+            font-weight: 500;
+        }
     </style>
 </head>
 <body>
@@ -4046,7 +4135,7 @@
                 <div class="app-item" data-app-id="app-4" onclick="showPage('theme-page')"><div class="app-icon"><img class="app-icon-img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="主题"></div><div class="app-name">主题</div></div>
                 <div class="app-item" data-app-id="app-5" onclick="showPage('emoji-library-page')"><div class="app-icon"><img class="app-icon-img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="表情库"></div><div class="app-name">表情库</div></div>
                 <div class="app-item" data-app-id="app-6" onclick="showPage('regex-app-page')"><div class="app-icon"><img class="app-icon-img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="正则"></div><div class="app-name">正则</div></div>
-                <div class="app-item" data-app-id="app-7" onclick="showToast('贴吧正在开发中...')"><div class="app-icon"><img class="app-icon-img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="贴吧"></div><div class="app-name">贴吧</div></div>
+                <div class="app-item" data-app-id="app-7" onclick="showPage('tieba-page')"><div class="app-icon"><img class="app-icon-img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="贴吧"></div><div class="app-name">贴吧</div></div>
             </div>
             <div class="dock-bar">
                 <div class="app-item" data-app-id="dock-1"><div class="app-icon"><img class="dock-icon-img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Dock 1"></div></div>
@@ -5207,6 +5296,42 @@
             </div>
         </div>
 
+        <div id="tieba-page" class="page">
+            <div class="tieba-header">
+                <div class="tieba-header-left" onclick="showPage('main-page')">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                </div>
+                <div class="tieba-header-center">
+                    <div class="tieba-tab-inactive">关注</div>
+                    <div class="tieba-tab-active">推荐</div>
+                </div>
+                <div style="width: 30px;"></div> <!-- Placeholder for right side to balance -->
+            </div>
+            <div class="tieba-content">
+                <!-- 推荐内容空白 -->
+            </div>
+            <div class="tieba-footer">
+                <div class="tieba-footer-item active">
+                    <div class="tieba-footer-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                    </div>
+                    <span class="tieba-footer-text">首页</span>
+                </div>
+                <div class="tieba-footer-item">
+                    <div class="tieba-footer-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                    </div>
+                    <span class="tieba-footer-text">消息</span>
+                </div>
+                <div class="tieba-footer-item">
+                    <div class="tieba-footer-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                    </div>
+                    <span class="tieba-footer-text">我</span>
+                </div>
+            </div>
+        </div>
+
         <div id="chat-info-page" class="page">
             <div class="settings-header">
                 <span class="back-arrow" onclick="showPage('chat-interface-page')"><</span>
@@ -6264,7 +6389,7 @@
             const settingsHeader = document.querySelector('.settings-header');
             const settingsPage = document.getElementById('settings-page');
 
-            if (pageId === 'theme-page' || pageId === 'desktop-theme-page' || pageId === 'chat-theme-page' || pageId === 'bubble-theme-page' || pageId === 'global-font-page' || pageId === 'world-book-page' || pageId === 'wechat-page' || pageId === 'wechat-contacts-page' || pageId === 'wechat-me-page' || pageId === 'persona-management-page' || pageId === 'friend-profile-page' || pageId === 'memory-management-page' || pageId === 'emoji-library-page' || pageId === 'search-detail-page' || pageId === 'regex-app-page') {
+            if (pageId === 'theme-page' || pageId === 'desktop-theme-page' || pageId === 'chat-theme-page' || pageId === 'bubble-theme-page' || pageId === 'global-font-page' || pageId === 'world-book-page' || pageId === 'wechat-page' || pageId === 'wechat-contacts-page' || pageId === 'wechat-me-page' || pageId === 'persona-management-page' || pageId === 'friend-profile-page' || pageId === 'memory-management-page' || pageId === 'emoji-library-page' || pageId === 'search-detail-page' || pageId === 'regex-app-page' || pageId === 'tieba-page') {
                 statusBar.style.backgroundColor = (pageId === 'wechat-page' || pageId === 'wechat-contacts-page' || pageId === 'wechat-me-page' || pageId === 'friend-profile-page' || pageId === 'memory-management-page' || pageId === 'search-detail-page') ? '#ededed' : 'white';
                 statusBar.style.color = '#333';
             } else if (pageId === 'settings-page' || pageId === 'chat-info-page') {
