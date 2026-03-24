@@ -12984,20 +12984,13 @@
                     });
                 }
 
-                const isOfflineModeUI = (friend.offlineSettings && friend.offlineSettings.enabled) || friend.separateOfflineUI;
-                if (isOfflineModeUI) {
-                    document.getElementById('offline-chat-title').textContent = friend.name;
-                    showPage('offline-chat-page');
-                    renderOfflineChat(friendId);
-                    document.querySelector('.status-bar').style.backgroundColor = 'transparent';
-                } else {
-                    document.getElementById('chat-interface-title').textContent = friend.name;
-                    showPage('chat-interface-page');
-                    renderMessages(friendId, targetMsgId);
-                    // Also change status bar color to transparent so header background shows through
-                    document.querySelector('.status-bar').style.backgroundColor = 'transparent';
-                    applyChatTheme(friend);
-                }
+                document.getElementById('chat-interface-title').textContent = friend.name;
+                showPage('chat-interface-page');
+                renderMessages(friendId, targetMsgId);
+                // Also change status bar color to transparent so header background shows through
+                document.querySelector('.status-bar').style.backgroundColor = 'transparent';
+                
+                applyChatTheme(friend);
             });
         }
 
@@ -13285,9 +13278,9 @@
                     let systemPrompt = "";
                     let allFriendsList = await new Promise(res => dbGetAll('friends', res));
                     let groupMembers = [];
-                    const isOfflineMode = (friend.offlineSettings && friend.offlineSettings.enabled) || friend.separateOfflineUI;
                     
                     if (friend.isGroup) {
+                        const isOfflineMode = (friend.offlineSettings && friend.offlineSettings.enabled) || (friend.separateOfflineUI && document.getElementById('offline-chat-page').classList.contains('active'));
                         groupMembers = allFriendsList.filter(f => (friend.members || []).includes(f.id));
                         systemPrompt = `【系统提示】这是一个群聊。群名称：${friend.name}。\n群成员如下：\n`;
                         
@@ -13429,6 +13422,8 @@
                             // Sanitize thought tags immediately to standardize various bracket forms to <thought>
                             aiResponseText = sanitizeThoughtTags(aiResponseText);
 
+                            const isOfflineMode = (friend.offlineSettings && friend.offlineSettings.enabled) || (friend.separateOfflineUI && document.getElementById('offline-chat-page').classList.contains('active'));
+
                             // Parse Thought Feature Tags
                             let mood = null;
                             let innerThought = null;
@@ -13469,7 +13464,7 @@
 
                             if (friend.isGroup) {
                                 hideTypingIndicator(friend.id);
-                                const isSeparateUI = friend.separateOfflineUI;
+                                const isSeparateUI = friend.separateOfflineUI && document.getElementById('offline-chat-page').classList.contains('active');
                                 
                                 const lines = aiResponseText.split('\n').map(s => s.trim()).filter(s => s !== '');
                                 let fallbackMember = groupMembers.length > 0 ? groupMembers[0] : null;
@@ -13546,9 +13541,9 @@
                                                 await new Promise(res => dbAdd('chat_history', msgObj, res));
                                                 
                                                 if (currentChatFriendId === friend.id) {
-                                                    if (isSeparateUI) {
+                                                    if (isSeparateUI && document.getElementById('offline-chat-page').classList.contains('active')) {
                                                         await appendOfflineMessage(msgObj, friend, true, true);
-                                                    } else {
+                                                    } else if (!isSeparateUI && document.getElementById('chat-interface-page').classList.contains('active')) {
                                                         addMessageToUI(msgObj);
                                                     }
                                                 }
@@ -13569,9 +13564,10 @@
                                                 };
                                                 await new Promise(res => dbAdd('chat_history', msgObj, res));
                                                 if (currentChatFriendId === friend.id) {
-                                                    if (isSeparateUI) {
+                                                    if (isSeparateUI && document.getElementById('offline-chat-page').classList.contains('active')) {
+                                                        // Fallback for stickers in offline mode if needed, currently appendOfflineMessage relies on parseOfflineMessage which ignores stickers, let's just pass it to addMessageToUI in fallback
                                                         addMessageToUI(msgObj); 
-                                                    } else {
+                                                    } else if (!isSeparateUI && document.getElementById('chat-interface-page').classList.contains('active')) {
                                                         addMessageToUI(msgObj);
                                                     }
                                                 }
@@ -13593,9 +13589,9 @@
                                                 };
                                                 let bubble;
                                                 if (currentChatFriendId === friend.id) {
-                                                    if (!isSeparateUI) {
+                                                    if (!isSeparateUI && document.getElementById('chat-interface-page').classList.contains('active')) {
                                                         bubble = addMessageToUI(diceMsg);
-                                                    } else if (isSeparateUI) {
+                                                    } else if (isSeparateUI && document.getElementById('offline-chat-page').classList.contains('active')) {
                                                         bubble = addMessageToUI(diceMsg); 
                                                     }
                                                 }
@@ -13641,7 +13637,7 @@
                             } else if (isOfflineMode) {
                                 // Offline mode: handle as a single message
                                 hideTypingIndicator(friend.id);
-                                const isSeparateUI = friend.separateOfflineUI;
+                                const isSeparateUI = friend.separateOfflineUI && document.getElementById('offline-chat-page').classList.contains('active');
                                 const responseMsg = {
                                     friendId: friend.id,
                                     text: aiResponseText,
@@ -14199,7 +14195,7 @@
 
         function buildSystemPrompt(friend, userPersona = null, aiStickers = [], visiblePosts = []) {
             let prompt = `你现在的身份是：${friend.realName || friend.name}。\n`;
-            const isOfflineMode = (friend.offlineSettings && friend.offlineSettings.enabled) || friend.separateOfflineUI;
+            const isOfflineMode = (friend.offlineSettings && friend.offlineSettings.enabled) || (friend.separateOfflineUI && document.getElementById('offline-chat-page').classList.contains('active'));
 
             // --- 核心互动原则 (最高优先级) ---
             prompt += `\n【核心互动原则与禁忌】\n`;
@@ -17282,11 +17278,6 @@ ${historyText}`;
                     if (seg.type === 'dialogue') hasDialogue = true;
                 }
 
-                // 如果有心声但没有对话，添加一个占位对话以便显示头像
-                if (currentThoughts.length > 0 && !hasDialogue) {
-                    parsedSegments.push({ type: 'dialogue', content: '...' });
-                }
-
                 for (let index = 0; index < parsedSegments.length; index++) {
                     const seg = parsedSegments[index];
                     
@@ -17341,13 +17332,6 @@ ${historyText}`;
                         const bubble = document.createElement('div');
                         bubble.className = 'offline-bubble left';
                         bubble.innerHTML = seg.content.replace(/\n/g, '<br>');
-                        
-                        // 如果是占位符，稍微淡一点
-                        if (seg.content === '...') {
-                            bubble.style.color = '#ccc';
-                            bubble.style.backgroundColor = 'transparent';
-                            bubble.style.border = '1px dashed #eee';
-                        }
 
                         attachMessageEvents(bubble, msg, segmentInfo);
                         
@@ -17364,6 +17348,44 @@ ${historyText}`;
                         attachMessageEvents(actionDiv, msg, segmentInfo);
                         row.appendChild(actionDiv);
                     } else if (seg.type === 'thought') {
+                        if (!hasDialogue && friend.offlineSettings && friend.offlineSettings.showThoughts !== false) {
+                            const bubbleContainer = document.createElement('div');
+                            bubbleContainer.className = 'offline-bubble-container left';
+                            
+                            const contentGroup = document.createElement('div');
+                            contentGroup.className = 'offline-bubble-content-group';
+                            
+                            const nameLabel = document.createElement('div');
+                            nameLabel.className = 'offline-user-name';
+                            nameLabel.style.textAlign = 'left';
+                            nameLabel.textContent = msg.senderName || friend.name;
+                            
+                            const avatar = document.createElement('img');
+                            avatar.className = 'offline-avatar';
+                            avatar.src = msg.senderAvatar || friend.avatar;
+                            
+                            const bubble = document.createElement('div');
+                            bubble.className = 'offline-bubble left';
+                            bubble.innerHTML = seg.content.replace(/\n/g, '<br>');
+                            
+                            bubble.style.color = '#888';
+                            bubble.style.backgroundColor = 'transparent';
+                            bubble.style.border = '1px dashed #ccc';
+                            bubble.style.fontStyle = 'italic';
+
+                            attachMessageEvents(bubble, msg, segmentInfo);
+                            
+                            contentGroup.appendChild(nameLabel);
+                            contentGroup.appendChild(bubble);
+                            
+                            bubbleContainer.appendChild(avatar);
+                            bubbleContainer.appendChild(contentGroup);
+                            row.appendChild(bubbleContainer);
+                            
+                            if (shouldScroll) {
+                                container.scrollTop = container.scrollHeight;
+                            }
+                        }
                         continue;
                     }
                     
@@ -19476,115 +19498,38 @@ ${historyText}`;
             }
         });
 
-        // 动态代理 document.getElementById，以兼容剥离了真实 ID 的输入框
-        const originalGetElementById = document.getElementById.bind(document);
-        document.getElementById = function(id) {
-            let el = originalGetElementById(id);
-            if (el) return el;
-            if (id) {
-                const safeId = String(id).replace(/"/g, '\\"');
-                return document.querySelector(`[data-original-id="${safeId}"]`);
-            }
-            return null;
-        };
-
-        // 深度混淆文本（插入零宽字符）
-        const obfuscateText = (text) => {
-            if (!text) return text;
-            if (text.includes('\u200B')) return text; 
-            return text.split('').join('\u200B');
-        };
-
-        const confuseLabels = (root) => {
-            if (!root.querySelectorAll) return;
-            const labels = root.querySelectorAll('label, .af-field-label, .gm-field label, .wb-field label, .chat-info-label, .settings-item label, .post-visibility-label, .offline-modal-item label, .offline-modal-field label');
-            labels.forEach(label => {
-                if (!label.dataset.obfuscated) {
-                    label.childNodes.forEach(child => {
-                        if (child.nodeType === 3 && child.nodeValue.trim() !== '') {
-                            child.nodeValue = obfuscateText(child.nodeValue.trim());
-                        }
-                    });
-                    label.dataset.obfuscated = 'true';
-                }
-            });
-        };
-
-        // 全局禁用所有输入框的系统自动填充（深度混淆）
+        // 全局禁用所有输入框的系统自动填充（针对安卓的钥匙、信用卡、密码小人图标等）
         const disableAutofill = (el) => {
-            if (el.dataset.autofillDisabled) return;
-
-            const randomStr = Math.random().toString(36).substring(2, 10);
-
-            // 1. 绝对无效的 autocomplete
-            el.setAttribute('autocomplete', 'nope_' + randomStr);
+            // 避免使用 off 或 new-password，现代安卓系统和浏览器经常忽略 off，且 new-password 会明确唤起密码管理器
+            // 使用一个随机/无效的值可以有效绕过大部分启发式自动填充
+            el.setAttribute('autocomplete', 'nope');
             el.setAttribute('autocorrect', 'off');
             el.setAttribute('autocapitalize', 'off');
             el.setAttribute('spellcheck', 'false');
             el.setAttribute('data-form-type', 'other');
-            el.setAttribute('data-lpignore', 'true');
-
-            // 2. 混淆 placeholder
-            if (el.getAttribute('placeholder')) {
-                el.setAttribute('placeholder', obfuscateText(el.getAttribute('placeholder')));
-            }
-
-            // 3. readonly 聚焦解锁机制 (规避初始化扫描)
-            if (!el.hasAttribute('readonly') && el.type !== 'checkbox' && el.type !== 'radio' && el.type !== 'range' && el.type !== 'color' && el.type !== 'file') {
-                el.setAttribute('readonly', 'true');
-                el.dataset.tempReadonly = 'true';
-                
-                const removeReadonly = () => {
-                    if (el.dataset.tempReadonly) {
-                        el.removeAttribute('readonly');
-                        delete el.dataset.tempReadonly;
-                    }
-                };
-                
-                el.addEventListener('focus', removeReadonly, { once: true });
-                el.addEventListener('touchstart', removeReadonly, { once: true });
-                el.addEventListener('click', removeReadonly, { once: true });
-            }
-
-            // 深度混淆 name 和 id
-            el.setAttribute('name', 'nofill_' + randomStr);
-            
-            if (el.id && !el.id.startsWith('nofill_')) {
-                el.dataset.originalId = el.id; // 备份真实ID
-                el.id = 'nofill_id_' + randomStr; // 修改为随机ID，欺骗浏览器
-            }
-
-            el.dataset.autofillDisabled = 'true';
+            el.setAttribute('data-lpignore', 'true'); // 针对部分第三方密码管理器
+            // 覆盖或设置一个随机的 name 属性，彻底打断系统基于 id 猜测字段类型的启发式检测（屏蔽小人、钱包等图标）
+            el.setAttribute('name', 'nofill_' + Math.random().toString(36).substring(2, 8));
         };
 
         document.querySelectorAll('input, textarea').forEach(disableAutofill);
-        confuseLabels(document.body);
 
-        // 监控动态创建的输入框（如打开弹窗时生成的元素）及属性变化
+        // 监控动态创建的输入框（如打开弹窗时生成的元素）
         const observer = new MutationObserver(mutations => {
             mutations.forEach(mutation => {
-                if (mutation.type === 'childList') {
-                    mutation.addedNodes.forEach(node => {
-                        if (node.nodeType === 1) { // ELEMENT_NODE
-                            if (node.tagName === 'INPUT' || node.tagName === 'TEXTAREA') {
-                                disableAutofill(node);
-                            }
-                            if (node.querySelectorAll) {
-                                node.querySelectorAll('input, textarea').forEach(disableAutofill);
-                            }
-                            confuseLabels(node);
+                mutation.addedNodes.forEach(node => {
+                    if (node.nodeType === 1) { // ELEMENT_NODE
+                        if (node.tagName === 'INPUT' || node.tagName === 'TEXTAREA') {
+                            disableAutofill(node);
                         }
-                    });
-                } else if (mutation.type === 'attributes' && mutation.attributeName === 'placeholder') {
-                    const el = mutation.target;
-                    const val = el.getAttribute('placeholder');
-                    if (val && !val.includes('\u200B')) {
-                        el.setAttribute('placeholder', obfuscateText(val));
+                        if (node.querySelectorAll) {
+                            node.querySelectorAll('input, textarea').forEach(disableAutofill);
+                        }
                     }
-                }
+                });
             });
         });
-        observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['placeholder'] });
+        observer.observe(document.body, { childList: true, subtree: true });
     });
 </script>
 </body>
