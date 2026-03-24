@@ -17319,15 +17319,15 @@ ${historyText}`;
                         avatar.className = 'offline-avatar';
                         avatar.src = msg.senderAvatar || friend.avatar;
                         
-                        // 绑定点击事件显示便利贴
-                        if (currentThoughts.length > 0) {
-                            avatar.onclick = (e) => {
-                                e.stopPropagation();
-                                if (friend.offlineSettings && friend.offlineSettings.showThoughts !== false) {
-                                    showStickyNote(e, currentThoughts.join('<br>'));
-                                }
-                            };
-                        }
+                        // 绑定点击事件显示便利贴或全局心声
+                        avatar.onclick = (e) => {
+                            e.stopPropagation();
+                            if (currentThoughts.length > 0 && friend.offlineSettings && friend.offlineSettings.showThoughts !== false) {
+                                showStickyNote(e, currentThoughts.join('<br>'));
+                            } else {
+                                handleAvatarClick(msg.friendId);
+                            }
+                        };
                         
                         const bubble = document.createElement('div');
                         bubble.className = 'offline-bubble left';
@@ -17348,7 +17348,7 @@ ${historyText}`;
                         attachMessageEvents(actionDiv, msg, segmentInfo);
                         row.appendChild(actionDiv);
                     } else if (seg.type === 'thought') {
-                        if (!hasDialogue && friend.offlineSettings && friend.offlineSettings.showThoughts !== false) {
+                        if (friend.offlineSettings && friend.offlineSettings.showThoughts !== false) {
                             const bubbleContainer = document.createElement('div');
                             bubbleContainer.className = 'offline-bubble-container left';
                             
@@ -17363,6 +17363,11 @@ ${historyText}`;
                             const avatar = document.createElement('img');
                             avatar.className = 'offline-avatar';
                             avatar.src = msg.senderAvatar || friend.avatar;
+                            
+                            avatar.onclick = (e) => {
+                                e.stopPropagation();
+                                handleAvatarClick(msg.friendId);
+                            };
                             
                             const bubble = document.createElement('div');
                             bubble.className = 'offline-bubble left';
