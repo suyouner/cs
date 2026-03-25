@@ -138,11 +138,11 @@
             max-height: 100%;
         }
 
-        #main-page, #theme-page, #desktop-theme-page, #chat-theme-page, #bubble-theme-page, #settings-page, #world-book-page, #wechat-page, #chat-interface-page, #chat-info-page, #wechat-me-page, #friend-profile-page, #memory-management-page, #emoji-library-page, #wechat-discover-page, #regex-app-page, #global-font-page, #offline-chat-page, #tieba-page {
+        #main-page, #theme-page, #desktop-theme-page, #chat-theme-page, #bubble-theme-page, #settings-page, #world-book-page, #wechat-page, #chat-interface-page, #chat-info-page, #wechat-me-page, #friend-profile-page, #memory-management-page, #emoji-library-page, #wechat-discover-page, #regex-app-page, #global-font-page, #offline-chat-page, #tieba-page, #tieba-post-detail-page {
             display: none;
         }
 
-        #main-page.active, #theme-page.active, #desktop-theme-page.active, #chat-theme-page.active, #settings-page.active, #world-book-page.active, #wechat-page.active, #wechat-contacts-page.active, #chat-interface-page.active, #chat-info-page.active, #wechat-me-page.active, #friend-profile-page.active, #memory-management-page.active, #emoji-library-page.active, #wechat-discover-page.active, #regex-app-page.active, #global-font-page.active, #offline-chat-page.active, #tieba-page.active {
+        #main-page.active, #theme-page.active, #desktop-theme-page.active, #chat-theme-page.active, #settings-page.active, #world-book-page.active, #wechat-page.active, #wechat-contacts-page.active, #chat-interface-page.active, #chat-info-page.active, #wechat-me-page.active, #friend-profile-page.active, #memory-management-page.active, #emoji-library-page.active, #wechat-discover-page.active, #regex-app-page.active, #global-font-page.active, #offline-chat-page.active, #tieba-page.active, #tieba-post-detail-page.active {
             display: flex;
         }
 
@@ -4083,7 +4083,7 @@
             height: 8px !important;
         }
 
-        #tieba-page {
+        #tieba-page, #tieba-post-detail-page {
             background-color: #f5f5f5;
             flex-direction: column;
             padding-top: calc(34px + env(safe-area-inset-top)); /* Space for status bar */
@@ -5447,6 +5447,49 @@
             </div>
         </div>
 
+        <!-- Tieba Post Detail Page -->
+        <div id="tieba-post-detail-page" class="page">
+            <div class="tieba-header">
+                <div class="tieba-header-left" onclick="closeTiebaPostDetail()" style="width: 30px; display: flex; align-items: center; cursor: pointer;">
+                    <span style="font-size: 24px; font-weight: bold; color: #000; margin-left: -5px;"><</span>
+                </div>
+                <div class="tieba-header-center">
+                    <span style="font-size: 17px; font-weight: 600; color: #000;">帖子详情</span>
+                </div>
+                <div class="tieba-header-right" style="width: 30px;"></div>
+            </div>
+            <div class="tieba-content" style="background-color: #f5f5f5;">
+                <div id="tieba-detail-post-container">
+                    <!-- 帖子原内容 -->
+                </div>
+                <div id="tieba-detail-comments-container" style="background: white; margin-top: 10px; padding: 15px; min-height: 300px;">
+                    <div style="font-size: 15px; font-weight: bold; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #f0f0f0;">全部评论</div>
+                    <div id="tieba-detail-comments-list">
+                        <!-- 评论列表 -->
+                    </div>
+                    <div id="tieba-detail-comments-loading" style="text-align: center; padding: 20px; color: #999; font-size: 13px; display: none;">正在加载评论...</div>
+                </div>
+            </div>
+            <!-- 底部操作栏 -->
+            <div style="height: 50px; background-color: #fff; border-top: 1px solid #eaeaea; display: flex; align-items: center; padding: 0 15px; gap: 15px; flex-shrink: 0; padding-bottom: env(safe-area-inset-bottom);">
+                <input type="text" id="tieba-detail-comment-input" placeholder="发评论..." style="flex: 1; height: 34px; border-radius: 17px; border: none; background: #f5f5f5; padding: 0 15px; outline: none; font-size: 14px;">
+                <div style="display: flex; gap: 15px; color: #666; font-size: 18px; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 3px;" id="tieba-detail-bottom-reposts">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 10 20 15 15 20"></polyline><path d="M4 4v7a4 4 0 0 0 4 4h12"></path></svg>
+                        <span style="font-size: 12px;" id="tieba-detail-reposts-num">0</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 3px;" id="tieba-detail-bottom-comments">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                        <span style="font-size: 12px;" id="tieba-detail-comments-num">0</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 3px;" id="tieba-detail-bottom-likes">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>
+                        <span style="font-size: 12px;" id="tieba-detail-likes-num">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Tieba Role Search Modal (关注页) -->
         <div class="modal-overlay" id="tieba-role-search-modal" style="z-index: 1000;">
             <div class="modal-content" style="width: 320px; padding: 20px;">
@@ -6604,7 +6647,7 @@
             const settingsHeader = document.querySelector('.settings-header');
             const settingsPage = document.getElementById('settings-page');
 
-            if (pageId === 'theme-page' || pageId === 'desktop-theme-page' || pageId === 'chat-theme-page' || pageId === 'bubble-theme-page' || pageId === 'global-font-page' || pageId === 'world-book-page' || pageId === 'wechat-page' || pageId === 'wechat-contacts-page' || pageId === 'wechat-me-page' || pageId === 'persona-management-page' || pageId === 'friend-profile-page' || pageId === 'memory-management-page' || pageId === 'emoji-library-page' || pageId === 'search-detail-page' || pageId === 'regex-app-page' || pageId === 'tieba-page') {
+            if (pageId === 'theme-page' || pageId === 'desktop-theme-page' || pageId === 'chat-theme-page' || pageId === 'bubble-theme-page' || pageId === 'global-font-page' || pageId === 'world-book-page' || pageId === 'wechat-page' || pageId === 'wechat-contacts-page' || pageId === 'wechat-me-page' || pageId === 'persona-management-page' || pageId === 'friend-profile-page' || pageId === 'memory-management-page' || pageId === 'emoji-library-page' || pageId === 'search-detail-page' || pageId === 'regex-app-page' || pageId === 'tieba-page' || pageId === 'tieba-post-detail-page') {
                 statusBar.style.backgroundColor = (pageId === 'wechat-page' || pageId === 'wechat-contacts-page' || pageId === 'wechat-me-page' || pageId === 'friend-profile-page' || pageId === 'memory-management-page' || pageId === 'search-detail-page') ? '#ededed' : 'white';
                 statusBar.style.color = '#333';
             } else if (pageId === 'settings-page' || pageId === 'chat-info-page') {
@@ -20089,7 +20132,11 @@ ${historyText}`;
                             authorAvatar: friend.avatar,
                             content: aiResponseText.trim(),
                             timestamp: Date.now(),
-                            isRolePost: true
+                            isRolePost: true,
+                            reposts: Math.floor(Math.random() * 50) + 1,
+                            comments: Math.floor(Math.random() * 100) + 10,
+                            likes: Math.floor(Math.random() * 500) + 20,
+                            tiebaComments: []
                         };
 
                         dbAdd('tieba_posts', post, () => {
@@ -20308,7 +20355,11 @@ ${historyText}`;
                                 authorAvatar: randomAvatars[Math.floor(Math.random() * randomAvatars.length)],
                                 content: cleanContent,
                                 timestamp: Date.now() - i * 1000, // Slightly offset so they order properly
-                                isRolePost: false
+                                isRolePost: false,
+                                reposts: Math.floor(Math.random() * 50) + 1,
+                                comments: Math.floor(Math.random() * 100) + 10,
+                                likes: Math.floor(Math.random() * 500) + 20,
+                                tiebaComments: []
                             };
 
                             await new Promise(res => dbAdd('tieba_posts', post, res));
@@ -20353,6 +20404,14 @@ ${historyText}`;
                     card.className = 'tieba-post-card';
                     card.style.cssText = 'background: white; margin-top: 10px; padding: 15px; border-bottom: 1px solid #eee;';
 
+                    if (post.reposts === undefined) {
+                        post.reposts = Math.floor(Math.random() * 50) + 1;
+                        post.comments = Math.floor(Math.random() * 100) + 10;
+                        post.likes = Math.floor(Math.random() * 500) + 20;
+                        post.tiebaComments = [];
+                        dbUpdate('tieba_posts', post);
+                    }
+
                     card.innerHTML = `
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                             <div style="display: flex; align-items: center; gap: 10px;">
@@ -20367,19 +20426,19 @@ ${historyText}`;
                                 <span style="color: #ccc; font-size: 20px; cursor: pointer; line-height: 1;" onclick="deleteTiebaPost('${post.id}')">×</span>
                             </div>
                         </div>
-                        <div style="font-size: 15px; color: #333; line-height: 1.6; margin-bottom: 15px; word-wrap: break-word; white-space: pre-wrap;">${post.content}</div>
+                        <div style="font-size: 15px; color: #333; line-height: 1.6; margin-bottom: 15px; word-wrap: break-word; white-space: pre-wrap; cursor: pointer;" onclick="openTiebaPostDetail('${post.id}')">${post.content}</div>
                         <div style="display: flex; justify-content: space-around; border-top: 1px solid #f9f9f9; padding-top: 10px; color: #999; font-size: 13px;">
                             <div style="display: flex; align-items: center; gap: 5px;">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 10 20 15 15 20"></polyline><path d="M4 4v7a4 4 0 0 0 4 4h12"></path></svg>
-                                转发
+                                ${post.reposts}
                             </div>
-                            <div style="display: flex; align-items: center; gap: 5px;">
+                            <div style="display: flex; align-items: center; gap: 5px; cursor: pointer;" onclick="openTiebaPostDetail('${post.id}')">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
-                                评论
+                                ${post.comments}
                             </div>
                             <div style="display: flex; align-items: center; gap: 5px;">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>
-                                点赞
+                                ${post.likes}
                             </div>
                         </div>
                     `;
@@ -20394,6 +20453,181 @@ ${historyText}`;
                     renderTiebaFeed();
                 });
             }, '删除帖子');
+        }
+
+        // --- Tieba Detail Page Logic ---
+        let currentTiebaPostId = null;
+
+        function openTiebaPostDetail(postId) {
+            currentTiebaPostId = postId;
+            dbGet('tieba_posts', postId, post => {
+                if(!post) return;
+                
+                const postDate = new Date(post.timestamp);
+                const timeStr = `${postDate.getMonth()+1}-${postDate.getDate()} ${String(postDate.getHours()).padStart(2, '0')}:${String(postDate.getMinutes()).padStart(2, '0')}`;
+
+                const container = document.getElementById('tieba-detail-post-container');
+                container.innerHTML = `
+                    <div style="background: white; padding: 15px;">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                            <img src="${post.authorAvatar}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: #eee;">
+                            <div>
+                                <div style="font-size: 15px; font-weight: 500; color: #333;">${post.authorName}</div>
+                                <div style="font-size: 12px; color: #999;">${timeStr}</div>
+                            </div>
+                        </div>
+                        <div style="font-size: 16px; color: #333; line-height: 1.6; word-wrap: break-word; white-space: pre-wrap;">${post.content}</div>
+                    </div>
+                `;
+                
+                document.getElementById('tieba-detail-reposts-num').textContent = post.reposts || 0;
+                document.getElementById('tieba-detail-comments-num').textContent = post.comments || 0;
+                document.getElementById('tieba-detail-likes-num').textContent = post.likes || 0;
+
+                renderTiebaCommentsList(post);
+                
+                showPage('tieba-post-detail-page');
+                
+                if (!post.hasSimulatedComments) {
+                    simulateTiebaComments(post);
+                }
+            });
+        }
+
+        function closeTiebaPostDetail() {
+            currentTiebaPostId = null;
+            showPage('tieba-page');
+        }
+
+        function renderTiebaCommentsList(post) {
+            const list = document.getElementById('tieba-detail-comments-list');
+            list.innerHTML = '';
+            
+            if (post.tiebaComments && post.tiebaComments.length > 0) {
+                post.tiebaComments.forEach(comment => {
+                    const commentEl = document.createElement('div');
+                    commentEl.style.display = 'flex';
+                    commentEl.style.gap = '10px';
+                    commentEl.style.marginBottom = '15px';
+                    commentEl.innerHTML = `
+                        <img src="${comment.avatar}" style="width: 30px; height: 30px; border-radius: 50%; object-fit: cover; background: #eee; flex-shrink: 0;">
+                        <div style="flex: 1; padding-bottom: 10px; border-bottom: 1px solid #f9f9f9;">
+                            <div style="font-size: 13px; font-weight: 500; color: #666;">${comment.name}</div>
+                            <div style="font-size: 14px; color: #333; line-height: 1.5; margin-top: 4px; word-wrap: break-word; white-space: pre-wrap;">${comment.content}</div>
+                        </div>
+                    `;
+                    list.appendChild(commentEl);
+                });
+            } else {
+                list.innerHTML = '<div style="text-align: center; color: #999; font-size: 13px; padding: 20px;">暂无评论</div>';
+            }
+        }
+
+        async function simulateTiebaComments(post) {
+            const configStr = localStorage.getItem('globalConfig');
+            if (!configStr) return;
+            const config = JSON.parse(configStr);
+            if (!config.apiKey || !config.model) return;
+
+            const loadingEl = document.getElementById('tieba-detail-comments-loading');
+            loadingEl.style.display = 'block';
+
+            const numComments = Math.floor(Math.random() * (15 - 8 + 1)) + 8; // 8 to 15
+
+            let prompt = `你现在需要扮演${numComments}个不同的网络论坛/贴吧用户，对以下这篇帖子发表评论。
+【原帖内容】：
+${post.content}
+
+【要求】：
+1. 请生成恰好 ${numComments} 条不同的网友评论，每条评论占一行，用换行符分隔。不要带有任何编号、发帖人名字或多余解释。
+2. 语气要符合真实的网民，可以有赞同、反对、吐槽、玩梗、抖机灵、围观等各种态度，尽量丰富多样。
+3. 每条评论长度在 5 到 50 字之间。
+4. 只输出评论内容文本，不输出任何其他东西。`;
+
+            try {
+                let aiResponseText = await callLLM(config, prompt, []);
+                if (aiResponseText) {
+                    const currentPost = await new Promise(res => dbGet('tieba_posts', post.id, res));
+                    if (!currentPost) return;
+
+                    const lines = aiResponseText.split('\n').filter(l => l.trim() !== '');
+                    const randomAvatars = [
+                        'https://via.placeholder.com/150/FFB7B2/ffffff?text=U',
+                        'https://via.placeholder.com/150/B5EAD7/ffffff?text=A',
+                        'https://via.placeholder.com/150/C7CEEA/ffffff?text=B',
+                        'https://via.placeholder.com/150/FFDAC1/ffffff?text=X',
+                        'https://via.placeholder.com/150/E2F0CB/ffffff?text=Y',
+                        'https://via.placeholder.com/150/D4A5A5/ffffff?text=C',
+                        'https://via.placeholder.com/150/9EC1CF/ffffff?text=D'
+                    ];
+                    const randomNames = ['吃瓜群众', '热心网友', '贴吧老哥', '路人甲', '潜水员', '网络冲浪员', '键盘侠', '吃瓜阿姨', '匿名用户'];
+                    
+                    if (!currentPost.tiebaComments) currentPost.tiebaComments = [];
+
+                    for (let i = 0; i < lines.length && i < numComments; i++) {
+                        let content = lines[i].replace(/^\d+[\.、]\s*/, '').trim();
+                        if (content) {
+                            content = content.replace(/^["「『]|["」』]$/g, '').trim();
+                            currentPost.tiebaComments.push({
+                                id: Date.now().toString() + '_' + i,
+                                name: randomNames[Math.floor(Math.random() * randomNames.length)] + Math.floor(Math.random() * 1000),
+                                avatar: randomAvatars[Math.floor(Math.random() * randomAvatars.length)],
+                                content: content,
+                                timestamp: Date.now() + i
+                            });
+                        }
+                    }
+                    
+                    currentPost.hasSimulatedComments = true;
+                    await new Promise(res => dbUpdate('tieba_posts', currentPost, res));
+                    
+                    if (currentTiebaPostId === currentPost.id) {
+                        renderTiebaCommentsList(currentPost);
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to simulate comments', e);
+            } finally {
+                if (currentTiebaPostId === post.id) {
+                    loadingEl.style.display = 'none';
+                }
+            }
+        }
+
+        function submitTiebaDetailComment() {
+            const input = document.getElementById('tieba-detail-comment-input');
+            const text = input.value.trim();
+            if (!text || !currentTiebaPostId) return;
+
+            dbGet('user_profile', 'main_user', profile => {
+                const myName = profile && profile.name ? profile.name : '我';
+                const myAvatar = profile && profile.avatar ? profile.avatar : 'https://via.placeholder.com/150/B5EAD7/ffffff?text=Me';
+
+                dbGet('tieba_posts', currentTiebaPostId, post => {
+                    if (post) {
+                        if (!post.tiebaComments) post.tiebaComments = [];
+                        post.tiebaComments.push({
+                            id: Date.now().toString(),
+                            name: myName,
+                            avatar: myAvatar,
+                            content: text,
+                            timestamp: Date.now()
+                        });
+                        
+                        dbUpdate('tieba_posts', post, () => {
+                            input.value = '';
+                            renderTiebaCommentsList(post);
+                            const page = document.getElementById('tieba-post-detail-page');
+                            const contentArea = page.querySelector('.tieba-content');
+                            if (contentArea) {
+                                setTimeout(() => {
+                                    contentArea.scrollTop = contentArea.scrollHeight;
+                                }, 50);
+                            }
+                        });
+                    }
+                });
+            });
         }
 
     // 检查并注册 Service Worker
@@ -20436,6 +20670,16 @@ ${historyText}`;
                 submitComment();
             }
         });
+
+        const tiebaDetailCommentInput = document.getElementById('tieba-detail-comment-input');
+        if (tiebaDetailCommentInput) {
+            tiebaDetailCommentInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    submitTiebaDetailComment();
+                }
+            });
+        }
 
         // 监听输入框焦点，在弹窗中时自动滚动以防被键盘遮挡
         document.addEventListener('focusin', (e) => {
