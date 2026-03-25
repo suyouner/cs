@@ -19293,7 +19293,7 @@ ${historyText}`;
             }
 
             // 2. Export IndexedDB
-            const stores = ['friends', 'chat_history', 'user_profile', 'ai_stickers', 'stickers', 'my_personas', 'discover_posts', 'tieba_posts'];
+            const stores = Array.from(db.objectStoreNames);
             
             try {
                 for (const storeName of stores) {
