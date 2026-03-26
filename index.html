@@ -20413,13 +20413,6 @@ ${historyText}`;
                 let aiResponseText = await callLLM(config, prompt, []);
                 if (aiResponseText) {
                     const lines = aiResponseText.split('\n').filter(l => l.trim() !== '');
-                    const randomAvatars = [
-                        'https://via.placeholder.com/150/FFB7B2/ffffff?text=U',
-                        'https://via.placeholder.com/150/B5EAD7/ffffff?text=A',
-                        'https://via.placeholder.com/150/C7CEEA/ffffff?text=B',
-                        'https://via.placeholder.com/150/FFDAC1/ffffff?text=X',
-                        'https://via.placeholder.com/150/E2F0CB/ffffff?text=Y',
-                    ];
                     const randomNames = ['匿名网友', '吃瓜群众', '路过的风', '贴吧老哥', '潜水员', '网络冲浪员'];
                     
                     let count = 0;
@@ -20431,7 +20424,7 @@ ${historyText}`;
                             const post = {
                                 id: Date.now().toString() + '_' + i,
                                 authorName: randomNames[Math.floor(Math.random() * randomNames.length)] + Math.floor(Math.random() * 1000),
-                                authorAvatar: randomAvatars[Math.floor(Math.random() * randomAvatars.length)],
+                                authorAvatar: 'https://q1.qlogo.cn/g?b=qq&nk=' + (Math.floor(Math.random() * 2900000000) + 100000000) + '&s=100',
                                 content: cleanContent,
                                 timestamp: Date.now() - i * 1000, // Slightly offset so they order properly
                                 isRolePost: false,
@@ -20699,15 +20692,6 @@ ${post.content}
                     if (!currentPost) return;
 
                     const lines = aiResponseText.split('\n').filter(l => l.trim() !== '');
-                    const randomAvatars = [
-                        'https://via.placeholder.com/150/FFB7B2/ffffff?text=U',
-                        'https://via.placeholder.com/150/B5EAD7/ffffff?text=A',
-                        'https://via.placeholder.com/150/C7CEEA/ffffff?text=B',
-                        'https://via.placeholder.com/150/FFDAC1/ffffff?text=X',
-                        'https://via.placeholder.com/150/E2F0CB/ffffff?text=Y',
-                        'https://via.placeholder.com/150/D4A5A5/ffffff?text=C',
-                        'https://via.placeholder.com/150/9EC1CF/ffffff?text=D'
-                    ];
                     const randomNames = ['吃瓜群众', '热心网友', '贴吧老哥', '路人甲', '潜水员', '网络冲浪员', '键盘侠', '吃瓜阿姨', '匿名用户'];
                     
                     if (!currentPost.tiebaComments) currentPost.tiebaComments = [];
@@ -20719,7 +20703,7 @@ ${post.content}
                             currentPost.tiebaComments.push({
                                 id: Date.now().toString() + '_' + i,
                                 name: randomNames[Math.floor(Math.random() * randomNames.length)] + Math.floor(Math.random() * 1000),
-                                avatar: randomAvatars[Math.floor(Math.random() * randomAvatars.length)],
+                                avatar: 'https://q1.qlogo.cn/g?b=qq&nk=' + (Math.floor(Math.random() * 2900000000) + 100000000) + '&s=100',
                                 content: content,
                                 timestamp: Date.now() + i,
                                 reposts: Math.floor(Math.random() * 5),
