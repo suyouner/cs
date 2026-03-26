@@ -19937,6 +19937,26 @@ ${historyText}`;
         }
 
         // --- Tieba Logic ---
+        function generateRealisticNetName() {
+            const prefixes = ['清风', '傲娇', '冰镇', '不想起', '沉迷', '打工', '发呆', '孤独', '海边', '捡漏', '快乐', '迷路', '南城', '偶尔', '胖胖', '咸鱼', '潜水', '失眠', '无聊', '野生', '一只', '有点', '在逃', '资深', '暴走', '文艺', '深夜', '狂野', '悲伤', '佛系', '过期', '二手', '月光', '迷之', '无敌', '超级', '躺平', '摸鱼', '熬夜', '脱发', '卑微', '心碎', '快乐的', '忧郁', '阳光', '社会'];
+            const cores = ['猫', '狗', '兔', '鱼', '哥', '青年', '少女', '大叔', '学生', '社畜', '阿宅', '萌新', '司机', '吃货', '胖纸', '鸽子', '土豆', '西瓜', '草莓', '橘子', '星辰', '月亮', '微风', '雨滴', '落叶', '雪花', '幽灵', '仙女', '少侠', '剑客', '法师', '勇者', '废物', '天才', '戏精', '打工人', '程序猿', '设计狮', '单身狗', '干饭人', '冲浪选手', '网友', '过客'];
+            const suffixes = ['ovo', 'QAQ', 'qwq', '~', '酱', '君', '大人', '同学', '老师', '老板', '哥', '姐', '仔', '球', '子', '吖', '呀', '惹', '呢', '哦', '哈', '的日常', '日记', '回忆录', 'bot', '在线', '不在线'];
+            
+            const rand = (arr) => arr[Math.floor(Math.random() * arr.length)];
+            const type = Math.random();
+            
+            if (type < 0.4) {
+                return rand(prefixes) + rand(cores);
+            } else if (type < 0.7) {
+                return rand(cores) + rand(suffixes);
+            } else if (type < 0.9) {
+                return rand(prefixes) + rand(cores) + rand(suffixes);
+            } else {
+                const abstractWords = ['逝去', '惘然', '羁绊', '空城', '旧梦', '浅笑', '初夏', '微凉', '暮雪', '千山', '孤影', '残月', '流年', '岁月', '花开', '叶落', '浮生', '清欢', '浅秋', '半夏'];
+                return rand(abstractWords) + (Math.random() < 0.5 ? rand(suffixes) : '');
+            }
+        }
+
         function openTiebaSidebar() {
             const overlay = document.getElementById('tieba-sidebar-overlay');
             overlay.style.display = 'block';
@@ -20413,7 +20433,6 @@ ${historyText}`;
                 let aiResponseText = await callLLM(config, prompt, []);
                 if (aiResponseText) {
                     const lines = aiResponseText.split('\n').filter(l => l.trim() !== '');
-                    const randomNames = ['匿名网友', '吃瓜群众', '路过的风', '贴吧老哥', '潜水员', '网络冲浪员'];
                     
                     let count = 0;
                     for (let i = 0; i < lines.length; i++) {
@@ -20423,7 +20442,7 @@ ${historyText}`;
                         if (cleanContent) {
                             const post = {
                                 id: Date.now().toString() + '_' + i,
-                                authorName: randomNames[Math.floor(Math.random() * randomNames.length)] + Math.floor(Math.random() * 1000),
+                                authorName: generateRealisticNetName(),
                                 authorAvatar: 'https://q1.qlogo.cn/g?b=qq&nk=' + (Math.floor(Math.random() * 2900000000) + 100000000) + '&s=100',
                                 content: cleanContent,
                                 timestamp: Date.now() - i * 1000, // Slightly offset so they order properly
@@ -20692,7 +20711,6 @@ ${post.content}
                     if (!currentPost) return;
 
                     const lines = aiResponseText.split('\n').filter(l => l.trim() !== '');
-                    const randomNames = ['吃瓜群众', '热心网友', '贴吧老哥', '路人甲', '潜水员', '网络冲浪员', '键盘侠', '吃瓜阿姨', '匿名用户'];
                     
                     if (!currentPost.tiebaComments) currentPost.tiebaComments = [];
 
@@ -20702,7 +20720,7 @@ ${post.content}
                             content = content.replace(/^["「『]|["」』]$/g, '').trim();
                             currentPost.tiebaComments.push({
                                 id: Date.now().toString() + '_' + i,
-                                name: randomNames[Math.floor(Math.random() * randomNames.length)] + Math.floor(Math.random() * 1000),
+                                name: generateRealisticNetName(),
                                 avatar: 'https://q1.qlogo.cn/g?b=qq&nk=' + (Math.floor(Math.random() * 2900000000) + 100000000) + '&s=100',
                                 content: content,
                                 timestamp: Date.now() + i,
