@@ -19955,13 +19955,18 @@ ${historyText}`;
         }
 
         // --- Tieba Logic ---
-        async function getRealisticAvatar(retryCount = 0) {
+        async function getRealisticAvatar(usedAvatars, retryCount = 0) {
             if (retryCount > 10) {
                 // Fallback after too many retries
                 return 'https://q1.qlogo.cn/g?b=qq&nk=10001&s=100';
             }
             
-            const qq = Math.floor(Math.random() * (3999999999 - 3800000000 + 1)) + 3800000000;
+            let qq;
+            do {
+                qq = Math.floor(Math.random() * (3999999999 - 2000000000 + 1)) + 2000000000;
+            } while (usedAvatars.has(qq));
+            usedAvatars.add(qq);
+            
             const avatarUrl = `https://q1.qlogo.cn/g?b=qq&nk=${qq}&s=100`;
 
             try {
@@ -19970,12 +19975,14 @@ ${historyText}`;
                 
                 // Default QQ avatars are very small (e.g., < 2KB). A real avatar is usually larger.
                 if (blob.size < 2000) {
-                    return await getRealisticAvatar(retryCount + 1); // Retry
+                    usedAvatars.delete(qq);
+                    return await getRealisticAvatar(usedAvatars, retryCount + 1); // Retry
                 }
                 return avatarUrl;
             } catch (error) {
                 console.error('Avatar fetch error, retrying:', error);
-                return await getRealisticAvatar(retryCount + 1); // Retry on error
+                usedAvatars.delete(qq);
+                return await getRealisticAvatar(usedAvatars, retryCount + 1); // Retry on error
             }
         }
 
@@ -20477,12 +20484,13 @@ ${historyText}`;
                     const lines = aiResponseText.split('\n').filter(l => l.trim() !== '');
                     
                     let count = 0;
+                    const usedAvatars = new Set();
                     for (let i = 0; i < lines.length; i++) {
                         const content = lines[i].trim();
                         // remove leading numbers if any
                         const cleanContent = content.replace(/^\d+[\.、]\s*/, '');
                         if (cleanContent) {
-                            const avatar = await getRealisticAvatar();
+                            const avatar = await getRealisticAvatar(usedAvatars);
                             const post = {
                                 id: Date.now().toString() + '_' + i,
                                 authorName: generateRealisticNetName(),
@@ -20757,11 +20765,12 @@ ${post.content}
                     
                     if (!currentPost.tiebaComments) currentPost.tiebaComments = [];
 
+                    const usedAvatars = new Set();
                     for (let i = 0; i < lines.length && i < numComments; i++) {
                         let content = lines[i].replace(/^\d+[\.、]\s*/, '').trim();
                         if (content) {
                             content = content.replace(/^["「『]|["」』]$/g, '').trim();
-                            const avatar = await getRealisticAvatar();
+                            const avatar = await getRealisticAvatar(usedAvatars);
                             currentPost.tiebaComments.push({
                                 id: Date.now().toString() + '_' + i,
                                 name: generateRealisticNetName(),
