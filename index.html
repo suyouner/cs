@@ -15070,7 +15070,33 @@
                     const errText = await response.text();
                     throw new Error(`Proxy Error: ${response.status} ${errText}`);
                 }
-                const data = await response.json();
+                
+                const responseText = await response.text();
+                let data;
+                try {
+                    data = JSON.parse(responseText);
+                } catch (e) {
+                    // Try to handle SSE format "data: {...}" returned by some proxies even when not streaming
+                    const match = responseText.match(/data:\s*({.*})/);
+                    if (match) {
+                        try {
+                            data = JSON.parse(match[1]);
+                        } catch (e2) {
+                            throw new Error(`JSON Parse Error: ${responseText.substring(0, 50)}...`);
+                        }
+                    } else {
+                        throw new Error(`JSON Parse Error: ${responseText.substring(0, 50)}...`);
+                    }
+                }
+
+                if (data.error) {
+                    throw new Error(`API Error: ${data.error.message || JSON.stringify(data.error)}`);
+                }
+
+                if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+                    throw new Error(`Unexpected API Response: ${JSON.stringify(data).substring(0, 100)}`);
+                }
+
                 return data.choices[0].message.content;
             }
         }
