@@ -20461,7 +20461,7 @@ ${historyText}`;
                             const post = {
                                 id: Date.now().toString() + '_' + i,
                                 authorName: generateRealisticNetName(),
-                                authorAvatar: 'https://q1.qlogo.cn/g?b=qq&nk=' + (Math.floor(Math.random() * 2900000000) + 100000000) + '&s=100',
+                                authorAvatar: 'https://q1.qlogo.cn/g?b=qq&nk=' + (Math.floor(Math.random() * (3999999999 - 2000000000 + 1)) + 2000000000) + '&s=100',
                                 content: cleanContent,
                                 timestamp: Date.now() - i * 1000, // Slightly offset so they order properly
                                 isRolePost: false,
@@ -20739,7 +20739,7 @@ ${post.content}
                             currentPost.tiebaComments.push({
                                 id: Date.now().toString() + '_' + i,
                                 name: generateRealisticNetName(),
-                                avatar: 'https://q1.qlogo.cn/g?b=qq&nk=' + (Math.floor(Math.random() * 2900000000) + 100000000) + '&s=100',
+                                avatar: 'https://q1.qlogo.cn/g?b=qq&nk=' + (Math.floor(Math.random() * (3999999999 - 2000000000 + 1)) + 2000000000) + '&s=100',
                                 content: content,
                                 timestamp: Date.now() + i,
                                 reposts: Math.floor(Math.random() * 5),
