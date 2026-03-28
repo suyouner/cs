@@ -7138,6 +7138,9 @@
             if (friend && friend[key] !== undefined && friend[key] !== null) {
                 return friend[key];
             }
+            if (themeSettings[key] !== undefined && themeSettings[key] !== null) {
+                return themeSettings[key];
+            }
             const globalVal = localStorage.getItem(key);
             if (globalVal !== null) return globalVal;
             return defaultVal;
@@ -7451,11 +7454,17 @@
                     }
                 });
             } else {
+                const promises = [];
                 for (const key in tempBubbleSettings) {
-                    localStorage.setItem(key, tempBubbleSettings[key]);
+                    promises.push(dbSaveSetting(key, tempBubbleSettings[key]));
+                    localStorage.removeItem(key);
                 }
-                tempBubbleSettings = {}; // Clear temp after save
-                showToast('已保存气泡全局设置');
+                Promise.all(promises).then(() => {
+                    tempBubbleSettings = {}; // Clear temp after save
+                    showToast('已保存气泡全局设置');
+                }).catch(e => {
+                    showToast('保存失败，可能是存储空间不足');
+                });
             }
         }
         
@@ -7725,9 +7734,17 @@
                 }
                 keysToRemove.forEach(k => localStorage.removeItem(k));
                 
-                updateBubbleThemePreview();
-                loadCornerSettings();
-                showToast('全局设置已恢复默认');
+                const promises = [];
+                for (const k in themeSettings) {
+                    if (k.startsWith('bubble_') && !k.startsWith('bubble_preset_')) {
+                        promises.push(dbDeleteSetting(k));
+                    }
+                }
+                Promise.all(promises).then(() => {
+                    updateBubbleThemePreview();
+                    loadCornerSettings();
+                    showToast('全局设置已恢复默认');
+                });
             }
         }
 
@@ -19512,10 +19529,22 @@ ${historyText}`;
                         if (data.localStorage) {
                             localStorage.clear();
                             for (const key in data.localStorage) {
-                                try {
-                                    localStorage.setItem(key, data.localStorage[key]);
-                                } catch (e) {
-                                    console.warn(`Failed to set localStorage item ${key}:`, e);
+                                const value = data.localStorage[key];
+                                if (value && typeof value === 'string' && value.length > 50000 && value.startsWith('data:image')) {
+                                    if (!data.indexedDB) data.indexedDB = {};
+                                    if (!data.indexedDB['theme_settings']) data.indexedDB['theme_settings'] = [];
+                                    data.indexedDB['theme_settings'] = data.indexedDB['theme_settings'].filter(item => item.id !== key);
+                                    data.indexedDB['theme_settings'].push({ id: key, value: value });
+                                } else {
+                                    try {
+                                        localStorage.setItem(key, value);
+                                    } catch (e) {
+                                        console.warn(`Failed to set localStorage item ${key}:`, e);
+                                        if (!data.indexedDB) data.indexedDB = {};
+                                        if (!data.indexedDB['theme_settings']) data.indexedDB['theme_settings'] = [];
+                                        data.indexedDB['theme_settings'] = data.indexedDB['theme_settings'].filter(item => item.id !== key);
+                                        data.indexedDB['theme_settings'].push({ id: key, value: value });
+                                    }
                                 }
                             }
                         }
@@ -19537,7 +19566,7 @@ ${historyText}`;
 
                                     // Add new items in chunks to prevent iOS Safari transaction aborts
                                     if (items && items.length > 0) {
-                                        const chunkSize = 200;
+                                        const chunkSize = 20; // 降低分块大小以防大量图片导致的单次事务过大
                                         for (let i = 0; i < items.length; i += chunkSize) {
                                             const chunk = items.slice(i, i + chunkSize);
                                             await new Promise((resolve, reject) => {
