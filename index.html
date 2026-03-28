@@ -19957,8 +19957,9 @@ ${historyText}`;
         // --- Tieba Logic ---
         async function getRealisticAvatar(usedAvatars, retryCount = 0) {
             if (retryCount > 10) {
-                // Fallback after too many retries
-                return 'https://q1.qlogo.cn/g?b=qq&nk=10001&s=100';
+                // Fallback after too many retries: generate a random one in the desired range and return it directly.
+                const fallbackQq = Math.floor(Math.random() * (3999999999 - 2000000000 + 1)) + 2000000000;
+                return `https://q1.qlogo.cn/g?b=qq&nk=${fallbackQq}&s=100`;
             }
             
             let qq;
@@ -19980,9 +19981,11 @@ ${historyText}`;
                 }
                 return avatarUrl;
             } catch (error) {
-                console.error('Avatar fetch error, retrying:', error);
-                usedAvatars.delete(qq);
-                return await getRealisticAvatar(usedAvatars, retryCount + 1); // Retry on error
+                 // If fetching fails (e.g., CORS, network error), don't retry.
+                 // Directly return a URL from the desired range to avoid getting stuck on the default fallback.
+                console.error('Avatar fetch error, using direct URL as fallback:', error);
+                const fallbackQq = Math.floor(Math.random() * (3999999999 - 2000000000 + 1)) + 2000000000;
+                return `https://q1.qlogo.cn/g?b=qq&nk=${fallbackQq}&s=100`;
             }
         }
 
