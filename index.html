@@ -20914,11 +20914,11 @@ ${post.content}
 
     function replaceTiebaAvatars() {
         // Select all potential avatar images in the Tieba sections
-        const avatarImages = document.querySelectorAll('.tieba-post-card img, .tieba-comment-avatar');
+        const avatarImages = document.querySelectorAll('.tieba-post-card img, #tieba-detail-post-container img, .tieba-comment-avatar');
         
         avatarImages.forEach(img => {
-            // Check if the image has already been replaced (by checking for a custom attribute)
-            if (img.dataset.avatarReplaced) {
+            // Check if this element is an actual image and not already replaced
+            if (img.tagName.toLowerCase() !== 'img') {
                 return;
             }
 
