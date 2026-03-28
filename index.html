@@ -20914,7 +20914,7 @@ ${post.content}
 
     function replaceTiebaAvatars() {
         // Select all potential avatar images in the Tieba sections
-        const avatarImages = document.querySelectorAll('.tieba-post-card img, #tieba-detail-post-container img, .tieba-comment-avatar');
+        const avatarImages = document.querySelectorAll('.tieba-post-card img, #tieba-detail-post-container img, #tieba-detail-comments-list img');
         
         avatarImages.forEach(img => {
             // Check if this element is an actual image and not already replaced
