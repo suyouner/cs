@@ -13787,6 +13787,15 @@
 
                             // 记忆互通
                             if (friend.memoryInterop && (friend.memoryInteropRoles || []).includes(member.id)) {
+                                // 注入长期记忆
+                                if (member.memories && member.memories.length > 0) {
+                                    systemPrompt += `[${member.name} 的长期记忆（记忆互通）]：\n`;
+                                    member.memories.forEach((mem, index) => {
+                                        systemPrompt += `${index + 1}. ${mem.content}\n`;
+                                    });
+                                    systemPrompt += `\n`;
+                                }
+
                                 const personalHistory = await new Promise(res => {
                                     const tx = db.transaction(['chat_history'], 'readonly');
                                     const store = tx.objectStore('chat_history');
