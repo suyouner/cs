@@ -19955,6 +19955,30 @@ ${historyText}`;
         }
 
         // --- Tieba Logic ---
+        async function getRealisticAvatar(retryCount = 0) {
+            if (retryCount > 10) {
+                // Fallback after too many retries
+                return 'https://q1.qlogo.cn/g?b=qq&nk=10001&s=100';
+            }
+            
+            const qq = Math.floor(Math.random() * (3999999999 - 3800000000 + 1)) + 3800000000;
+            const avatarUrl = `https://q1.qlogo.cn/g?b=qq&nk=${qq}&s=100`;
+
+            try {
+                const response = await fetch(avatarUrl);
+                const blob = await response.blob();
+                
+                // Default QQ avatars are very small (e.g., < 2KB). A real avatar is usually larger.
+                if (blob.size < 2000) {
+                    return await getRealisticAvatar(retryCount + 1); // Retry
+                }
+                return avatarUrl;
+            } catch (error) {
+                console.error('Avatar fetch error, retrying:', error);
+                return await getRealisticAvatar(retryCount + 1); // Retry on error
+            }
+        }
+
         function generateRealisticNetName() {
             const prefixes = ['清风', '傲娇', '冰镇', '不想起', '沉迷', '打工', '发呆', '孤独', '海边', '捡漏', '快乐', '迷路', '南城', '偶尔', '胖胖', '咸鱼', '潜水', '失眠', '无聊', '野生', '一只', '有点', '在逃', '资深', '暴走', '文艺', '深夜', '狂野', '悲伤', '佛系', '过期', '二手', '月光', '迷之', '无敌', '超级', '躺平', '摸鱼', '熬夜', '脱发', '卑微', '心碎', '快乐的', '忧郁', '阳光', '社会'];
             const cores = ['猫', '狗', '兔', '鱼', '哥', '青年', '少女', '大叔', '学生', '社畜', '阿宅', '萌新', '司机', '吃货', '胖纸', '鸽子', '土豆', '西瓜', '草莓', '橘子', '星辰', '月亮', '微风', '雨滴', '落叶', '雪花', '幽灵', '仙女', '少侠', '剑客', '法师', '勇者', '废物', '天才', '戏精', '打工人', '程序猿', '设计狮', '单身狗', '干饭人', '冲浪选手', '网友', '过客'];
@@ -20458,10 +20482,11 @@ ${historyText}`;
                         // remove leading numbers if any
                         const cleanContent = content.replace(/^\d+[\.、]\s*/, '');
                         if (cleanContent) {
+                            const avatar = await getRealisticAvatar();
                             const post = {
                                 id: Date.now().toString() + '_' + i,
                                 authorName: generateRealisticNetName(),
-                                authorAvatar: 'https://q1.qlogo.cn/g?b=qq&nk=' + (Math.floor(Math.random() * (3999999999 - 2000000000 + 1)) + 2000000000) + '&s=100',
+                                authorAvatar: avatar,
                                 content: cleanContent,
                                 timestamp: Date.now() - i * 1000, // Slightly offset so they order properly
                                 isRolePost: false,
@@ -20736,10 +20761,11 @@ ${post.content}
                         let content = lines[i].replace(/^\d+[\.、]\s*/, '').trim();
                         if (content) {
                             content = content.replace(/^["「『]|["」』]$/g, '').trim();
+                            const avatar = await getRealisticAvatar();
                             currentPost.tiebaComments.push({
                                 id: Date.now().toString() + '_' + i,
                                 name: generateRealisticNetName(),
-                                avatar: 'https://q1.qlogo.cn/g?b=qq&nk=' + (Math.floor(Math.random() * (3999999999 - 2000000000 + 1)) + 2000000000) + '&s=100',
+                                avatar: avatar,
                                 content: content,
                                 timestamp: Date.now() + i,
                                 reposts: Math.floor(Math.random() * 5),
